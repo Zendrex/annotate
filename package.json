@@ -1,0 +1,63 @@
+{
+	"name": "@zendrex/annotate",
+	"version": "0.1.0",
+	"description": "A modern decorator and metadata system for TypeScript with built-in reflection.",
+	"author": "zendrex",
+	"license": "MIT",
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"import": {
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.js"
+			},
+			"require": {
+				"types": "./dist/index.d.ts",
+				"default": "./dist/index.cjs"
+			}
+		}
+	},
+	"scripts": {
+		"build": "bun run scripts/build.ts",
+		"check": "bunx --bun biome check",
+		"fix": "bunx --bun biome lint --write && bunx --bun biome format --write",
+		"prepare": "husky"
+	},
+	"dependencies": {},
+	"devDependencies": {
+		"@biomejs/biome": "2.3.10",
+		"@types/bun": "latest",
+		"bun-plugin-dts": "^0.3.0",
+		"husky": "^9.1.7",
+		"lint-staged": "^16.2.7",
+		"reflect-metadata": "^0.2.2"
+	},
+	"peerDependencies": {
+		"reflect-metadata": "^0.2.2",
+		"typescript": "^5.9.3"
+	},
+	"lint-staged": {
+		"*.{js,ts,cjs,mjs,d.cts,d.mts,jsx,tsx,json,jsonc}": [
+			"bun run fix"
+		]
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/zendrex/annotate.git"
+	},
+	"bugs": {
+		"url": "https://github.com/zendrex/annotate/issues"
+	},
+	"homepage": "https://github.com/zendrex/annotate#readme",
+	"keywords": [
+		"typescript",
+		"decorators",
+		"metadata",
+		"reflection",
+		"annotation",
+		"interceptor"
+	]
+}
