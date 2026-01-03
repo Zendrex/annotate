@@ -1,4 +1,3 @@
-import { getMetadataArray, getParameterMap } from "./metadata";
 import type {
 	AnyConstructor,
 	DecoratedClass,
@@ -9,6 +8,8 @@ import type {
 	MetadataKey,
 	ScopedReflector,
 } from "./types";
+
+import { getMetadataArray, getParameterMap } from "./metadata";
 
 /**
  * Provides reflection over decorator metadata attached to a class.
