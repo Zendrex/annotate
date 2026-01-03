@@ -28,7 +28,7 @@
 	},
 	"dependencies": {},
 	"devDependencies": {
-		"@biomejs/biome": "2.3.10",
+		"@biomejs/biome": "2.3.11",
 		"@types/bun": "latest",
 		"bun-plugin-dts": "^0.3.0",
 		"husky": "^9.1.7",
