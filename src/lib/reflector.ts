@@ -29,12 +29,16 @@ export class Reflector {
 		this.proto = target.prototype;
 	}
 
-	/** Get all decorated items for a metadata key. */
+	/**
+	 * Get all decorated items for a metadata key.
+	 */
 	all<T>(key: MetadataKey): DecoratedItem<T>[] {
 		return [...this.class<T>(key), ...this.methods<T>(key), ...this.properties<T>(key), ...this.parameters<T>(key)];
 	}
 
-	/** Get class-level metadata. */
+	/**
+	 * Get class-level metadata.
+	 */
 	class<T>(key: MetadataKey): DecoratedClass<T>[] {
 		const metadata = getMetadataArray<T>(key, this.ctor);
 		if (metadata.length === 0) {
@@ -44,7 +48,9 @@ export class Reflector {
 		return [{ kind: "class", name: "constructor", metadata, target: this.ctor }];
 	}
 
-	/** Get method metadata (instance and static). Walks prototype chain for inheritance. */
+	/**
+	 * Get method metadata (instance and static). Walks prototype chain for inheritance.
+	 */
 	methods<T>(key: MetadataKey): DecoratedMethod<T>[] {
 		const results: DecoratedMethod<T>[] = [];
 		const seen = new Set<string | symbol>();
@@ -83,7 +89,9 @@ export class Reflector {
 		return results;
 	}
 
-	/** Get property metadata (instance and static). Walks prototype chain for inheritance. */
+	/**
+	 * Get property metadata (instance and static). Walks prototype chain for inheritance.
+	 */
 	properties<T>(key: MetadataKey): DecoratedProperty<T>[] {
 		const results: DecoratedProperty<T>[] = [];
 		const seen = new Set<string | symbol>();
@@ -122,7 +130,9 @@ export class Reflector {
 		return results;
 	}
 
-	/** Get parameter metadata (constructor and method parameters). */
+	/**
+	 * Get parameter metadata (constructor and method parameters).
+	 */
 	parameters<T>(key: MetadataKey): DecoratedParameter<T>[] {
 		const results: DecoratedParameter<T>[] = [];
 
@@ -187,7 +197,9 @@ export class Reflector {
 		return results;
 	}
 
-	/** Get own keys from a single object (no prototype chain). */
+	/**
+	 * Get own keys from a single object (no prototype chain).
+	 */
 	private getOwnKeys(target: object): (string | symbol)[] {
 		return [...Object.getOwnPropertyNames(target), ...Object.getOwnPropertySymbols(target)].filter(
 			(k) => k !== "constructor" && k !== "prototype",
@@ -220,10 +232,6 @@ export function reflect(target: AnyConstructor): Reflector {
 	return new Reflector(target);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Scoped Reflector
-// ─────────────────────────────────────────────────────────────────────────────
-
 /**
  * A reflector pre-bound to a specific metadata key.
  * Provides the same API as Reflector but without needing to pass the key to each method.
@@ -241,27 +249,37 @@ class ScopedReflectorImpl<TMeta> implements ScopedReflector<TMeta> {
 		this.key = key;
 	}
 
-	/** Get all decorated items for this key. */
+	/**
+	 * Get all decorated items for this key.
+	 */
 	all(): DecoratedItem<TMeta>[] {
 		return this.reflector.all<TMeta>(this.key);
 	}
 
-	/** Get class-level metadata. */
+	/**
+	 * Get class-level metadata.
+	 */
 	class(): DecoratedClass<TMeta>[] {
 		return this.reflector.class<TMeta>(this.key);
 	}
 
-	/** Get method metadata (instance + static). */
+	/**
+	 * Get method metadata (instance + static).
+	 */
 	methods(): DecoratedMethod<TMeta>[] {
 		return this.reflector.methods<TMeta>(this.key);
 	}
 
-	/** Get property metadata (instance + static). */
+	/**
+	 * Get property metadata (instance + static).
+	 */
 	properties(): DecoratedProperty<TMeta>[] {
 		return this.reflector.properties<TMeta>(this.key);
 	}
 
-	/** Get parameter metadata (constructor + methods). */
+	/**
+	 * Get parameter metadata (constructor + methods).
+	 */
 	parameters(): DecoratedParameter<TMeta>[] {
 		return this.reflector.parameters<TMeta>(this.key);
 	}

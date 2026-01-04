@@ -15,22 +15,22 @@ import type {
 import { appendMetadata, getMetadataArray, getParameterMap, setParameterMap } from "./metadata";
 import { createScopedReflector } from "./reflector";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
-
 function compose<TMeta, TArgs extends unknown[]>(args: TArgs, fn?: (...a: TArgs) => TMeta): TMeta {
 	return fn ? fn(...args) : (args[0] as TMeta);
 }
 
-/** Generate a unique symbol key. */
+/**
+ * Generate a unique symbol key.
+ */
 let keyCounter = 0;
 function generateKey(): MetadataKey {
 	keyCounter += 1;
 	return Symbol(`decorator:${keyCounter}`);
 }
 
-/** Ensure a property key exists on the target so reflection can find it. */
+/**
+ * Ensure a property key exists on the target so reflection can find it.
+ */
 function ensureProperty(target: object, key: string | symbol): void {
 	if (Object.hasOwn(target, key)) {
 		return;
@@ -77,10 +77,6 @@ function toAccessor(target: object, key: string | symbol): PropertyDescriptor {
 	return accessor;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Class Decorator
-// ─────────────────────────────────────────────────────────────────────────────
-
 /**
  * Creates a class decorator factory that stores metadata on the class.
  *
@@ -114,10 +110,6 @@ export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
 		class: (target: AnyConstructor) => createScopedReflector<TMeta>(target, key).class(),
 	}) as DecoratedClassFactory<TMeta, TArgs>;
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Method Decorator
-// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Creates a method decorator factory that stores metadata per method.
@@ -155,10 +147,6 @@ export function createMethodDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
 	}) as DecoratedMethodFactory<TMeta, TArgs>;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Property Decorator
-// ─────────────────────────────────────────────────────────────────────────────
-
 /**
  * Creates a property decorator factory that stores metadata on fields.
  *
@@ -195,10 +183,6 @@ export function createPropertyDecorator<TMeta, TArgs extends unknown[] = [TMeta]
 		properties: (target: AnyConstructor) => createScopedReflector<TMeta>(target, key).properties(),
 	}) as DecoratedPropertyFactory<TMeta, TArgs>;
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Parameter Decorator
-// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Creates a parameter decorator factory that stores metadata per parameter.
@@ -238,10 +222,6 @@ export function createParameterDecorator<TMeta, TArgs extends unknown[] = [TMeta
 		parameters: (target: AnyConstructor) => createScopedReflector<TMeta>(target, key).parameters(),
 	}) as DecoratedParameterFactory<TMeta, TArgs>;
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Method Interceptor
-// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Creates a method decorator that wraps the original method.
@@ -295,10 +275,6 @@ export function createMethodInterceptor<TMeta, TArgs extends unknown[] = [TMeta]
 		methods: (target: AnyConstructor) => createScopedReflector<TMeta>(target, key).methods(),
 	}) as DecoratedMethodFactory<TMeta, TArgs>;
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Property Interceptor
-// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Creates a property decorator that intercepts get/set operations.

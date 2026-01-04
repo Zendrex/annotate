@@ -1,4 +1,6 @@
-/** biome-ignore-all lint/performance/noBarrelFile: barrel file */
+/**
+ * biome-ignore-all lint/performance/noBarrelFile: barrel file
+ */
 import "reflect-metadata";
 
 export type {
