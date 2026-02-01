@@ -33,8 +33,7 @@
 		"fix": "bunx --bun biome lint --write && bunx --bun biome format --write",
 		"prepare": "husky",
 		"changeset": "changeset",
-		"version": "changeset version",
-		"release": "bun run build && changeset publish"
+		"version": "changeset version"
 	},
 	"dependencies": {},
 	"devDependencies": {
