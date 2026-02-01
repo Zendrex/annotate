@@ -80,18 +80,41 @@ function toAccessor(target: object, key: string | symbol): PropertyDescriptor {
 /**
  * Creates a class decorator factory that stores metadata on the class.
  *
- * @example
- * // Simple - direct metadata
- * const Tag = createClassDecorator<string>();
+ * This factory generates decorators for marking classes with typed metadata.
+ * The returned factory function creates decorators that can be applied to
+ * class declarations. Metadata is stored using `reflect-metadata` and can
+ * be retrieved via the attached reflection methods or the global {@link Reflector}.
  *
- * // Compose - inferred types from function args
- * const Role = createClassDecorator((name: string, level: number) => ({ name, level }));
+ * @typeParam TMeta - The type of metadata stored by the decorator
+ * @typeParam TArgs - The argument types accepted by the decorator factory (defaults to `[TMeta]`)
+ *
+ * @param composeFn - Optional function to compose decorator arguments into metadata.
+ *   If not provided, the first argument is used as the metadata value directly.
+ *
+ * @returns A {@link DecoratedClassFactory} that creates class decorators and provides
+ *   reflection methods (`reflect`, `class`, `key`) for querying decorated classes.
+ *
+ * @see {@link DecoratedClassFactory}
+ * @see {@link ScopedReflector}
+ *
+ * @example
+ * ```typescript
+ * // Simple - direct metadata (first argument becomes metadata)
+ * const Tag = createClassDecorator<string>();
  *
  * @Tag("admin")
  * class AdminController {}
  *
- * // Reflection
+ * // Compose - transform multiple arguments into structured metadata
+ * const Role = createClassDecorator((name: string, level: number) => ({ name, level }));
+ *
+ * @Role("moderator", 5)
+ * class ModeratorController {}
+ *
+ * // Reflection - query decorated classes
  * const tags = Tag.class(AdminController);
+ * // => [{ kind: "class", name: "AdminController", metadata: ["admin"], target: AdminController }]
+ * ```
  */
 export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
 	composeFn?: (...args: TArgs) => TMeta,
@@ -114,11 +137,34 @@ export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
 /**
  * Creates a method decorator factory that stores metadata per method.
  *
+ * This factory generates decorators for annotating methods with typed metadata.
+ * The returned factory function creates decorators that can be applied to both
+ * instance and static methods. Metadata is stored using `reflect-metadata` and
+ * can be retrieved via the attached reflection methods or the global {@link Reflector}.
+ *
+ * @typeParam TMeta - The type of metadata stored by the decorator
+ * @typeParam TArgs - The argument types accepted by the decorator factory (defaults to `[TMeta]`)
+ *
+ * @param composeFn - Optional function to compose decorator arguments into metadata.
+ *   If not provided, the first argument is used as the metadata value directly.
+ *
+ * @returns A {@link DecoratedMethodFactory} that creates method decorators and provides
+ *   reflection methods (`reflect`, `methods`, `key`) for querying decorated methods.
+ *
+ * @see {@link DecoratedMethodFactory}
+ * @see {@link ScopedReflector}
+ *
  * @example
- * // Simple - direct metadata
+ * ```typescript
+ * // Simple - direct metadata (first argument becomes metadata)
  * const Route = createMethodDecorator<string>();
  *
- * // Compose - inferred types from function args
+ * class Api {
+ *   @Route("/users")
+ *   getUsers() {}
+ * }
+ *
+ * // Compose - transform multiple arguments into structured metadata
  * const Route = createMethodDecorator((path: string, method: "GET" | "POST") => ({ path, method }));
  *
  * class Api {
@@ -126,8 +172,10 @@ export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
  *   getUsers() {}
  * }
  *
- * // Reflection
+ * // Reflection - query decorated methods
  * const routes = Route.methods(Api);
+ * // => [{ kind: "method", name: "getUsers", metadata: [{ path: "/users", method: "GET" }], target: fn }]
+ * ```
  */
 export function createMethodDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
 	composeFn?: (...args: TArgs) => TMeta,
@@ -150,11 +198,35 @@ export function createMethodDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
 /**
  * Creates a property decorator factory that stores metadata on fields.
  *
+ * This factory generates decorators for annotating class properties with typed metadata.
+ * The returned factory function creates decorators that can be applied to both instance
+ * and static properties. Properties are ensured to exist on the prototype for reflection
+ * discovery. Metadata is stored using `reflect-metadata` and can be retrieved via the
+ * attached reflection methods or the global {@link Reflector}.
+ *
+ * @typeParam TMeta - The type of metadata stored by the decorator
+ * @typeParam TArgs - The argument types accepted by the decorator factory (defaults to `[TMeta]`)
+ *
+ * @param composeFn - Optional function to compose decorator arguments into metadata.
+ *   If not provided, the first argument is used as the metadata value directly.
+ *
+ * @returns A {@link DecoratedPropertyFactory} that creates property decorators and provides
+ *   reflection methods (`reflect`, `properties`, `key`) for querying decorated properties.
+ *
+ * @see {@link DecoratedPropertyFactory}
+ * @see {@link ScopedReflector}
+ *
  * @example
- * // Simple - direct metadata
+ * ```typescript
+ * // Simple - direct metadata (first argument becomes metadata)
  * const Column = createPropertyDecorator<string>();
  *
- * // Compose - inferred types from function args
+ * class User {
+ *   @Column("varchar")
+ *   name!: string;
+ * }
+ *
+ * // Compose - transform multiple arguments into structured metadata
  * const Column = createPropertyDecorator((type: string, nullable: boolean) => ({ type, nullable }));
  *
  * class User {
@@ -162,8 +234,10 @@ export function createMethodDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
  *   name!: string;
  * }
  *
- * // Reflection
+ * // Reflection - query decorated properties
  * const columns = Column.properties(User);
+ * // => [{ kind: "property", name: "name", metadata: [{ type: "varchar", nullable: false }] }]
+ * ```
  */
 export function createPropertyDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
 	composeFn?: (...args: TArgs) => TMeta,
@@ -187,19 +261,45 @@ export function createPropertyDecorator<TMeta, TArgs extends unknown[] = [TMeta]
 /**
  * Creates a parameter decorator factory that stores metadata per parameter.
  *
+ * This factory generates decorators for annotating constructor and method parameters
+ * with typed metadata. The returned factory function creates decorators that track
+ * the parameter index and store metadata keyed by that index. Multiple decorators
+ * on the same parameter accumulate their metadata in application order. Metadata
+ * is stored using `reflect-metadata` and can be retrieved via the attached reflection
+ * methods or the global {@link Reflector}.
+ *
+ * @typeParam TMeta - The type of metadata stored by the decorator
+ * @typeParam TArgs - The argument types accepted by the decorator factory (defaults to `[TMeta]`)
+ *
+ * @param composeFn - Optional function to compose decorator arguments into metadata.
+ *   If not provided, the first argument is used as the metadata value directly.
+ *
+ * @returns A {@link DecoratedParameterFactory} that creates parameter decorators and provides
+ *   reflection methods (`reflect`, `parameters`, `key`) for querying decorated parameters.
+ *
+ * @see {@link DecoratedParameterFactory}
+ * @see {@link ScopedReflector}
+ *
  * @example
- * // Simple - direct metadata
+ * ```typescript
+ * // Simple - direct metadata (first argument becomes metadata)
  * const Inject = createParameterDecorator<string>();
  *
- * // Compose - inferred types from function args
+ * class Service {
+ *   constructor(@Inject("db") db: Database) {}
+ * }
+ *
+ * // Compose - transform multiple arguments into structured metadata
  * const Inject = createParameterDecorator((token: string, optional: boolean) => ({ token, optional }));
  *
  * class Service {
  *   constructor(@Inject("db", false) db: Database) {}
  * }
  *
- * // Reflection
+ * // Reflection - query decorated parameters
  * const params = Inject.parameters(Service);
+ * // => [{ kind: "parameter", name: "constructor", parameterIndex: 0, metadata: [{ token: "db", optional: false }] }]
+ * ```
  */
 export function createParameterDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
 	composeFn?: (...args: TArgs) => TMeta,
@@ -224,20 +324,50 @@ export function createParameterDecorator<TMeta, TArgs extends unknown[] = [TMeta
 }
 
 /**
- * Creates a method decorator that wraps the original method.
+ * Creates a method decorator that wraps the original method with an interceptor.
+ *
+ * This factory generates decorators that wrap method implementations, enabling
+ * cross-cutting concerns like logging, timing, caching, or validation. The
+ * interceptor receives the original method, accumulated metadata, and context
+ * about the decoration target. Unlike {@link createMethodDecorator}, this factory
+ * actively modifies method behavior at decoration time.
+ *
+ * @typeParam TMeta - The type of metadata stored by the decorator
+ * @typeParam TArgs - The argument types accepted by the decorator factory (defaults to `[TMeta]`)
+ *
+ * @param options - Configuration for the method interceptor, including:
+ *   - `compose`: Optional function to transform decorator arguments into metadata
+ *   - `interceptor`: Function that receives the original method and returns a wrapped version
+ *
+ * @returns A {@link DecoratedMethodFactory} that creates method decorators with interception
+ *   and provides reflection methods (`reflect`, `methods`, `key`) for querying decorated methods.
+ *
+ * @see {@link MethodInterceptorOptions}
+ * @see {@link DecoratedMethodFactory}
  *
  * @example
+ * ```typescript
+ * // Create a timing decorator
  * const Timed = createMethodInterceptor<string>({
  *   interceptor: (original, meta, ctx) => function(...args) {
  *     const start = Date.now();
  *     const result = original.apply(this, args);
- *     console.log(`${ctx.propertyKey} took ${Date.now() - start}ms`);
+ *     console.log(`${String(ctx.propertyKey)} took ${Date.now() - start}ms`);
  *     return result;
  *   }
  * });
  *
- * // Reflection
+ * class Service {
+ *   @Timed("operation")
+ *   expensiveOperation() {
+ *     // ... slow work
+ *   }
+ * }
+ *
+ * // Reflection - query decorated methods
  * const timed = Timed.methods(Service);
+ * // => [{ kind: "method", name: "expensiveOperation", metadata: ["operation"], target: fn }]
+ * ```
  */
 export function createMethodInterceptor<TMeta, TArgs extends unknown[] = [TMeta]>(
 	options: MethodInterceptorOptions<TMeta, TArgs>,
@@ -279,16 +409,48 @@ export function createMethodInterceptor<TMeta, TArgs extends unknown[] = [TMeta]
 /**
  * Creates a property decorator that intercepts get/set operations.
  *
+ * This factory generates decorators that wrap property access, enabling
+ * features like lazy initialization, validation, change tracking, or
+ * computed properties. The interceptors receive the original getter/setter,
+ * accumulated metadata, and context about the decoration target. Properties
+ * are converted to accessor descriptors (get/set) if they aren't already.
+ *
+ * @typeParam TMeta - The type of metadata stored by the decorator
+ * @typeParam TArgs - The argument types accepted by the decorator factory (defaults to `[TMeta]`)
+ *
+ * @param options - Configuration for the property interceptor, including:
+ *   - `compose`: Optional function to transform decorator arguments into metadata
+ *   - `onGet`: Optional interceptor for property reads
+ *   - `onSet`: Optional interceptor for property writes
+ *
+ * @returns A {@link DecoratedPropertyFactory} that creates property decorators with interception
+ *   and provides reflection methods (`reflect`, `properties`, `key`) for querying decorated properties.
+ *
+ * @see {@link PropertyInterceptorOptions}
+ * @see {@link DecoratedPropertyFactory}
+ *
  * @example
+ * ```typescript
+ * // Create an observable property decorator
  * const Observable = createPropertyInterceptor<string>({
  *   onSet: (original, meta, ctx) => function(value) {
- *     console.log(`${ctx.propertyKey} = ${value}`);
+ *     console.log(`${String(ctx.propertyKey)} changed to ${value}`);
  *     original.call(this, value);
  *   }
  * });
  *
- * // Reflection
+ * class Store {
+ *   @Observable("count")
+ *   count = 0;
+ * }
+ *
+ * const store = new Store();
+ * store.count = 5; // logs: "count changed to 5"
+ *
+ * // Reflection - query decorated properties
  * const observed = Observable.properties(Store);
+ * // => [{ kind: "property", name: "count", metadata: ["count"] }]
+ * ```
  */
 export function createPropertyInterceptor<TMeta, TArgs extends unknown[] = [TMeta]>(
 	options: PropertyInterceptorOptions<TMeta, TArgs>,

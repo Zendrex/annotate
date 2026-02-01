@@ -1,6 +1,24 @@
 /**
- * biome-ignore-all lint/performance/noBarrelFile: barrel file
+ * @packageDocumentation
+ *
+ * A TypeScript decorator factory library with metadata storage and reflection capabilities.
+ *
+ * This package provides:
+ * - **Decorator Factories**: {@link createClassDecorator}, {@link createMethodDecorator},
+ *   {@link createPropertyDecorator}, {@link createParameterDecorator} - Create type-safe
+ *   decorators that automatically store metadata for later reflection.
+ * - **Interceptors**: {@link createMethodInterceptor}, {@link createPropertyInterceptor} -
+ *   Create decorators that wrap method calls or property access for cross-cutting concerns.
+ * - **Metadata Utilities**: {@link getMetadata}, {@link defineMetadata}, {@link appendMetadata} -
+ *   Low-level functions for reading and writing metadata on targets.
+ * - **Reflection**: {@link Reflector}, {@link reflect}, {@link createScopedReflector} -
+ *   Retrieve stored metadata from decorated classes and their members.
+ *
+ * @see {@link createClassDecorator} - Entry point for creating class decorators
+ * @see {@link Reflector} - Primary API for reflecting on decorated classes
  */
+
+/** biome-ignore-all lint/performance/noBarrelFile: main index file */
 import "reflect-metadata";
 
 export type {

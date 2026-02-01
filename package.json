@@ -21,6 +21,7 @@
 		}
 	},
 	"files": [
+		"src",
 		"dist",
 		"README.md",
 		"LICENSE"
