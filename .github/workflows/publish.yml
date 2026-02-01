@@ -39,12 +39,12 @@ jobs:
 
       - name: Publish
         if: ${{ !inputs.dry-run }}
-        run: bun publish --registry https://npm.pkg.github.com
+        run: bun publish --ignore-scripts --registry https://npm.pkg.github.com
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish (dry-run)
         if: ${{ inputs.dry-run }}
-        run: bun publish --dry-run --registry https://npm.pkg.github.com
+        run: bun publish --ignore-scripts --dry-run --registry https://npm.pkg.github.com
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.GITHUB_TOKEN }}

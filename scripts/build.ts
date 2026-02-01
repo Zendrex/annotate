@@ -12,7 +12,13 @@ await Promise.all([
 	Bun.build({
 		...defaultConfig,
 		format: "esm",
-		plugins: [dts()],
+		plugins: [
+			dts({
+				output: {
+					noBanner: true,
+				},
+			}),
+		],
 		naming: "[dir]/[name].js",
 	}),
 	Bun.build({
