@@ -20,6 +20,11 @@
 			}
 		}
 	},
+	"files": [
+		"dist",
+		"README.md",
+		"LICENSE"
+	],
 	"scripts": {
 		"build": "bun run scripts/build.ts",
 		"check": "bunx --bun biome check",
