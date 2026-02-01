@@ -12,7 +12,7 @@ on:
         default: false
 
 concurrency:
-  group: publish-${{ github.ref }}
+  group: publish-github-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
