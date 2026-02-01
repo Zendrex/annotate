@@ -1,0 +1,40 @@
+---
+alwaysApply: true
+---
+This project uses Changesets for versioning and releases.
+
+## When committing changes
+
+Before making a commit that affects the library's functionality, create a changeset:
+
+```bash
+bun changeset
+```
+
+Then select the appropriate version bump:
+- `patch` - Bug fixes, internal changes
+- `minor` - New features (backwards compatible)
+- `major` - Breaking changes
+
+Include the generated `.changeset/*.md` file in your commit.
+
+## When to include a changeset
+
+**Include a changeset for:**
+- Bug fixes
+- New features
+- Breaking changes
+- API changes
+- Behavior changes
+
+**Skip changesets for:**
+- Documentation-only changes
+- CI/tooling changes
+- Internal refactors with no user-facing impact
+- Test-only changes
+
+## Workflow
+
+1. Make code changes
+2. Run `bun changeset` and describe the change
+3. Commit both code changes and the changeset file together
