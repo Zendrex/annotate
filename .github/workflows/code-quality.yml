@@ -3,6 +3,11 @@ name: Code Quality
 on:
   push:
     branches: [main]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "scripts/**"
+      - "*.json"
   pull_request:
 
 concurrency:
