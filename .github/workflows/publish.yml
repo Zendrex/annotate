@@ -36,13 +36,7 @@ jobs:
 
       - name: Build
         run: bun run build
-
-      - name: Configure .npmrc
-        run: |
-          echo "@zendrex:registry=https://npm.pkg.github.com" > ~/.npmrc
-          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" >> ~/.npmrc
-          echo "always-auth=true" >> ~/.npmrc
-
+        
       - name: Publish
         if: ${{ !inputs.dry-run }}
         run: bun publish --ignore-scripts --registry https://npm.pkg.github.com
