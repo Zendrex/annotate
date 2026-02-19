@@ -1,5 +1,11 @@
 # @zendrex/annotate
 
+## 0.1.3
+
+### Patch Changes
+
+- [`a2d7b93`](https://github.com/Zendrex/annotate/commit/a2d7b93f20c8986be6c5b1575e6d8045ebd83e66) Thanks [@Zendrex](https://github.com/Zendrex)! - Refactor reflector parameter collection into a shared helper and apply consistent formatting across source files.
+
 ## 0.1.2
 
 ### Patch Changes
