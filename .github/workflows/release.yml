@@ -3,10 +3,6 @@ name: Release
 on:
   push:
     branches: [main]
-    paths:
-      - "src/**"
-      - "package.json"
-      - ".changeset/**"
 
 concurrency:
   group: release-${{ github.ref }}
@@ -18,7 +14,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      packages: write
       pull-requests: write
     steps:
       - name: Checkout
@@ -32,36 +27,42 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Create Release PR or Tag
+      - name: Create release PR
         id: changesets
         uses: changesets/action@v1
         with:
           version: bun run version
-          title: "chore: release package"
-          commit: "chore: release package"
+          title: "chore: version packages"
+          commit: "chore: version packages"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Get version from package.json
-        if: steps.changesets.outputs.hasChangesets == 'false'
-        id: package
-        run: echo "version=$(jq -r .version package.json)" >> $GITHUB_OUTPUT
-
-      - name: Check if tag exists
-        if: steps.changesets.outputs.hasChangesets == 'false'
-        id: tag
-        run: |
-          if git rev-parse "v${{ steps.package.outputs.version }}" >/dev/null 2>&1; then
-            echo "exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "exists=false" >> $GITHUB_OUTPUT
-          fi
 
       - name: Create GitHub Release
-        if: steps.changesets.outputs.hasChangesets == 'false' && steps.tag.outputs.exists == 'false'
+        id: github-release
+        if: steps.changesets.outputs.hasChangesets == 'false'
         run: |
-          gh release create "v${{ steps.package.outputs.version }}" \
-            --title "@zendrex/annotate@${{ steps.package.outputs.version }}" \
-            --generate-notes
+          VERSION=$(jq -r '.version' package.json)
+          TAG="v${VERSION}"
+
+          if git ls-remote --tags origin "$TAG" | grep -q "$TAG"; then
+            echo "Tag $TAG already exists on remote, skipping"
+            echo "released=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git tag "$TAG"
+          git push origin "$TAG"
+          gh release create "$TAG" --generate-notes --title "$TAG"
+          echo "released=true" >> "$GITHUB_OUTPUT"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build
+        if: steps.github-release.outputs.released == 'true'
+        run: bun run build
+
+      - name: Publish to npm
+        if: steps.github-release.outputs.released == 'true'
+        run: bun publish --access public --ignore-scripts
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
