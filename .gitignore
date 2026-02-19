@@ -27,7 +27,7 @@ Thumbs.db
 # =====================
 # IDEs and Editors
 # =====================
-.vscode/
+.vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
@@ -63,21 +63,3 @@ coverage
 .cache
 tmp
 temp
-
-# =====================
-# Documentation
-# =====================
-docs/.next/
-docs/.source/
-docs/out/
-docs/node_modules/
-docs/bun.lock
-docs/next-env.d.ts
-
-# =====================
-# Ruler Generated Files
-# =====================
-# START Ruler Generated Files
-/CLAUDE.md
-/CLAUDE.md.bak
-# END Ruler Generated Files
