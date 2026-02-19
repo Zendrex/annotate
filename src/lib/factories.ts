@@ -117,7 +117,7 @@ function toAccessor(target: object, key: string | symbol): PropertyDescriptor {
  * ```
  */
 export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
-	composeFn?: (...args: TArgs) => TMeta,
+	composeFn?: (...args: TArgs) => TMeta
 ): DecoratedClassFactory<TMeta, TArgs> {
 	const key = generateKey();
 
@@ -178,7 +178,7 @@ export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
  * ```
  */
 export function createMethodDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
-	composeFn?: (...args: TArgs) => TMeta,
+	composeFn?: (...args: TArgs) => TMeta
 ): DecoratedMethodFactory<TMeta, TArgs> {
 	const key = generateKey();
 
@@ -240,7 +240,7 @@ export function createMethodDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
  * ```
  */
 export function createPropertyDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
-	composeFn?: (...args: TArgs) => TMeta,
+	composeFn?: (...args: TArgs) => TMeta
 ): DecoratedPropertyFactory<TMeta, TArgs> {
 	const key = generateKey();
 
@@ -302,7 +302,7 @@ export function createPropertyDecorator<TMeta, TArgs extends unknown[] = [TMeta]
  * ```
  */
 export function createParameterDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
-	composeFn?: (...args: TArgs) => TMeta,
+	composeFn?: (...args: TArgs) => TMeta
 ): DecoratedParameterFactory<TMeta, TArgs> {
 	const key = generateKey();
 
@@ -370,7 +370,7 @@ export function createParameterDecorator<TMeta, TArgs extends unknown[] = [TMeta
  * ```
  */
 export function createMethodInterceptor<TMeta, TArgs extends unknown[] = [TMeta]>(
-	options: MethodInterceptorOptions<TMeta, TArgs>,
+	options: MethodInterceptorOptions<TMeta, TArgs>
 ): DecoratedMethodFactory<TMeta, TArgs> {
 	const key = generateKey();
 	const { compose: composeFn, interceptor } = options;
@@ -453,7 +453,7 @@ export function createMethodInterceptor<TMeta, TArgs extends unknown[] = [TMeta]
  * ```
  */
 export function createPropertyInterceptor<TMeta, TArgs extends unknown[] = [TMeta]>(
-	options: PropertyInterceptorOptions<TMeta, TArgs>,
+	options: PropertyInterceptorOptions<TMeta, TArgs>
 ): DecoratedPropertyFactory<TMeta, TArgs> {
 	const key = generateKey();
 	const { compose: composeFn, onGet, onSet } = options;

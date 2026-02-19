@@ -201,19 +201,7 @@ export class Reflector {
 		const results: DecoratedParameter<T>[] = [];
 
 		// Constructor parameters
-		const ctorMap = getParameterMap<T>(key, this.ctor);
-		if (ctorMap instanceof Map) {
-			for (const [index, metadata] of ctorMap) {
-				if (metadata.length > 0) {
-					results.push({
-						kind: "parameter",
-						name: "constructor",
-						metadata,
-						parameterIndex: index,
-					});
-				}
-			}
-		}
+		this.collectParams(key, this.ctor, "constructor", results);
 
 		// Method parameters (instance) - walk prototype chain
 		const seenParams = new Set<string | symbol>();
@@ -221,44 +209,41 @@ export class Reflector {
 			if (seenParams.has(name)) {
 				continue;
 			}
-
-			const map = getParameterMap<T>(key, target, name);
-			if (!(map instanceof Map)) {
-				continue;
-			}
-
-			for (const [index, metadata] of map) {
-				if (metadata.length > 0) {
-					seenParams.add(name);
-					results.push({
-						kind: "parameter",
-						name,
-						metadata,
-						parameterIndex: index,
-					});
-				}
+			if (this.collectParams(key, target, name, results)) {
+				seenParams.add(name);
 			}
 		}
 
 		// Method parameters (static)
 		for (const name of this.getOwnKeys(this.ctor)) {
-			const map = getParameterMap<T>(key, this.ctor, name);
-			if (!(map instanceof Map)) {
-				continue;
-			}
-			for (const [index, metadata] of map) {
-				if (metadata.length > 0) {
-					results.push({
-						kind: "parameter",
-						name,
-						metadata,
-						parameterIndex: index,
-					});
-				}
-			}
+			this.collectParams(key, this.ctor, name, results);
 		}
 
 		return results;
+	}
+
+	/**
+	 * Collect parameter metadata from a target into results.
+	 * @returns true if any entries were added
+	 */
+	private collectParams<T>(
+		key: MetadataKey,
+		target: object,
+		name: string | symbol,
+		results: DecoratedParameter<T>[]
+	): boolean {
+		const map = getParameterMap<T>(key, target, name === "constructor" ? undefined : name);
+		if (!(map instanceof Map)) {
+			return false;
+		}
+		let added = false;
+		for (const [index, metadata] of map) {
+			if (metadata.length > 0) {
+				added = true;
+				results.push({ kind: "parameter", name, metadata, parameterIndex: index });
+			}
+		}
+		return added;
 	}
 
 	/**
@@ -266,7 +251,7 @@ export class Reflector {
 	 */
 	private getOwnKeys(target: object): (string | symbol)[] {
 		return [...Object.getOwnPropertyNames(target), ...Object.getOwnPropertySymbols(target)].filter(
-			(k) => k !== "constructor" && k !== "prototype",
+			(k) => k !== "constructor" && k !== "prototype"
 		);
 	}
 

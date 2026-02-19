@@ -73,7 +73,7 @@ export function getMetadataArray<T>(key: MetadataKey, target: object, propertyKe
 export function getParameterMap<T>(
 	key: MetadataKey,
 	target: object,
-	propertyKey?: string | symbol,
+	propertyKey?: string | symbol
 ): ParameterMetadataMap<T> {
 	return getOwnMetadata<ParameterMetadataMap<T>>(key, target, propertyKey) ?? new Map();
 }
@@ -138,7 +138,7 @@ export function setParameterMap<T>(
 	key: MetadataKey,
 	target: object,
 	map: ParameterMetadataMap<T>,
-	propertyKey?: string | symbol,
+	propertyKey?: string | symbol
 ): void {
 	defineMetadata(key, map, target, propertyKey);
 }

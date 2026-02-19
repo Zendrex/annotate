@@ -59,12 +59,12 @@ export type PropertySetter = (this: unknown, value: unknown) => void;
  * allowing interceptors to inspect and modify behavior.
  */
 export interface InterceptorContext {
-	/** The object that owns the decorated member (prototype for instance members, constructor for static). */
-	target: object;
-	/** The name of the decorated property or method. */
-	propertyKey: string | symbol;
 	/** The property descriptor for the decorated member. */
 	descriptor: PropertyDescriptor;
+	/** The name of the decorated property or method. */
+	propertyKey: string | symbol;
+	/** The object that owns the decorated member (prototype for instance members, constructor for static). */
+	target: object;
 }
 
 /**
@@ -99,7 +99,7 @@ export interface MethodInterceptorOptions<TMeta, TArgs extends unknown[] = [TMet
 	interceptor: (
 		original: (...args: unknown[]) => unknown,
 		metadata: TMeta[],
-		context: InterceptorContext,
+		context: InterceptorContext
 	) => (...args: unknown[]) => unknown;
 }
 
@@ -206,13 +206,6 @@ export type ParameterDecoratorFactory<TMeta, TArgs extends unknown[] = [TMeta]> 
  */
 export interface ClassDecoratorReflection<TMeta> {
 	/**
-	 * Returns a {@link ScopedReflector} bound to this decorator's key.
-	 *
-	 * @param target - The class constructor to reflect on
-	 * @returns A scoped reflector for querying this decorator's metadata
-	 */
-	reflect(target: AnyConstructor): ScopedReflector<TMeta>;
-	/**
 	 * Shorthand to get class-level metadata for a specific class.
 	 *
 	 * @param target - The class constructor to query
@@ -225,6 +218,13 @@ export interface ClassDecoratorReflection<TMeta> {
 	 * Can be used with the global {@link Reflector} for advanced queries.
 	 */
 	readonly key: MetadataKey;
+	/**
+	 * Returns a {@link ScopedReflector} bound to this decorator's key.
+	 *
+	 * @param target - The class constructor to reflect on
+	 * @returns A scoped reflector for querying this decorator's metadata
+	 */
+	reflect(target: AnyConstructor): ScopedReflector<TMeta>;
 }
 
 /**
@@ -237,12 +237,11 @@ export interface ClassDecoratorReflection<TMeta> {
  */
 export interface MethodDecoratorReflection<TMeta> {
 	/**
-	 * Returns a {@link ScopedReflector} bound to this decorator's key.
+	 * The unique metadata key for this decorator.
 	 *
-	 * @param target - The class constructor to reflect on
-	 * @returns A scoped reflector for querying this decorator's metadata
+	 * Can be used with the global {@link Reflector} for advanced queries.
 	 */
-	reflect(target: AnyConstructor): ScopedReflector<TMeta>;
+	readonly key: MetadataKey;
 	/**
 	 * Shorthand to get method metadata for a specific class.
 	 *
@@ -251,11 +250,12 @@ export interface MethodDecoratorReflection<TMeta> {
 	 */
 	methods(target: AnyConstructor): DecoratedMethod<TMeta>[];
 	/**
-	 * The unique metadata key for this decorator.
+	 * Returns a {@link ScopedReflector} bound to this decorator's key.
 	 *
-	 * Can be used with the global {@link Reflector} for advanced queries.
+	 * @param target - The class constructor to reflect on
+	 * @returns A scoped reflector for querying this decorator's metadata
 	 */
-	readonly key: MetadataKey;
+	reflect(target: AnyConstructor): ScopedReflector<TMeta>;
 }
 
 /**
@@ -268,12 +268,11 @@ export interface MethodDecoratorReflection<TMeta> {
  */
 export interface PropertyDecoratorReflection<TMeta> {
 	/**
-	 * Returns a {@link ScopedReflector} bound to this decorator's key.
+	 * The unique metadata key for this decorator.
 	 *
-	 * @param target - The class constructor to reflect on
-	 * @returns A scoped reflector for querying this decorator's metadata
+	 * Can be used with the global {@link Reflector} for advanced queries.
 	 */
-	reflect(target: AnyConstructor): ScopedReflector<TMeta>;
+	readonly key: MetadataKey;
 	/**
 	 * Shorthand to get property metadata for a specific class.
 	 *
@@ -282,11 +281,12 @@ export interface PropertyDecoratorReflection<TMeta> {
 	 */
 	properties(target: AnyConstructor): DecoratedProperty<TMeta>[];
 	/**
-	 * The unique metadata key for this decorator.
+	 * Returns a {@link ScopedReflector} bound to this decorator's key.
 	 *
-	 * Can be used with the global {@link Reflector} for advanced queries.
+	 * @param target - The class constructor to reflect on
+	 * @returns A scoped reflector for querying this decorator's metadata
 	 */
-	readonly key: MetadataKey;
+	reflect(target: AnyConstructor): ScopedReflector<TMeta>;
 }
 
 /**
@@ -299,12 +299,11 @@ export interface PropertyDecoratorReflection<TMeta> {
  */
 export interface ParameterDecoratorReflection<TMeta> {
 	/**
-	 * Returns a {@link ScopedReflector} bound to this decorator's key.
+	 * The unique metadata key for this decorator.
 	 *
-	 * @param target - The class constructor to reflect on
-	 * @returns A scoped reflector for querying this decorator's metadata
+	 * Can be used with the global {@link Reflector} for advanced queries.
 	 */
-	reflect(target: AnyConstructor): ScopedReflector<TMeta>;
+	readonly key: MetadataKey;
 	/**
 	 * Shorthand to get parameter metadata for a specific class.
 	 *
@@ -313,11 +312,12 @@ export interface ParameterDecoratorReflection<TMeta> {
 	 */
 	parameters(target: AnyConstructor): DecoratedParameter<TMeta>[];
 	/**
-	 * The unique metadata key for this decorator.
+	 * Returns a {@link ScopedReflector} bound to this decorator's key.
 	 *
-	 * Can be used with the global {@link Reflector} for advanced queries.
+	 * @param target - The class constructor to reflect on
+	 * @returns A scoped reflector for querying this decorator's metadata
 	 */
-	readonly key: MetadataKey;
+	reflect(target: AnyConstructor): ScopedReflector<TMeta>;
 }
 
 /**
@@ -403,17 +403,17 @@ export interface ScopedReflector<TMeta> {
 	 */
 	methods(): DecoratedMethod<TMeta>[];
 	/**
-	 * Get property metadata (instance + static).
-	 *
-	 * @returns Array of decorated property entries
-	 */
-	properties(): DecoratedProperty<TMeta>[];
-	/**
 	 * Get parameter metadata (constructor + methods).
 	 *
 	 * @returns Array of decorated parameter entries
 	 */
 	parameters(): DecoratedParameter<TMeta>[];
+	/**
+	 * Get property metadata (instance + static).
+	 *
+	 * @returns Array of decorated property entries
+	 */
+	properties(): DecoratedProperty<TMeta>[];
 }
 
 /** Discriminator for the kind of decorated item in {@link DecoratedItem}. */
@@ -429,10 +429,10 @@ export type DecoratedKind = "class" | "method" | "property" | "parameter";
 interface DecoratedBase<TMeta> {
 	/** The kind of decorated item for type discrimination. */
 	kind: DecoratedKind;
-	/** The name of the decorated item (class name, method/property key). */
-	name: string | symbol;
 	/** Array of metadata values applied to this item, in decorator application order. */
 	metadata: MetadataArray<TMeta>;
+	/** The name of the decorated item (class name, method/property key). */
+	name: string | symbol;
 }
 
 /**
