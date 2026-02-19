@@ -1,4 +1,4 @@
-# annotate
+# @zendrex/annotate
 
 A modern decorator and metadata system for TypeScript. Create typed decorators with built-in reflection.
 
