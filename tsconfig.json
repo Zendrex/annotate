@@ -25,7 +25,7 @@
 		"emitDecoratorMetadata": true,
 
 		// Types
-		"types": ["bun-types", "reflect-metadata"]
+		"types": ["bun", "reflect-metadata"]
 	},
 	"include": ["src", "tests"],
 	"exclude": ["node_modules", "dist"]
