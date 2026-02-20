@@ -1,5 +1,11 @@
 # @zendrex/annotate
 
+## 0.1.4
+
+### Patch Changes
+
+- [`293356c`](https://github.com/Zendrex/annotate/commit/293356cbffa98a32ed026b7d4b865b0a204129cb) Thanks [@Zendrex](https://github.com/Zendrex)! - Cleaned up JSDoc documentation across the library: fixed incorrect `@see` references, removed redundant `@see` tags and repetitive boilerplate, added missing type assertion justifications, and trimmed over-explained type aliases for documentation-page readiness.
+
 ## 0.1.3
 
 ### Patch Changes
