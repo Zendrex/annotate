@@ -1,5 +1,11 @@
 # @zendrex/annotate
 
+## 0.1.5
+
+### Patch Changes
+
+- [`a9cc051`](https://github.com/Zendrex/annotate/commit/a9cc0510d7222d280eafaee42f0f6d646fba2ba0) Thanks [@Zendrex](https://github.com/Zendrex)! - Add property injection example to docs and JSDoc
+
 ## 0.1.4
 
 ### Patch Changes
