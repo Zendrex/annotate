@@ -13,9 +13,6 @@
  *   Low-level functions for reading and writing metadata on targets.
  * - **Reflection**: {@link Reflector}, {@link reflect}, {@link createScopedReflector} -
  *   Retrieve stored metadata from decorated classes and their members.
- *
- * @see {@link createClassDecorator} - Entry point for creating class decorators
- * @see {@link Reflector} - Primary API for reflecting on decorated classes
  */
 
 /** biome-ignore-all lint/performance/noBarrelFile: main index file */

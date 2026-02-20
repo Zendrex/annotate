@@ -1,46 +1,23 @@
-import {
-	createClassDecorator,
-	createMethodDecorator,
-	createParameterDecorator,
-	createPropertyDecorator,
-} from "./factories";
-import { Reflector } from "./reflector";
-
 /**
- * A class constructor (any function with a prototype).
- *
- * This is a permissive type that accepts any constructor, including
- * abstract classes and built-in constructors like `Function`.
- *
- * @see {@link DecoratedClass} for decorated class metadata
+ * A permissive constructor type that accepts any function with a prototype,
+ * including abstract classes.
  */
 // biome-ignore lint/complexity/noBannedTypes: needed for constructor type
 export type AnyConstructor = Function & { prototype: object };
 
-/**
- * Unique key used to store decorator metadata.
- *
- * Each decorator factory creates a unique symbol key to avoid
- * collisions between different decorators on the same target.
- */
+/** Unique symbol key used to identify and store decorator metadata. */
 export type MetadataKey = symbol;
 
 /**
- * Metadata is stored as an array to preserve decorator application order.
- *
- * When multiple decorators of the same type are applied to a target,
- * their metadata is collected in the order they were applied (bottom-up
- * for stacked decorators).
+ * Array that preserves decorator application order when multiple decorators
+ * of the same type are applied to a target.
  *
  * @typeParam T - The type of metadata stored by the decorator
  */
 export type MetadataArray<T> = T[];
 
 /**
- * Parameter metadata maps parameter indexes to their metadata arrays.
- *
- * Used internally to store metadata for decorated constructor and method
- * parameters. The map key is the zero-based parameter index.
+ * Maps zero-based parameter indexes to their metadata arrays.
  *
  * @typeParam T - The type of metadata stored for each parameter
  */
@@ -77,7 +54,7 @@ export interface InterceptorContext {
  * @typeParam TMeta - The type of metadata stored by the decorator
  * @typeParam TArgs - The argument types accepted by the decorator factory (defaults to `[TMeta]`)
  *
- * @see {@link createMethodDecorator}
+ * @see {@link createMethodInterceptor}
  */
 export interface MethodInterceptorOptions<TMeta, TArgs extends unknown[] = [TMeta]> {
 	/**
@@ -112,7 +89,7 @@ export interface MethodInterceptorOptions<TMeta, TArgs extends unknown[] = [TMet
  * @typeParam TMeta - The type of metadata stored by the decorator
  * @typeParam TArgs - The argument types accepted by the decorator factory (defaults to `[TMeta]`)
  *
- * @see {@link createPropertyDecorator}
+ * @see {@link createPropertyInterceptor}
  */
 export interface PropertyInterceptorOptions<TMeta, TArgs extends unknown[] = [TMeta]> {
 	/**
@@ -148,20 +125,16 @@ export interface PropertyInterceptorOptions<TMeta, TArgs extends unknown[] = [TM
  *
  * @typeParam TMeta - The type of metadata stored by the decorator
  * @typeParam TArgs - The argument types accepted by the factory (defaults to `[TMeta]`)
- *
- * @see {@link createClassDecorator}
  */
 export type ClassDecoratorFactory<TMeta, TArgs extends unknown[] = [TMeta]> = (...args: TArgs) => ClassDecorator;
 
 /**
  * A factory function that creates method decorators.
  *
- * The returned decorator can be applied to both instance and static methods.
+ * Applicable to both instance and static methods.
  *
  * @typeParam TMeta - The type of metadata stored by the decorator
  * @typeParam TArgs - The argument types accepted by the factory (defaults to `[TMeta]`)
- *
- * @see {@link createMethodDecorator}
  */
 export type MethodDecoratorFactory<TMeta, TArgs extends unknown[] = [TMeta]> = (
 	...args: TArgs
@@ -170,12 +143,10 @@ export type MethodDecoratorFactory<TMeta, TArgs extends unknown[] = [TMeta]> = (
 /**
  * A factory function that creates property decorators.
  *
- * The returned decorator can be applied to both instance and static properties.
+ * Applicable to both instance and static properties.
  *
  * @typeParam TMeta - The type of metadata stored by the decorator
  * @typeParam TArgs - The argument types accepted by the factory (defaults to `[TMeta]`)
- *
- * @see {@link createPropertyDecorator}
  */
 export type PropertyDecoratorFactory<TMeta, TArgs extends unknown[] = [TMeta]> = (
 	...args: TArgs
@@ -184,13 +155,11 @@ export type PropertyDecoratorFactory<TMeta, TArgs extends unknown[] = [TMeta]> =
 /**
  * A factory function that creates parameter decorators.
  *
- * The returned decorator can be applied to constructor parameters
- * (when `propertyKey` is `undefined`) or method parameters.
+ * Applicable to constructor parameters (when `propertyKey` is `undefined`)
+ * or method parameters.
  *
  * @typeParam TMeta - The type of metadata stored by the decorator
  * @typeParam TArgs - The argument types accepted by the factory (defaults to `[TMeta]`)
- *
- * @see {@link createParameterDecorator}
  */
 export type ParameterDecoratorFactory<TMeta, TArgs extends unknown[] = [TMeta]> = (
 	...args: TArgs
@@ -198,9 +167,6 @@ export type ParameterDecoratorFactory<TMeta, TArgs extends unknown[] = [TMeta]> 
 
 /**
  * Reflection methods attached to class decorator factories.
- *
- * These methods enable runtime introspection of decorated classes
- * without accessing the global {@link Reflector} directly.
  *
  * @typeParam TMeta - The type of metadata stored by the decorator
  */
@@ -212,11 +178,7 @@ export interface ClassDecoratorReflection<TMeta> {
 	 * @returns Array of decorated class entries (typically one per class)
 	 */
 	class(target: AnyConstructor): DecoratedClass<TMeta>[];
-	/**
-	 * The unique metadata key for this decorator.
-	 *
-	 * Can be used with the global {@link Reflector} for advanced queries.
-	 */
+	/** The unique metadata key for this decorator. */
 	readonly key: MetadataKey;
 	/**
 	 * Returns a {@link ScopedReflector} bound to this decorator's key.
@@ -230,17 +192,10 @@ export interface ClassDecoratorReflection<TMeta> {
 /**
  * Reflection methods attached to method decorator factories.
  *
- * These methods enable runtime introspection of decorated methods
- * without accessing the global {@link Reflector} directly.
- *
  * @typeParam TMeta - The type of metadata stored by the decorator
  */
 export interface MethodDecoratorReflection<TMeta> {
-	/**
-	 * The unique metadata key for this decorator.
-	 *
-	 * Can be used with the global {@link Reflector} for advanced queries.
-	 */
+	/** The unique metadata key for this decorator. */
 	readonly key: MetadataKey;
 	/**
 	 * Shorthand to get method metadata for a specific class.
@@ -261,17 +216,10 @@ export interface MethodDecoratorReflection<TMeta> {
 /**
  * Reflection methods attached to property decorator factories.
  *
- * These methods enable runtime introspection of decorated properties
- * without accessing the global {@link Reflector} directly.
- *
  * @typeParam TMeta - The type of metadata stored by the decorator
  */
 export interface PropertyDecoratorReflection<TMeta> {
-	/**
-	 * The unique metadata key for this decorator.
-	 *
-	 * Can be used with the global {@link Reflector} for advanced queries.
-	 */
+	/** The unique metadata key for this decorator. */
 	readonly key: MetadataKey;
 	/**
 	 * Shorthand to get property metadata for a specific class.
@@ -292,17 +240,10 @@ export interface PropertyDecoratorReflection<TMeta> {
 /**
  * Reflection methods attached to parameter decorator factories.
  *
- * These methods enable runtime introspection of decorated parameters
- * without accessing the global {@link Reflector} directly.
- *
  * @typeParam TMeta - The type of metadata stored by the decorator
  */
 export interface ParameterDecoratorReflection<TMeta> {
-	/**
-	 * The unique metadata key for this decorator.
-	 *
-	 * Can be used with the global {@link Reflector} for advanced queries.
-	 */
+	/** The unique metadata key for this decorator. */
 	readonly key: MetadataKey;
 	/**
 	 * Shorthand to get parameter metadata for a specific class.
@@ -323,9 +264,6 @@ export interface ParameterDecoratorReflection<TMeta> {
 /**
  * A class decorator factory with attached reflection methods.
  *
- * Created by {@link createClassDecorator}, this type combines the ability
- * to create class decorators with convenient reflection shortcuts.
- *
  * @typeParam TMeta - The type of metadata stored by the decorator
  * @typeParam TArgs - The argument types accepted by the factory (defaults to `[TMeta]`)
  */
@@ -335,9 +273,6 @@ export type DecoratedClassFactory<TMeta, TArgs extends unknown[] = [TMeta]> = Cl
 /**
  * A method decorator factory with attached reflection methods.
  *
- * Created by {@link createMethodDecorator}, this type combines the ability
- * to create method decorators with convenient reflection shortcuts.
- *
  * @typeParam TMeta - The type of metadata stored by the decorator
  * @typeParam TArgs - The argument types accepted by the factory (defaults to `[TMeta]`)
  */
@@ -346,9 +281,6 @@ export type DecoratedMethodFactory<TMeta, TArgs extends unknown[] = [TMeta]> = M
 
 /**
  * A property decorator factory with attached reflection methods.
- *
- * Created by {@link createPropertyDecorator}, this type combines the ability
- * to create property decorators with convenient reflection shortcuts.
  *
  * @typeParam TMeta - The type of metadata stored by the decorator
  * @typeParam TArgs - The argument types accepted by the factory (defaults to `[TMeta]`)
@@ -361,9 +293,6 @@ export type DecoratedPropertyFactory<TMeta, TArgs extends unknown[] = [TMeta]> =
 
 /**
  * A parameter decorator factory with attached reflection methods.
- *
- * Created by {@link createParameterDecorator}, this type combines the ability
- * to create parameter decorators with convenient reflection shortcuts.
  *
  * @typeParam TMeta - The type of metadata stored by the decorator
  * @typeParam TArgs - The argument types accepted by the factory (defaults to `[TMeta]`)

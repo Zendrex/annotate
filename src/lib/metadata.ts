@@ -2,14 +2,11 @@ import type { MetadataArray, MetadataKey, ParameterMetadataMap } from "./types";
 import "reflect-metadata";
 
 /**
- * Retrieves metadata from a target, walking the prototype chain.
+ * Retrieves metadata, including inherited values from the prototype chain.
  *
- * Uses `Reflect.getMetadata` to search the target and its prototypes
- * for metadata stored under the given key. This enables inheritance
- * of decorator metadata from parent classes.
+ * Enables decorator metadata inheritance from parent classes.
  *
  * @typeParam T - The expected type of the metadata value
- *
  * @param key - The unique symbol key identifying the metadata
  * @param target - The object to retrieve metadata from
  * @param propertyKey - Optional property or method name to scope the lookup
@@ -20,15 +17,11 @@ export function getMetadata<T>(key: MetadataKey, target: object, propertyKey?: s
 }
 
 /**
- * Retrieves metadata from a target without walking the prototype chain.
+ * Retrieves metadata defined directly on the target (no prototype chain).
  *
- * Uses `Reflect.getOwnMetadata` to only check the target itself,
- * ignoring any metadata that might be inherited from parent classes.
- * This is useful when you need to check if a decorator was applied
- * directly to a class rather than inherited.
+ * Useful for checking whether a decorator was applied directly vs. inherited.
  *
  * @typeParam T - The expected type of the metadata value
- *
  * @param key - The unique symbol key identifying the metadata
  * @param target - The object to retrieve metadata from
  * @param propertyKey - Optional property or method name to scope the lookup
@@ -41,12 +34,10 @@ export function getOwnMetadata<T>(key: MetadataKey, target: object, propertyKey?
 /**
  * Retrieves the metadata array for a key, or an empty array if none exists.
  *
- * This is a convenience wrapper around {@link getOwnMetadata} that ensures
- * an array is always returned. Used internally to collect metadata from
- * multiple decorator applications on the same target.
+ * Always returns an array, even if no metadata has been stored.
+ * Does not walk the prototype chain.
  *
  * @typeParam T - The type of elements in the metadata array
- *
  * @param key - The unique symbol key identifying the metadata
  * @param target - The object to retrieve metadata from
  * @param propertyKey - Optional property or method name to scope the lookup
@@ -59,12 +50,10 @@ export function getMetadataArray<T>(key: MetadataKey, target: object, propertyKe
 /**
  * Retrieves the parameter metadata map for a key, or an empty map if none exists.
  *
- * This is a convenience wrapper around {@link getOwnMetadata} that ensures
- * a Map is always returned. Used internally to store metadata for decorated
- * parameters, keyed by their zero-based index.
+ * Always returns a Map keyed by zero-based parameter index.
+ * Does not walk the prototype chain.
  *
  * @typeParam T - The type of metadata stored for each parameter
- *
  * @param key - The unique symbol key identifying the metadata
  * @param target - The object to retrieve metadata from
  * @param propertyKey - Optional property or method name to scope the lookup
@@ -79,14 +68,9 @@ export function getParameterMap<T>(
 }
 
 /**
- * Defines metadata on a target.
- *
- * Uses `Reflect.defineMetadata` to store a value under the given key.
- * This is the low-level primitive used by decorator factories to persist
- * metadata at decoration time.
+ * Stores metadata on a target under the given key.
  *
  * @typeParam T - The type of the metadata value
- *
  * @param key - The unique symbol key identifying the metadata
  * @param value - The metadata value to store
  * @param target - The object to store metadata on
@@ -104,11 +88,10 @@ export function defineMetadata<T>(key: MetadataKey, value: T, target: object, pr
  * Appends a value to the metadata array for a key.
  *
  * Retrieves the existing array (or creates a new one), pushes the value,
- * and stores the updated array. This enables multiple decorators of the
- * same type to accumulate metadata on a single target.
+ * and stores the updated array. Multiple decorators of the same type
+ * accumulate metadata in application order.
  *
  * @typeParam T - The type of elements in the metadata array
- *
  * @param key - The unique symbol key identifying the metadata
  * @param target - The object to store metadata on
  * @param value - The metadata value to append
@@ -123,12 +106,7 @@ export function appendMetadata<T>(key: MetadataKey, target: object, value: T, pr
 /**
  * Stores a parameter metadata map on a target.
  *
- * This is a convenience wrapper around {@link defineMetadata} specifically
- * for parameter decorator metadata. The map keys are zero-based parameter
- * indexes, and the values are arrays of metadata for each parameter.
- *
  * @typeParam T - The type of metadata stored for each parameter
- *
  * @param key - The unique symbol key identifying the metadata
  * @param target - The object to store metadata on
  * @param map - The parameter metadata map to store

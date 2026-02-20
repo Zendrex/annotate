@@ -29,9 +29,6 @@ import { getMetadataArray, getParameterMap } from "./metadata";
  *   console.log(name, metadata);
  * }
  * ```
- *
- * @see {@link reflect} - Factory function to create a Reflector
- * @see {@link ScopedReflector} - Pre-bound reflector for single-key queries
  */
 export class Reflector {
 	/** The class constructor being reflected. */
@@ -58,11 +55,6 @@ export class Reflector {
 	 * @typeParam T - The type of metadata stored by the decorator
 	 * @param key - The unique {@link MetadataKey} for the decorator
 	 * @returns Array of all {@link DecoratedItem} entries across all decoration targets
-	 *
-	 * @see {@link Reflector.class}
-	 * @see {@link Reflector.methods}
-	 * @see {@link Reflector.properties}
-	 * @see {@link Reflector.parameters}
 	 */
 	all<T>(key: MetadataKey): DecoratedItem<T>[] {
 		return [...this.class<T>(key), ...this.methods<T>(key), ...this.properties<T>(key), ...this.parameters<T>(key)];
@@ -274,9 +266,7 @@ export class Reflector {
 /**
  * Creates a {@link Reflector} for the given class constructor.
  *
- * This is the primary entry point for reflecting on decorator metadata.
- * The returned Reflector provides methods to query metadata by kind
- * (class, methods, properties, parameters).
+ * Primary entry point for reflecting on decorator metadata.
  *
  * @param target - The class constructor to reflect metadata from
  * @returns A new {@link Reflector} instance bound to the target
@@ -285,9 +275,6 @@ export class Reflector {
  * ```typescript
  * const entries = reflect(MyClass).methods<string>(MY_KEY);
  * ```
- *
- * @see {@link Reflector}
- * @see {@link createScopedReflector} - For single-key reflection
  */
 export function reflect(target: AnyConstructor): Reflector {
 	return new Reflector(target);
@@ -388,9 +375,6 @@ class ScopedReflectorImpl<TMeta> implements ScopedReflector<TMeta> {
  * const scoped = createScopedReflector(MyClass, Route.key);
  * const methods = scoped.methods(); // No key parameter needed
  * ```
- *
- * @see {@link Reflector} - For multi-key reflection
- * @see {@link ScopedReflector} - Interface implemented by the returned object
  */
 export function createScopedReflector<TMeta>(target: AnyConstructor, key: MetadataKey): ScopedReflector<TMeta> {
 	return new ScopedReflectorImpl<TMeta>(target, key);

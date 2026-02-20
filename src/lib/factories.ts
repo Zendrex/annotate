@@ -15,7 +15,9 @@ import type {
 import { appendMetadata, getMetadataArray, getParameterMap, setParameterMap } from "./metadata";
 import { createScopedReflector } from "./reflector";
 
+/** Applies the compose function if provided, otherwise uses the first arg as metadata. */
 function compose<TMeta, TArgs extends unknown[]>(args: TArgs, fn?: (...a: TArgs) => TMeta): TMeta {
+	// Type assertion safe: when no compose fn, the caller's type signature guarantees args[0] is TMeta
 	return fn ? fn(...args) : (args[0] as TMeta);
 }
 
@@ -43,6 +45,7 @@ function ensureProperty(target: object, key: string | symbol): void {
 	});
 }
 
+/** Converts a data property to an accessor descriptor backed by a WeakMap. */
 function toAccessor(target: object, key: string | symbol): PropertyDescriptor {
 	const desc = Object.getOwnPropertyDescriptor(target, key);
 
@@ -80,35 +83,24 @@ function toAccessor(target: object, key: string | symbol): PropertyDescriptor {
 /**
  * Creates a class decorator factory that stores metadata on the class.
  *
- * This factory generates decorators for marking classes with typed metadata.
- * The returned factory function creates decorators that can be applied to
- * class declarations. Metadata is stored using `reflect-metadata` and can
- * be retrieved via the attached reflection methods or the global {@link Reflector}.
- *
  * @typeParam TMeta - The type of metadata stored by the decorator
  * @typeParam TArgs - The argument types accepted by the decorator factory (defaults to `[TMeta]`)
- *
  * @param composeFn - Optional function to compose decorator arguments into metadata.
  *   If not provided, the first argument is used as the metadata value directly.
- *
- * @returns A {@link DecoratedClassFactory} that creates class decorators and provides
- *   reflection methods (`reflect`, `class`, `key`) for querying decorated classes.
- *
- * @see {@link DecoratedClassFactory}
- * @see {@link ScopedReflector}
+ * @returns A {@link DecoratedClassFactory} with reflection methods (`reflect`, `class`, `key`)
  *
  * @example
  * ```typescript
  * // Simple - direct metadata (first argument becomes metadata)
  * const Tag = createClassDecorator<string>();
  *
- * @Tag("admin")
+ * \@Tag("admin")
  * class AdminController {}
  *
  * // Compose - transform multiple arguments into structured metadata
  * const Role = createClassDecorator((name: string, level: number) => ({ name, level }));
  *
- * @Role("moderator", 5)
+ * \@Role("moderator", 5)
  * class ModeratorController {}
  *
  * // Reflection - query decorated classes
@@ -127,6 +119,8 @@ export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
 			appendMetadata(key, target, compose(args, composeFn));
 		};
 
+	// Type assertion safe: Object.assign merges the decorator fn with reflection methods,
+	// matching the DecoratedClassFactory intersection type
 	return Object.assign(decoratorFn, {
 		key,
 		reflect: (target: AnyConstructor): ScopedReflector<TMeta> => createScopedReflector(target, key),
@@ -137,22 +131,13 @@ export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
 /**
  * Creates a method decorator factory that stores metadata per method.
  *
- * This factory generates decorators for annotating methods with typed metadata.
- * The returned factory function creates decorators that can be applied to both
- * instance and static methods. Metadata is stored using `reflect-metadata` and
- * can be retrieved via the attached reflection methods or the global {@link Reflector}.
+ * Applicable to both instance and static methods.
  *
  * @typeParam TMeta - The type of metadata stored by the decorator
  * @typeParam TArgs - The argument types accepted by the decorator factory (defaults to `[TMeta]`)
- *
  * @param composeFn - Optional function to compose decorator arguments into metadata.
  *   If not provided, the first argument is used as the metadata value directly.
- *
- * @returns A {@link DecoratedMethodFactory} that creates method decorators and provides
- *   reflection methods (`reflect`, `methods`, `key`) for querying decorated methods.
- *
- * @see {@link DecoratedMethodFactory}
- * @see {@link ScopedReflector}
+ * @returns A {@link DecoratedMethodFactory} with reflection methods (`reflect`, `methods`, `key`)
  *
  * @example
  * ```typescript
@@ -160,7 +145,7 @@ export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
  * const Route = createMethodDecorator<string>();
  *
  * class Api {
- *   @Route("/users")
+ *   \@Route("/users")
  *   getUsers() {}
  * }
  *
@@ -168,7 +153,7 @@ export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
  * const Route = createMethodDecorator((path: string, method: "GET" | "POST") => ({ path, method }));
  *
  * class Api {
- *   @Route("/users", "GET")
+ *   \@Route("/users", "GET")
  *   getUsers() {}
  * }
  *
@@ -188,6 +173,8 @@ export function createMethodDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
 			appendMetadata(key, target, compose(args, composeFn), propertyKey);
 		};
 
+	// Type assertion safe: Object.assign merges the decorator fn with reflection methods,
+	// matching the DecoratedMethodFactory intersection type
 	return Object.assign(decoratorFn, {
 		key,
 		reflect: (target: AnyConstructor): ScopedReflector<TMeta> => createScopedReflector(target, key),
@@ -198,23 +185,15 @@ export function createMethodDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
 /**
  * Creates a property decorator factory that stores metadata on fields.
  *
- * This factory generates decorators for annotating class properties with typed metadata.
- * The returned factory function creates decorators that can be applied to both instance
- * and static properties. Properties are ensured to exist on the prototype for reflection
- * discovery. Metadata is stored using `reflect-metadata` and can be retrieved via the
- * attached reflection methods or the global {@link Reflector}.
+ * Applicable to both instance and static properties. Properties are defined on the
+ * prototype with `undefined` so the {@link Reflector} can discover them via
+ * `Object.getOwnPropertyNames`.
  *
  * @typeParam TMeta - The type of metadata stored by the decorator
  * @typeParam TArgs - The argument types accepted by the decorator factory (defaults to `[TMeta]`)
- *
  * @param composeFn - Optional function to compose decorator arguments into metadata.
  *   If not provided, the first argument is used as the metadata value directly.
- *
- * @returns A {@link DecoratedPropertyFactory} that creates property decorators and provides
- *   reflection methods (`reflect`, `properties`, `key`) for querying decorated properties.
- *
- * @see {@link DecoratedPropertyFactory}
- * @see {@link ScopedReflector}
+ * @returns A {@link DecoratedPropertyFactory} with reflection methods (`reflect`, `properties`, `key`)
  *
  * @example
  * ```typescript
@@ -222,7 +201,7 @@ export function createMethodDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
  * const Column = createPropertyDecorator<string>();
  *
  * class User {
- *   @Column("varchar")
+ *   \@Column("varchar")
  *   name!: string;
  * }
  *
@@ -230,7 +209,7 @@ export function createMethodDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
  * const Column = createPropertyDecorator((type: string, nullable: boolean) => ({ type, nullable }));
  *
  * class User {
- *   @Column("varchar", false)
+ *   \@Column("varchar", false)
  *   name!: string;
  * }
  *
@@ -251,6 +230,8 @@ export function createPropertyDecorator<TMeta, TArgs extends unknown[] = [TMeta]
 			ensureProperty(target, propertyKey);
 		};
 
+	// Type assertion safe: Object.assign merges the decorator fn with reflection methods,
+	// matching the DecoratedPropertyFactory intersection type
 	return Object.assign(decoratorFn, {
 		key,
 		reflect: (target: AnyConstructor): ScopedReflector<TMeta> => createScopedReflector(target, key),
@@ -261,24 +242,14 @@ export function createPropertyDecorator<TMeta, TArgs extends unknown[] = [TMeta]
 /**
  * Creates a parameter decorator factory that stores metadata per parameter.
  *
- * This factory generates decorators for annotating constructor and method parameters
- * with typed metadata. The returned factory function creates decorators that track
- * the parameter index and store metadata keyed by that index. Multiple decorators
- * on the same parameter accumulate their metadata in application order. Metadata
- * is stored using `reflect-metadata` and can be retrieved via the attached reflection
- * methods or the global {@link Reflector}.
+ * Tracks the parameter index and stores metadata keyed by that index.
+ * Multiple decorators on the same parameter accumulate in application order.
  *
  * @typeParam TMeta - The type of metadata stored by the decorator
  * @typeParam TArgs - The argument types accepted by the decorator factory (defaults to `[TMeta]`)
- *
  * @param composeFn - Optional function to compose decorator arguments into metadata.
  *   If not provided, the first argument is used as the metadata value directly.
- *
- * @returns A {@link DecoratedParameterFactory} that creates parameter decorators and provides
- *   reflection methods (`reflect`, `parameters`, `key`) for querying decorated parameters.
- *
- * @see {@link DecoratedParameterFactory}
- * @see {@link ScopedReflector}
+ * @returns A {@link DecoratedParameterFactory} with reflection methods (`reflect`, `parameters`, `key`)
  *
  * @example
  * ```typescript
@@ -316,6 +287,8 @@ export function createParameterDecorator<TMeta, TArgs extends unknown[] = [TMeta
 			setParameterMap(key, target, map, propertyKey);
 		};
 
+	// Type assertion safe: Object.assign merges the decorator fn with reflection methods,
+	// matching the DecoratedParameterFactory intersection type
 	return Object.assign(decoratorFn, {
 		key,
 		reflect: (target: AnyConstructor): ScopedReflector<TMeta> => createScopedReflector(target, key),
@@ -326,24 +299,14 @@ export function createParameterDecorator<TMeta, TArgs extends unknown[] = [TMeta
 /**
  * Creates a method decorator that wraps the original method with an interceptor.
  *
- * This factory generates decorators that wrap method implementations, enabling
- * cross-cutting concerns like logging, timing, caching, or validation. The
- * interceptor receives the original method, accumulated metadata, and context
- * about the decoration target. Unlike {@link createMethodDecorator}, this factory
- * actively modifies method behavior at decoration time.
+ * Unlike {@link createMethodDecorator}, this factory actively modifies method
+ * behavior at decoration time for cross-cutting concerns like logging, timing,
+ * caching, or validation.
  *
  * @typeParam TMeta - The type of metadata stored by the decorator
  * @typeParam TArgs - The argument types accepted by the decorator factory (defaults to `[TMeta]`)
- *
- * @param options - Configuration for the method interceptor, including:
- *   - `compose`: Optional function to transform decorator arguments into metadata
- *   - `interceptor`: Function that receives the original method and returns a wrapped version
- *
- * @returns A {@link DecoratedMethodFactory} that creates method decorators with interception
- *   and provides reflection methods (`reflect`, `methods`, `key`) for querying decorated methods.
- *
- * @see {@link MethodInterceptorOptions}
- * @see {@link DecoratedMethodFactory}
+ * @param options - {@link MethodInterceptorOptions} with `interceptor` and optional `compose`
+ * @returns A {@link DecoratedMethodFactory} with reflection methods (`reflect`, `methods`, `key`)
  *
  * @example
  * ```typescript
@@ -358,7 +321,7 @@ export function createParameterDecorator<TMeta, TArgs extends unknown[] = [TMeta
  * });
  *
  * class Service {
- *   @Timed("operation")
+ *   \@Timed("operation")
  *   expensiveOperation() {
  *     // ... slow work
  *   }
@@ -399,6 +362,8 @@ export function createMethodInterceptor<TMeta, TArgs extends unknown[] = [TMeta]
 			descriptor.value = wrapped;
 		};
 
+	// Type assertion safe: Object.assign merges the decorator fn with reflection methods,
+	// matching the DecoratedMethodFactory intersection type
 	return Object.assign(decoratorFn, {
 		key,
 		reflect: (target: AnyConstructor): ScopedReflector<TMeta> => createScopedReflector(target, key),
@@ -409,25 +374,13 @@ export function createMethodInterceptor<TMeta, TArgs extends unknown[] = [TMeta]
 /**
  * Creates a property decorator that intercepts get/set operations.
  *
- * This factory generates decorators that wrap property access, enabling
- * features like lazy initialization, validation, change tracking, or
- * computed properties. The interceptors receive the original getter/setter,
- * accumulated metadata, and context about the decoration target. Properties
- * are converted to accessor descriptors (get/set) if they aren't already.
+ * Properties are converted to accessor descriptors (get/set) if they aren't
+ * already, enabling lazy initialization, validation, or change tracking.
  *
  * @typeParam TMeta - The type of metadata stored by the decorator
  * @typeParam TArgs - The argument types accepted by the decorator factory (defaults to `[TMeta]`)
- *
- * @param options - Configuration for the property interceptor, including:
- *   - `compose`: Optional function to transform decorator arguments into metadata
- *   - `onGet`: Optional interceptor for property reads
- *   - `onSet`: Optional interceptor for property writes
- *
- * @returns A {@link DecoratedPropertyFactory} that creates property decorators with interception
- *   and provides reflection methods (`reflect`, `properties`, `key`) for querying decorated properties.
- *
- * @see {@link PropertyInterceptorOptions}
- * @see {@link DecoratedPropertyFactory}
+ * @param options - {@link PropertyInterceptorOptions} with optional `onGet`, `onSet`, and `compose`
+ * @returns A {@link DecoratedPropertyFactory} with reflection methods (`reflect`, `properties`, `key`)
  *
  * @example
  * ```typescript
@@ -440,7 +393,7 @@ export function createMethodInterceptor<TMeta, TArgs extends unknown[] = [TMeta]
  * });
  *
  * class Store {
- *   @Observable("count")
+ *   \@Observable("count")
  *   count = 0;
  * }
  *
@@ -471,6 +424,7 @@ export function createPropertyInterceptor<TMeta, TArgs extends unknown[] = [TMet
 			const metadata = getMetadataArray<TMeta>(key, target, propertyKey);
 			const context = { target, propertyKey, descriptor };
 
+			// Type assertion safe: toAccessor() guarantees an accessor descriptor with get/set
 			if (onGet && descriptor.get) {
 				descriptor.get = onGet(descriptor.get as PropertyGetter, metadata, context);
 			}
@@ -482,6 +436,8 @@ export function createPropertyInterceptor<TMeta, TArgs extends unknown[] = [TMet
 			Object.defineProperty(target, propertyKey, descriptor);
 		};
 
+	// Type assertion safe: Object.assign merges the decorator fn with reflection methods,
+	// matching the DecoratedPropertyFactory intersection type
 	return Object.assign(decoratorFn, {
 		key,
 		reflect: (target: AnyConstructor): ScopedReflector<TMeta> => createScopedReflector(target, key),
