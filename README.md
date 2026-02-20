@@ -78,7 +78,7 @@ import {
 const Tag = createClassDecorator<string>();
 const Route = createMethodDecorator<string>();
 const Column = createPropertyDecorator<string>();
-const Inject = createParameterDecorator<string>();
+const Param = createParameterDecorator<string>();
 ```
 
 ### Compose Functions
@@ -124,6 +124,34 @@ for (const col of columns) {
 // age [{ type: "int", nullable: true }]
 ```
 
+### Property Injection
+
+Property decorators can mark fields for dependency injection:
+
+```typescript
+import { createPropertyDecorator } from "@zendrex/annotate";
+
+const Inject = createPropertyDecorator<string>();
+
+class UserService {
+  @Inject("database")
+  db!: Database;
+
+  @Inject("logger")
+  logger!: Logger;
+}
+
+// Reflect and resolve
+const deps = Inject.properties(UserService);
+// => [{ kind: "property", name: "db", metadata: ["database"] },
+//     { kind: "property", name: "logger", metadata: ["logger"] }]
+
+const instance = new UserService();
+for (const dep of deps) {
+  (instance as any)[dep.name] = container.get(dep.metadata[0]);
+}
+```
+
 ### General Reflection
 
 Use `reflect()` when you need to query multiple decorator types on a single class:
@@ -136,7 +164,7 @@ const reflector = reflect(UserController);
 // Query by decorator key
 const routes = reflector.methods(Route.key);
 const columns = reflector.properties(Column.key);
-const params = reflector.parameters(Inject.key);
+const params = reflector.parameters(Param.key);
 ```
 
 ## Interceptors

@@ -216,6 +216,20 @@ export function createMethodDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
  * // Reflection - query decorated properties
  * const columns = Column.properties(User);
  * // => [{ kind: "property", name: "name", metadata: [{ type: "varchar", nullable: false }] }]
+ *
+ * // Dependency injection - mark properties for resolution
+ * const Inject = createPropertyDecorator<string>();
+ *
+ * class Service {
+ *   \@Inject("database")
+ *   db!: Database;
+ * }
+ *
+ * // Reflect and resolve
+ * const deps = Inject.properties(Service);
+ * for (const dep of deps) {
+ *   (instance as any)[dep.name] = container.get(dep.metadata[0]);
+ * }
  * ```
  */
 export function createPropertyDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
