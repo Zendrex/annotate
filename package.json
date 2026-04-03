@@ -62,12 +62,12 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/zendrex/annotate.git"
+		"url": "git+https://github.com/Zendrex/annotate.git"
 	},
 	"bugs": {
-		"url": "https://github.com/zendrex/annotate/issues"
+		"url": "https://github.com/Zendrex/annotate/issues"
 	},
-	"homepage": "https://github.com/zendrex/annotate#readme",
+	"homepage": "https://github.com/Zendrex/annotate#readme",
 	"keywords": [
 		"typescript",
 		"decorators",
