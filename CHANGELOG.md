@@ -1,5 +1,13 @@
 # @zendrex/annotate
 
+## 0.1.5
+
+### Patch Changes
+
+- [`a9cc051`](https://github.com/Zendrex/annotate/commit/a9cc0510d7222d280eafaee42f0f6d646fba2ba0) Thanks [@Zendrex](https://github.com/Zendrex)! - Add property injection example to docs and JSDoc
+
+- [`6f318ce`](https://github.com/Zendrex/annotate/commit/6f318cee4cb1383642f66b643f038bdd1ad33d50) Thanks [@Zendrex](https://github.com/Zendrex)! - Migrate build tooling from tsup to tsdown and update dependencies
+
 ## 0.1.4
 
 ### Patch Changes
