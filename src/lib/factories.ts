@@ -1,3 +1,5 @@
+import { appendMetadata, getMetadataArray, getParameterMap, setParameterMap } from "./metadata";
+import { createScopedReflector } from "./reflector";
 import type {
 	AnyConstructor,
 	DecoratedClassFactory,
@@ -11,9 +13,6 @@ import type {
 	PropertySetter,
 	ScopedReflector,
 } from "./types";
-
-import { appendMetadata, getMetadataArray, getParameterMap, setParameterMap } from "./metadata";
-import { createScopedReflector } from "./reflector";
 
 /** Applies the compose function if provided, otherwise uses the first arg as metadata. */
 function compose<TMeta, TArgs extends unknown[]>(args: TArgs, fn?: (...a: TArgs) => TMeta): TMeta {

@@ -18,6 +18,24 @@
 /** biome-ignore-all lint/performance/noBarrelFile: main index file */
 import "reflect-metadata";
 
+export {
+	createClassDecorator,
+	createMethodDecorator,
+	createMethodInterceptor,
+	createParameterDecorator,
+	createPropertyDecorator,
+	createPropertyInterceptor,
+} from "./lib/factories";
+export {
+	appendMetadata,
+	defineMetadata,
+	getMetadata,
+	getMetadataArray,
+	getOwnMetadata,
+	getParameterMap,
+	setParameterMap,
+} from "./lib/metadata";
+export { createScopedReflector, Reflector, reflect } from "./lib/reflector";
 export type {
 	ClassDecoratorFactory,
 	ClassDecoratorReflection,
@@ -47,22 +65,3 @@ export type {
 	PropertySetter,
 	ScopedReflector,
 } from "./lib/types";
-
-export {
-	createClassDecorator,
-	createMethodDecorator,
-	createMethodInterceptor,
-	createParameterDecorator,
-	createPropertyDecorator,
-	createPropertyInterceptor,
-} from "./lib/factories";
-export {
-	appendMetadata,
-	defineMetadata,
-	getMetadata,
-	getMetadataArray,
-	getOwnMetadata,
-	getParameterMap,
-	setParameterMap,
-} from "./lib/metadata";
-export { createScopedReflector, Reflector, reflect } from "./lib/reflector";

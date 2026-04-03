@@ -1,7 +1,5 @@
 import "reflect-metadata";
 
-import type { ParameterMetadataMap } from "../src/lib/types";
-
 import { describe, expect, test } from "bun:test";
 
 import {
@@ -13,6 +11,7 @@ import {
 	getParameterMap,
 	setParameterMap,
 } from "../src/lib/metadata";
+import type { ParameterMetadataMap } from "../src/lib/types";
 
 // Test metadata keys
 const TEST_KEY = Symbol("test:key");
