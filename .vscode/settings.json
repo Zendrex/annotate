@@ -18,6 +18,9 @@
 	"[json]": {
 		"editor.defaultFormatter": "biomejs.biome"
 	},
+	"[markdown]": {
+		"editor.defaultFormatter": "biomejs.biome"
+	},
 
 	// TypeScript
 	"typescript.tsdk": "node_modules/typescript/lib",
