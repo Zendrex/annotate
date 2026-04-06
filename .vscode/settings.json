@@ -27,5 +27,8 @@
 
 	// Extension - Path Intellisense
 	"typescript.suggest.paths": false,
-	"javascript.suggest.paths": false
+	"javascript.suggest.paths": false,
+	"[yaml]": {
+		"editor.defaultFormatter": "redhat.vscode-yaml"
+	}
 }
