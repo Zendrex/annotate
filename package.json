@@ -39,7 +39,7 @@
 		"clean": "git clean -xdf dist node_modules"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.4.10",
+		"@biomejs/biome": "2.4.11",
 		"@changesets/changelog-github": "^0.6.0",
 		"@changesets/cli": "^2.30.0",
 		"@swc/core": "^1.15.21",
