@@ -207,3 +207,55 @@ export function flushFor(ctor: Ctor, correlation: object | null): void {
 	}
 	pendingByMetadata.delete(correlation);
 }
+
+// ---------------------------------------------------------------------------
+// v0.x reflect-metadata bridge stubs
+// These are placeholders retained so v0.x factory files remain importable while
+// they await Stage-3 rewrites. Each throws at call time to surface misuse.
+// Remove when all factory files are migrated to the Stage-3 store API.
+// ---------------------------------------------------------------------------
+
+/** @deprecated Stage-3 factories use appendClassMeta / appendMemberMeta. Remove after factory migration. */
+export function appendMetadata(key: symbol, _target: object, _value: unknown, _member?: string | symbol): void {
+	throw new Error(`appendMetadata called at runtime on key ${String(key)} — migrate to Stage-3 store API`);
+}
+
+/** @deprecated Stage-3 factories use collectClassMeta / collectMemberMeta. Remove after factory migration. */
+export function getMetadataArray<T>(key: symbol, _target: object, _member?: string | symbol): T[] {
+	throw new Error(`getMetadataArray called at runtime on key ${String(key)} — migrate to Stage-3 store API`);
+}
+
+/** @deprecated Reflect.defineMetadata bridge. Remove after factory migration. */
+export function defineMetadata(key: symbol, _value: unknown, _target: object, _member?: string | symbol): void {
+	throw new Error(`defineMetadata called at runtime on key ${String(key)} — migrate to Stage-3 store API`);
+}
+
+/** @deprecated Reflect.getMetadata bridge. Remove after factory migration. */
+export function getMetadata<T>(key: symbol, _target: object, _member?: string | symbol): T | undefined {
+	throw new Error(`getMetadata called at runtime on key ${String(key)} — migrate to Stage-3 store API`);
+}
+
+/** @deprecated Reflect.getOwnMetadata bridge. Remove after factory migration. */
+export function getOwnMetadata<T>(key: symbol, _target: object, _member?: string | symbol): T | undefined {
+	throw new Error(`getOwnMetadata called at runtime on key ${String(key)} — migrate to Stage-3 store API`);
+}
+
+/** @deprecated Parameter metadata bridge. Remove after factory migration. */
+export function getParameterMap<T>(
+	key: symbol,
+	_target: object,
+	_member?: string | symbol
+): Map<number, T[]> | undefined {
+	throw new Error(`getParameterMap called at runtime on key ${String(key)} — migrate to Stage-3 store API`);
+}
+
+/** @deprecated Parameter metadata bridge. Remove after factory migration. */
+export function setParameterMap(
+	key: symbol,
+	_target: object,
+	_member: string | symbol | undefined,
+	_index: number,
+	_value: unknown
+): void {
+	throw new Error(`setParameterMap called at runtime on key ${String(key)} — migrate to Stage-3 store API`);
+}
