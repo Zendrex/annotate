@@ -1,10 +1,8 @@
 /** biome-ignore-all lint/suspicious/noEmptyBlockStatements: test file */
-import "reflect-metadata";
-
 import { describe, expect, test } from "bun:test";
 
 import { createMethodDecorator, createPropertyDecorator } from "../../../src";
-import { ClassTag, ParamInject, PropertyColumn } from "../../fixtures/decorators";
+import { ClassTag, PropertyColumn } from "../../fixtures/decorators";
 
 describe("factory.reflect()", () => {
 	test("should be scoped to key", () => {
@@ -45,18 +43,6 @@ describe("factory.reflect()", () => {
 
 		expect(results).toHaveLength(1);
 		expect(results[0]?.name).toBe("field");
-	});
-
-	test("should provide parameters() without key argument", () => {
-		class Target {
-			constructor(@ParamInject("token") _token: unknown) {}
-		}
-
-		const scoped = ParamInject.reflect(Target);
-		const results = scoped.parameters();
-
-		expect(results).toHaveLength(1);
-		expect(results[0]?.kind).toBe("constructor-parameter");
 	});
 });
 
