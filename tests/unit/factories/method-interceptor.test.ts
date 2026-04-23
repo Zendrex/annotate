@@ -1,81 +1,91 @@
-import "reflect-metadata";
-
 import { describe, expect, test } from "bun:test";
 
-import { createMethodInterceptor } from "../../../src";
+// Temporary: importing directly until Phase M1 consolidates all factory exports into src/index.ts.
+import { createMethodInterceptor } from "../../../src/factories/method-interceptor";
 
-describe("createMethodInterceptor", () => {
-	test("should wrap method and intercept calls", () => {
+describe("createMethodInterceptor (Stage-3)", () => {
+	test("wraps a method and records metadata", () => {
 		const calls: string[] = [];
-
 		const Log = createMethodInterceptor<string>({
-			intercept: (original, _meta, ctx) =>
+			intercept: (original, readMetadata, context) =>
 				function (this: unknown, ...args: unknown[]) {
-					calls.push(`before:${String(ctx.name)}`);
-					const result = original.apply(this, args);
-					calls.push(`after:${String(ctx.name)}`);
-					return result;
-				},
+					const meta = readMetadata(this as object);
+					calls.push(`${context.name as string}:${meta.join(",")}`);
+					return original.call(this, ...args);
+				} as typeof original,
 		});
 
-		class Service {
-			@Log("info")
-			doWork() {
-				calls.push("work");
-				return "done";
+		class Svc {
+			@Log("a")
+			run(x: number): number {
+				return x + 1;
 			}
 		}
 
-		const service = new Service();
-		const result = service.doWork();
-
-		expect(result).toBe("done");
-		expect(calls).toEqual(["before:doWork", "work", "after:doWork"]);
+		const s = new Svc();
+		expect(s.run(1)).toBe(2);
+		expect(calls).toEqual(["run:a"]);
+		expect(Log.metadata(Svc, "run")).toBe("a");
 	});
 
-	test("should provide metadata to interceptor", () => {
-		let capturedMeta: string[] = [];
-
-		const Track = createMethodInterceptor<string>({
-			intercept: (original, meta) => {
-				capturedMeta = meta;
-				return original;
-			},
+	test("readMetadata returns the complete ancestor-merged array at call-time", () => {
+		const Outer = createMethodInterceptor<string>({
+			intercept: (original, readMetadata) =>
+				function (this: unknown, ...args: unknown[]) {
+					(this as { _seen?: string[] })._seen = readMetadata(this as object);
+					return original.call(this, ...args);
+				} as typeof original,
 		});
 
-		class Service {
-			@Track("tag1")
-			@Track("tag2")
-			method() {
-				return null;
-			}
+		class Parent {
+			@Outer("p")
+			// biome-ignore lint/suspicious/noEmptyBlockStatements: test stub method
+			run(): void {}
+		}
+		class Child extends Parent {
+			// inherits run; ancestor merge should include "p"
 		}
 
-		new Service().method();
-
-		expect(capturedMeta).toEqual(["tag2", "tag1"]);
+		const c = new Child() as Child & { _seen?: string[] };
+		c.run();
+		expect(c._seen).toEqual(["p"]);
 	});
 
-	test("should support compose function", () => {
-		let capturedMeta: Array<{ level: string; enabled: boolean }> = [];
-
-		const Trace = createMethodInterceptor({
-			compose: (level: string, enabled: boolean) => ({ level, enabled }),
-			intercept: (original, meta) => {
-				capturedMeta = meta;
-				return original;
-			},
+	test("static method interception", () => {
+		const Cmd = createMethodInterceptor<string>({
+			intercept: (original) => ((...args: unknown[]) => `[${original(...args)}]`) as typeof original,
 		});
 
-		class Service {
-			@Trace("debug", true)
-			method() {
-				return null;
+		// biome-ignore lint/complexity/noStaticOnlyClass: test fixture requires a class with a single static method
+		class Cli {
+			@Cmd("build")
+			static greet(): string {
+				return "hi";
 			}
 		}
+		expect(Cli.greet()).toBe("[hi]");
+		expect(Cmd.metadata(Cli, "greet")).toBe("build");
+	});
 
-		new Service().method();
+	test("stacked interceptors: outer wraps inner; both metadata visible", () => {
+		const Trace = createMethodInterceptor<string>({
+			intercept: (original, readMetadata) =>
+				function (this: unknown, ...args: unknown[]) {
+					const meta = readMetadata(this as object);
+					(this as { _all?: string[] })._all = meta;
+					return original.call(this, ...args);
+				} as typeof original,
+		});
 
-		expect(capturedMeta).toEqual([{ level: "debug", enabled: true }]);
+		class X {
+			@Trace("outer")
+			@Trace("inner")
+			// biome-ignore lint/suspicious/noEmptyBlockStatements: test stub method
+			run(): void {}
+		}
+
+		const x = new X() as X & { _all?: string[] };
+		x.run();
+		expect(x._all).toEqual(["inner", "outer"]);
 	});
 });
