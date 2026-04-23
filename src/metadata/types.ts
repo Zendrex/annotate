@@ -1,17 +1,34 @@
-/** Unique symbol key used to identify and store decorator metadata. */
+/** Per-factory metadata key. Each factory generates a unique symbol at construction. */
 export type MetadataKey = symbol;
 
-/**
- * Array preserving decorator application order when multiple decorators of same type
- * are applied to a target.
- *
- * @typeParam T - Metadata type stored by decorator
- */
-export type MetadataArray<T> = T[];
+/** Bucket of class-scoped metadata, keyed per factory symbol. */
+export type ClassBucket = Map<symbol, unknown[]>;
 
 /**
- * Maps zero-based parameter indexes to metadata arrays.
+ * Bucket of member-scoped metadata.
  *
- * @typeParam T - Metadata type stored per parameter
+ * Outer key: per-factory symbol (`MetadataKey`).
+ * Inner key: member name (`string | symbol`).
+ *
+ * `Map` is used at both nesting levels to avoid prototype-pollution hazards
+ * present with plain object records.
  */
-export type ParameterMetadataMap<T> = Map<number, MetadataArray<T>>;
+export type MemberBucket = Map<symbol, Map<string | symbol, unknown[]>>;
+
+/**
+ * Pending instance-member registration captured at decoration time and
+ * committed when the declaring class is correlated (eager flush via
+ * `flushFor`, or lazy commit via the per-instance initializer).
+ *
+ * @internal
+ */
+export interface Deferred {
+	key: symbol;
+	meta: unknown;
+	name: string | symbol;
+	token: symbol;
+	unique: boolean;
+}
+
+// Thin alias retained for downstream compatibility. Phase C+ consumers migrate to ClassBucket / MemberBucket.
+export type MetadataArray<T = unknown> = readonly T[];
