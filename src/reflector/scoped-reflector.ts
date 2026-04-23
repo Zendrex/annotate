@@ -7,7 +7,6 @@ import type {
 	DecoratedItem,
 	DecoratedMethod,
 	DecoratedMethodSingle,
-	DecoratedParameter,
 	DecoratedProperty,
 	DecoratedPropertySingle,
 	ScopedReflector,
@@ -53,9 +52,5 @@ class ScopedReflectorImpl<TMeta> implements ScopedReflector<TMeta> {
 		return this.reflector
 			.properties<TMeta>(this.key)
 			.map((entry) => ({ ...entry, metadata: entry.metadata[0] as TMeta }));
-	}
-
-	parameters(): DecoratedParameter<TMeta>[] {
-		return this.reflector.parameters<TMeta>(this.key);
 	}
 }
