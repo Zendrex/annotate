@@ -1,12 +1,6 @@
-import { appendClassMeta, collectClassMeta, flushFor, hasOwnClassMeta, registerCtor } from "../metadata/store";
-import { resolveReflectTarget } from "../reflector/resolve-instance";
-import { createScopedReflector } from "../reflector/scoped-reflector";
-import { materialize } from "../runtime/materialize";
-import { compose, ensureClassRegistered, generateKey, labelFor, throwMissingClass } from "./shared";
+import { appendClassMeta, flushFor, registerCtor } from "../metadata/store";
+import { compose, createClassFactoryHelpers, generateKey, labelFor } from "./shared";
 import type { DecoratedClassFactory, DecoratorOptions } from "./types";
-
-// biome-ignore lint/complexity/noBannedTypes: Constructor identity uses Function for parity with metadata/store module.
-type Ctor = Function;
 
 /**
  * Create a typed class decorator with reflection helpers pre-bound to a unique
@@ -30,36 +24,8 @@ export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta], T
 			flushFor(value, context.metadata);
 		};
 
-	const firstClassMeta = (ctor: Ctor): TMeta | undefined => {
-		const list = collectClassMeta<TMeta>(ctor, key);
-		return list.length > 0 ? list[0] : undefined;
-	};
-
 	return Object.assign(decoratorFn, {
 		key,
-		reflect: (target: object) => createScopedReflector<TMeta>(resolveReflectTarget(target), key),
-		metadata: (target: object) => {
-			const ctor = resolveReflectTarget(target);
-			materialize(ctor);
-			ensureClassRegistered(ctor);
-			return firstClassMeta(ctor);
-		},
-		requireMetadata: (target: object): TMeta => {
-			const ctor = resolveReflectTarget(target);
-			materialize(ctor);
-			ensureClassRegistered(ctor);
-			const first = firstClassMeta(ctor);
-			return first === undefined ? throwMissingClass(key, ctor, label) : first;
-		},
-		applied: (target: object) => {
-			const ctor = resolveReflectTarget(target);
-			materialize(ctor);
-			return collectClassMeta<TMeta>(ctor, key).length > 0;
-		},
-		appliedOwn: (target: object) => {
-			const ctor = resolveReflectTarget(target);
-			materialize(ctor);
-			return hasOwnClassMeta(ctor, key);
-		},
+		...createClassFactoryHelpers<TMeta>(key, label),
 	}) as DecoratedClassFactory<TMeta, TArgs, TInstance>;
 }

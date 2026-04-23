@@ -1,8 +1,6 @@
 import { DuplicateMetadataError } from "../errors";
-import type { ClassBucket, Deferred, MemberBucket, MemberKind } from "./types";
-
-// biome-ignore lint/complexity/noBannedTypes: Store API accepts raw constructor identity for WeakMap parity; aliased once to avoid suppression noise throughout this file.
-type Ctor = Function;
+import type { AnyConstructor } from "../reflector/types";
+import type { ClassBucket, Ctor, Deferred, MemberBucket, MemberKind } from "./types";
 
 const classMetaStore = new WeakMap<Ctor, ClassBucket>();
 const memberMetaStore = new WeakMap<Ctor, MemberBucket>();
@@ -45,7 +43,7 @@ export function appendClassMeta<T>(ctor: Ctor, key: symbol, value: T, options: {
 		bucket.set(key, list);
 	}
 	if (options.unique && list.length > 0) {
-		throw new DuplicateMetadataError(ctor as new (...args: unknown[]) => unknown, key, "class");
+		throw new DuplicateMetadataError(ctor as AnyConstructor, key, "class");
 	}
 	list.push(value);
 }
@@ -92,7 +90,7 @@ export function appendMemberMeta<T>(
 		inner.set(name, list);
 	}
 	if (options.unique && list.length > 0) {
-		throw new DuplicateMetadataError(ctor as new (...args: unknown[]) => unknown, key, options.kind, name);
+		throw new DuplicateMetadataError(ctor as AnyConstructor, key, options.kind, name);
 	}
 	list.push(meta);
 	tokens.add(token);

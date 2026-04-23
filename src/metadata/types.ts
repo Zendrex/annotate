@@ -1,3 +1,16 @@
+/**
+ * Internal constructor identity used as the key across metadata WeakMaps.
+ *
+ * Typed as bare `Function` (not `AnyConstructor`) because WeakMap keys accept
+ * any callable — including the raw forms received by the decorator bodies
+ * before the reflector coerces them to constructors. Kept internal; public
+ * API surfaces use `AnyConstructor` from `reflector/types`.
+ *
+ * @internal
+ */
+// biome-ignore lint/complexity/noBannedTypes: WeakMap key parity requires bare Function across the store and related modules.
+export type Ctor = Function;
+
 /** Per-factory metadata key. Each factory generates a unique symbol at construction. */
 export type MetadataKey = symbol;
 

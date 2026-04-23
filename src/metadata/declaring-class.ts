@@ -1,7 +1,5 @@
 import { hasOwnMetadata, readOwnMetadata } from "../runtime/symbol-metadata";
-
-// biome-ignore lint/complexity/noBannedTypes: Constructor identity uses Function for parity with runtime/symbol-metadata.
-type Ctor = Function;
+import type { Ctor } from "./types";
 
 /**
  * Walk the constructor prototype chain from `instance.constructor` upward,

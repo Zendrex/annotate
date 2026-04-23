@@ -10,11 +10,8 @@ import {
 import { materialize } from "../runtime/materialize";
 import { targetDisplayName } from "./class-name";
 import { resolveReflectTarget } from "./resolve-instance";
-import type { MetadataKey } from "../metadata/types";
+import type { Ctor, MetadataKey } from "../metadata/types";
 import type { AnyConstructor, DecoratedClass, DecoratedItem, DecoratedMethod, DecoratedProperty } from "./types";
-
-// biome-ignore lint/complexity/noBannedTypes: constructor identity uses Function for parity with metadata/store
-type Ctor = Function;
 
 /**
  * Reflection over decorator metadata attached to a class. Each query takes a

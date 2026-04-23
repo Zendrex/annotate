@@ -8,56 +8,62 @@ import type { AnyConstructor, DecoratedKind } from "./reflector/types";
  * - `DUPLICATE` — thrown at decoration time when `unique` is violated.
  * - `MISSING` — thrown at reflection time by `requireMetadata` when the
  *   requested slot has no recorded metadata.
+ * - `UNREGISTERED` — thrown at reflection time when the target class has no
+ *   registered annotate metadata anywhere on its prototype chain.
  */
 export const AnnotateErrorCode = {
 	DUPLICATE: "duplicate",
 	MISSING: "missing",
+	UNREGISTERED: "unregistered",
 } as const;
 export type AnnotateErrorCode = (typeof AnnotateErrorCode)[keyof typeof AnnotateErrorCode];
 
 /** @internal */
 export interface AnnotateErrorOptions {
 	code: AnnotateErrorCode;
-	key: MetadataKey;
-	kind: DecoratedKind;
+	key?: MetadataKey;
+	kind?: DecoratedKind;
 	memberName?: string | symbol;
 	message: string;
 	target: AnyConstructor;
 }
 
 /**
- * Thrown by decorator factories when a library invariant is violated.
- *
- * Two failure modes share this type, discriminated by `code`:
+ * Thrown by decorator factories and reflection helpers when a library
+ * invariant is violated. Failure modes share this type, discriminated by
+ * `code`:
  *
  * - Decoration-time `"duplicate"` — a factory with `unique: true` was applied
  *   to a site that already has metadata.
  * - Reflection-time `"missing"` — `factory.requireMetadata(...)` was called on
  *   a site without recorded metadata.
+ * - Reflection-time `"unregistered"` — a class has no annotate metadata
+ *   anywhere (after auto-materialization).
  *
- * Always thrown with `target` resolved to a class constructor (never an
- * instance or prototype). `memberName` is populated only when the kind is
- * `"method"` or `"property"`. Distinguish from consumer domain errors with
- * `instanceof AnnotateError`.
+ * `target` is always a class constructor (never an instance or prototype).
+ * `memberName` is populated only when the kind is `"method"` or `"property"`.
+ * `key` and `kind` are set for decoration-site failures and omitted for
+ * class-level `"unregistered"` failures. Distinguish from consumer domain
+ * errors with `instanceof AnnotateError`.
  */
 export class AnnotateError extends Error {
 	override readonly name: string = "AnnotateError";
 
-	/** Factory-level metadata key identifying which decorator raised the error. */
-	readonly key: MetadataKey;
-	/** Decoration site kind where the violation occurred. */
-	readonly kind: DecoratedKind;
 	readonly code: AnnotateErrorCode;
 	readonly target: AnyConstructor;
+	/** Factory-level metadata key. Omitted for `"unregistered"`. */
+	readonly key?: MetadataKey;
+	/** Decoration site kind. Omitted for `"unregistered"`. */
+	readonly kind?: DecoratedKind;
 	/** Set for method/property sites. */
 	readonly memberName?: string | symbol;
 
 	constructor(options: AnnotateErrorOptions) {
 		super(options.message);
-		this.key = options.key;
-		this.kind = options.kind;
 		this.code = options.code;
 		this.target = options.target;
+		this.key = options.key;
+		this.kind = options.kind;
 		this.memberName = options.memberName;
 	}
 }
@@ -97,18 +103,18 @@ export class DuplicateMetadataError extends AnnotateError {
  * `materialize(ctor)` on instance-member-only classes if pre-instantiation
  * reflection is required and the class has no class decorator or static decorations.
  */
-export class UnregisteredClassError extends Error {
+export class UnregisteredClassError extends AnnotateError {
 	override readonly name: string = "UnregisteredClassError";
 
-	readonly target: AnyConstructor;
-
 	constructor(target: AnyConstructor) {
-		super(
-			`@zendrex/annotate: no registered metadata for "${targetDisplayName(target)}". ` +
+		super({
+			code: AnnotateErrorCode.UNREGISTERED,
+			target,
+			message:
+				`@zendrex/annotate: no registered metadata for "${targetDisplayName(target)}". ` +
 				"Causes: missing decorator import, bundler tree-shake of the decoration module, " +
 				`legacy "experimentalDecorators: true" emit, or instance-member-only class with ` +
-				"no class decorator (call materialize(ctor) before reflect)."
-		);
-		this.target = target;
+				"no class decorator (call materialize(ctor) before reflect).",
+		});
 	}
 }

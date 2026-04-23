@@ -1,9 +1,8 @@
 import { UnregisteredClassError } from "../errors";
 import { flushFor, getCorrelationFor, hasPendingFor, registerCtor } from "../metadata/store";
 import { hasOwnMetadata, readOwnMetadata } from "./symbol-metadata";
-
-// biome-ignore lint/complexity/noBannedTypes: Constructor identity uses Function for parity with store/declaring-class modules.
-type Ctor = Function;
+import type { Ctor } from "../metadata/types";
+import type { AnyConstructor } from "../reflector/types";
 
 /**
  * Force commit of any pending instance-member registrations for `ctor` so
@@ -42,7 +41,7 @@ export function materialize(ctor: Ctor): void {
 			return;
 		}
 		// Own slot exists but value is null/undefined — degraded-path signal.
-		throw new UnregisteredClassError(ctor as new (...args: unknown[]) => unknown);
+		throw new UnregisteredClassError(ctor as AnyConstructor);
 	}
 
 	let current: Ctor | null = Object.getPrototypeOf(ctor) as Ctor | null;

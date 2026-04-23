@@ -1,20 +1,7 @@
-import { resolveDeclaringClass } from "../metadata/declaring-class";
-import {
-	appendMemberMeta,
-	collectMemberMeta,
-	flushFor,
-	hasOwnMemberMeta,
-	queueDeferred,
-	registerCtor,
-} from "../metadata/store";
-import { resolveReflectTarget } from "../reflector/resolve-instance";
-import { createScopedReflector } from "../reflector/scoped-reflector";
-import { materialize } from "../runtime/materialize";
-import { compose, ensureClassRegistered, generateKey, labelFor, throwMissingMember } from "./shared";
+import { collectMemberMeta } from "../metadata/store";
+import { compose, createMemberFactoryHelpers, emitMemberDecoration, generateKey, labelFor } from "./shared";
+import type { Ctor } from "../metadata/types";
 import type { AccessorInterceptorOptions, DecoratedAccessorFactory, InterceptorContext } from "./types";
-
-// biome-ignore lint/complexity/noBannedTypes: Constructor identity uses Function for parity with metadata/store module.
-type Ctor = Function;
 
 /**
  * Create an accessor (get/set) interceptor. Supply `onGet`, `onSet`, or both;
@@ -50,9 +37,6 @@ export function createAccessorInterceptor<TMeta, TArgs extends unknown[] = [TMet
 			context: ClassAccessorDecoratorContext<any, TValue>
 			// biome-ignore lint/suspicious/noExplicitAny: EA-3 — This defaults to any per lib.es2023.decorators.d.ts
 		): ClassAccessorDecoratorResult<any, TValue> => {
-			const meta = compose(args, composeFn);
-			const token = Symbol("accessorIntercept");
-			const correlation = context.metadata;
 			const memberName = context.name;
 			const isStatic = context.static;
 
@@ -70,71 +54,27 @@ export function createAccessorInterceptor<TMeta, TArgs extends unknown[] = [TMet
 			// biome-ignore lint/suspicious/noExplicitAny: EA-3 — This defaults to any per lib.es2023.decorators.d.ts
 			const result: ClassAccessorDecoratorResult<any, TValue> = {};
 			if (onGet) {
-				const wrappedGet = onGet(value.get, readMetadata, interceptorContext);
-				result.get = wrappedGet;
+				result.get = onGet(value.get, readMetadata, interceptorContext);
 			}
 			if (onSet) {
-				const wrappedSet = onSet(value.set, readMetadata, interceptorContext);
-				result.set = wrappedSet;
+				result.set = onSet(value.set, readMetadata, interceptorContext);
 			}
 
-			if (isStatic) {
-				context.addInitializer(function (this: unknown) {
-					const ctor = this as Ctor;
-					appendMemberMeta(ctor, key, memberName, meta, token, { unique, static: true, kind: "property" });
-					registerCtor(ctor, correlation);
-					flushFor(ctor, correlation);
-				});
-			} else {
-				queueDeferred(correlation, {
-					key,
-					name: memberName,
-					meta,
-					token,
-					unique,
-					static: false,
-					kind: "property",
-				});
-				context.addInitializer(function (this: unknown) {
-					const ctor = resolveDeclaringClass(this as object, correlation);
-					registerCtor(ctor, correlation);
-					appendMemberMeta(ctor, key, memberName, meta, token, { unique, static: false, kind: "property" });
-				});
-			}
+			emitMemberDecoration({
+				context,
+				key,
+				// Auto-accessors classify as fields in the store (parity with reflector).
+				kind: "property",
+				meta: compose(args, composeFn),
+				token: Symbol("accessorIntercept"),
+				unique,
+			});
 
 			return result;
 		};
 
-	const firstMemberMeta = (ctor: Ctor, member: string | symbol): TMeta | undefined => {
-		const list = collectMemberMeta<TMeta>(ctor, key, member);
-		return list.length > 0 ? list[0] : undefined;
-	};
-
 	return Object.assign(decoratorFn, {
 		key,
-		reflect: (target: object) => createScopedReflector<TMeta>(resolveReflectTarget(target), key),
-		metadata: (target: object, member: string | symbol) => {
-			const ctor = resolveReflectTarget(target);
-			materialize(ctor);
-			ensureClassRegistered(ctor);
-			return firstMemberMeta(ctor, member);
-		},
-		requireMetadata: (target: object, member: string | symbol): TMeta => {
-			const ctor = resolveReflectTarget(target);
-			materialize(ctor);
-			ensureClassRegistered(ctor);
-			const first = firstMemberMeta(ctor, member);
-			return first === undefined ? throwMissingMember(key, "property", ctor, member, label) : first;
-		},
-		applied: (target: object, member: string | symbol) => {
-			const ctor = resolveReflectTarget(target);
-			materialize(ctor);
-			return collectMemberMeta<TMeta>(ctor, key, member).length > 0;
-		},
-		appliedOwn: (target: object, member: string | symbol) => {
-			const ctor = resolveReflectTarget(target);
-			materialize(ctor);
-			return hasOwnMemberMeta(ctor, key, member);
-		},
+		...createMemberFactoryHelpers<TMeta>(key, "property", label),
 	}) as DecoratedAccessorFactory<TMeta, TArgs, TValue>;
 }
