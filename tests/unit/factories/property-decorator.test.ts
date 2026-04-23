@@ -118,4 +118,21 @@ describe("createPropertyDecorator (Stage-3)", () => {
 		expect(Column.appliedOwn(B, "bar")).toBe(true);
 		expect(Column.appliedOwn(A, "foo")).toBe(true);
 	});
+
+	test("applied / appliedOwn never throw on undecorated class", () => {
+		const Column = createPropertyDecorator<string>();
+		class Bare {}
+		expect(Column.applied(Bare, "foo")).toBe(false);
+		expect(Column.appliedOwn(Bare, "foo")).toBe(false);
+	});
+
+	test("appliedOwn auto-materializes pending registrations", () => {
+		const Column = createPropertyDecorator<string>();
+		class User {
+			@Column("v")
+			name!: string;
+		}
+		// No new User(), no materialize() — appliedOwn should still see it via auto-materialize.
+		expect(Column.appliedOwn(User, "name")).toBe(true);
+	});
 });

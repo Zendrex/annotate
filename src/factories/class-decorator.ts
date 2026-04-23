@@ -1,6 +1,7 @@
 import { appendClassMeta, collectClassMeta, flushFor, hasOwnClassMeta, registerCtor } from "../metadata/store";
 import { resolveReflectTarget } from "../reflector/resolve-instance";
 import { createScopedReflector } from "../reflector/scoped-reflector";
+import { materialize } from "../runtime/materialize";
 import { compose, generateKey, labelFor, throwMissingClass } from "./shared";
 import type { DecoratedClassFactory, DecoratorOptions } from "./types";
 
@@ -37,13 +38,26 @@ export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta], T
 	return Object.assign(decoratorFn, {
 		key,
 		reflect: (target: object) => createScopedReflector<TMeta>(resolveReflectTarget(target), key),
-		metadata: (target: object) => firstClassMeta(resolveReflectTarget(target)),
+		metadata: (target: object) => {
+			const ctor = resolveReflectTarget(target);
+			materialize(ctor);
+			return firstClassMeta(ctor);
+		},
 		requireMetadata: (target: object): TMeta => {
 			const ctor = resolveReflectTarget(target);
+			materialize(ctor);
 			const first = firstClassMeta(ctor);
 			return first === undefined ? throwMissingClass(key, ctor, label) : first;
 		},
-		applied: (target: object) => collectClassMeta<TMeta>(resolveReflectTarget(target), key).length > 0,
-		appliedOwn: (target: object) => hasOwnClassMeta(resolveReflectTarget(target), key),
+		applied: (target: object) => {
+			const ctor = resolveReflectTarget(target);
+			materialize(ctor);
+			return collectClassMeta<TMeta>(ctor, key).length > 0;
+		},
+		appliedOwn: (target: object) => {
+			const ctor = resolveReflectTarget(target);
+			materialize(ctor);
+			return hasOwnClassMeta(ctor, key);
+		},
 	}) as DecoratedClassFactory<TMeta, TArgs, TInstance>;
 }

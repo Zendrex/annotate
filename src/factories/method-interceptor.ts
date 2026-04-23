@@ -9,6 +9,7 @@ import {
 } from "../metadata/store";
 import { resolveReflectTarget } from "../reflector/resolve-instance";
 import { createScopedReflector } from "../reflector/scoped-reflector";
+import { materialize } from "../runtime/materialize";
 import { compose, generateKey, labelFor, throwMissingMember } from "./shared";
 import type { AnyFn, DecoratedMethodFactory, InterceptorContext, MethodInterceptorOptions } from "./types";
 
@@ -86,15 +87,26 @@ export function createMethodInterceptor<TMeta, TArgs extends unknown[] = [TMeta]
 	return Object.assign(decoratorFn, {
 		key,
 		reflect: (target: object) => createScopedReflector<TMeta>(resolveReflectTarget(target), key),
-		metadata: (target: object, member: string | symbol) => firstMemberMeta(resolveReflectTarget(target), member),
+		metadata: (target: object, member: string | symbol) => {
+			const ctor = resolveReflectTarget(target);
+			materialize(ctor);
+			return firstMemberMeta(ctor, member);
+		},
 		requireMetadata: (target: object, member: string | symbol): TMeta => {
 			const ctor = resolveReflectTarget(target);
+			materialize(ctor);
 			const first = firstMemberMeta(ctor, member);
 			return first === undefined ? throwMissingMember(key, "method", ctor, member, label) : first;
 		},
-		applied: (target: object, member: string | symbol) =>
-			collectMemberMeta<TMeta>(resolveReflectTarget(target), key, member).length > 0,
-		appliedOwn: (target: object, member: string | symbol) =>
-			hasOwnMemberMeta(resolveReflectTarget(target), key, member),
+		applied: (target: object, member: string | symbol) => {
+			const ctor = resolveReflectTarget(target);
+			materialize(ctor);
+			return collectMemberMeta<TMeta>(ctor, key, member).length > 0;
+		},
+		appliedOwn: (target: object, member: string | symbol) => {
+			const ctor = resolveReflectTarget(target);
+			materialize(ctor);
+			return hasOwnMemberMeta(ctor, key, member);
+		},
 	}) as DecoratedMethodFactory<TMeta, TArgs, TMethod>;
 }
