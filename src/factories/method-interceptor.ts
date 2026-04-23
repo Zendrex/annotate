@@ -1,5 +1,12 @@
 import { resolveDeclaringClass } from "../metadata/declaring-class";
-import { appendMemberMeta, collectMemberMeta, hasOwnMemberMeta, queueDeferred, registerCtor } from "../metadata/store";
+import {
+	appendMemberMeta,
+	collectMemberMeta,
+	flushFor,
+	hasOwnMemberMeta,
+	queueDeferred,
+	registerCtor,
+} from "../metadata/store";
 import { resolveReflectTarget } from "../reflector/resolve-instance";
 import { createScopedReflector } from "../reflector/scoped-reflector";
 import { compose, generateKey, labelFor, throwMissingMember } from "./shared";
@@ -8,6 +15,20 @@ import type { AnyFn, DecoratedMethodFactory, InterceptorContext, MethodIntercept
 // biome-ignore lint/complexity/noBannedTypes: Constructor identity uses Function for parity with metadata/store module.
 type Ctor = Function;
 
+/**
+ * Create a method interceptor that wraps the original method with the function
+ * returned by `options.intercept`. The interceptor receives a `readMetadata`
+ * reader that, when called at invocation time, returns the full ancestor-merged
+ * metadata array for the decorated member.
+ *
+ * `TMethod` constrains the method signature the decorator may apply to —
+ * narrowing it (e.g. `(x: number) => number`) rejects applications to
+ * methods with incompatible shapes at compile time.
+ *
+ * Applies to both instance and static methods. For instance methods the
+ * metadata registers lazily on first instantiation; static applications
+ * register at class-body evaluation and drain the pending buffer.
+ */
 export function createMethodInterceptor<TMeta, TArgs extends unknown[] = [TMeta], TMethod extends AnyFn = AnyFn>(
 	options: MethodInterceptorOptions<TMeta, TArgs, TMethod>
 ): DecoratedMethodFactory<TMeta, TArgs, TMethod> {
@@ -21,7 +42,7 @@ export function createMethodInterceptor<TMeta, TArgs extends unknown[] = [TMeta]
 		(value: TMethod, context: ClassMethodDecoratorContext<any, TMethod>): TMethod => {
 			const meta = compose(args, composeFn);
 			const token = Symbol("methodIntercept");
-			const correlation = context.metadata as object | null;
+			const correlation = context.metadata;
 			const memberName = context.name;
 			const isStatic = context.static;
 
@@ -43,6 +64,7 @@ export function createMethodInterceptor<TMeta, TArgs extends unknown[] = [TMeta]
 					const ctor = this as Ctor;
 					appendMemberMeta(ctor, key, memberName, meta, token, { unique });
 					registerCtor(ctor, correlation);
+					flushFor(ctor, correlation);
 				});
 			} else {
 				queueDeferred(correlation, { key, name: memberName, meta, token, unique });
