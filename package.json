@@ -34,6 +34,7 @@
 		"test:integration": "bun test tests/integration",
 		"build": "tsdown",
 		"check": "bunx ultracite check",
+		"check:dist-helpers": "bun scripts/check-helper-imports.ts",
 		"fix": "bunx ultracite fix",
 		"check-types": "tsc -b",
 		"changeset": "changeset",
