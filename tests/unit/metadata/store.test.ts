@@ -4,6 +4,7 @@ import { DuplicateMetadataError } from "../../../src/errors";
 import {
 	appendClassMeta,
 	appendMemberMeta,
+	collectMemberMeta,
 	getClassMeta,
 	getMemberMeta,
 	hasOwnClassMeta,
@@ -97,5 +98,39 @@ describe("member metadata store", () => {
 		appendMemberMeta(Parent, key, "foo", "p", Symbol("t"), { unique: false });
 		expect(getMemberMeta(Child, key, "foo")).toEqual([]);
 		expect(hasOwnMemberMeta(Child, key, "foo")).toBe(false);
+	});
+});
+
+describe("collectMemberMeta ancestor walk", () => {
+	test("returns own entries when no ancestor data", () => {
+		const key = Symbol("k");
+		class A {}
+		appendMemberMeta(A, key, "foo", "a", Symbol("t"), { unique: false });
+		expect(collectMemberMeta<string>(A, key, "foo")).toEqual(["a"]);
+	});
+
+	test("most-derived-first concatenation, no shadow", () => {
+		const key = Symbol("k");
+		class A {}
+		class B extends A {}
+		class C extends B {}
+		appendMemberMeta(A, key, "foo", "from-a", Symbol("ta"), { unique: false });
+		appendMemberMeta(B, key, "foo", "from-b", Symbol("tb"), { unique: false });
+		appendMemberMeta(C, key, "foo", "from-c1", Symbol("tc1"), { unique: false });
+		appendMemberMeta(C, key, "foo", "from-c2", Symbol("tc2"), { unique: false });
+		expect(collectMemberMeta<string>(C, key, "foo")).toEqual(["from-c1", "from-c2", "from-b", "from-a"]);
+	});
+
+	test("returns empty when no link in chain has entries for the name", () => {
+		const key = Symbol("k");
+		class A {}
+		class B extends A {}
+		expect(collectMemberMeta(B, key, "foo")).toEqual([]);
+	});
+
+	test("stops at Function.prototype", () => {
+		const key = Symbol("k");
+		class A {}
+		expect(() => collectMemberMeta(A, key, "missing")).not.toThrow();
 	});
 });
