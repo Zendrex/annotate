@@ -1,5 +1,24 @@
 # @zendrex/annotate
 
+## 0.2.0
+
+### Minor Changes
+
+- [#16](https://github.com/Zendrex/annotate/pull/16) [`e90824c`](https://github.com/Zendrex/annotate/commit/e90824cffaa3eb0308dc5c8329e3394b58314874) Thanks [@Zendrex](https://github.com/Zendrex)! - v0.2 API and module reorganization.
+
+  Restructure the library into focused submodules under `src/factories`, `src/metadata`, and `src/reflector`, replacing the previous monolithic `src/lib/*` layout. The public import path (`@zendrex/annotate`) is unchanged; the internal module graph is not part of the supported surface.
+
+  New public API:
+
+  - `reflectInstance(instance)` and `ofInstance(instance)` on every decorator factory — instance-based reflection that resolves the owning constructor. Both runtime-guard the constructor shape and throw `TypeError` on bare objects, primitives, and arrow/bound functions.
+  - `metadataOf(target)` on class decorator factories — singleton accessor returning the first metadata value applied to a class (or `undefined`), walking the prototype chain.
+  - `requireMetadata(target)` on class decorator factories — throwing sibling of `metadataOf`; throws `AnnotateError` with `reason: "missing"` when neither the target nor any ancestor carries metadata.
+  - `applied(target)` / `appliedOwn(target)` on class decorator factories — boolean predicates; `applied` walks the prototype chain, `appliedOwn` checks direct application only.
+  - **Breaking:** `createClassDecorator` now takes only an options object `{ unique?: boolean; name?: string; compose?: (...args) => TMeta }`. The legacy `createClassDecorator(composeFn)` positional signature is removed — pass the compose function as `options.compose`. With `unique: true`, the decorator throws `AnnotateError` when applied twice to the same class (inherited metadata is not treated as a duplicate).
+  - Exported `AnnotateError` class with `decoratorKey`, `kind`, `reason`, and `target` fields for distinct `instanceof` handling.
+
+  Tests reorganized into `tests/unit/` (mirroring `src/`), `tests/integration/`, and `tests/fixtures/` for shared helpers.
+
 ## 0.1.5
 
 ### Patch Changes
