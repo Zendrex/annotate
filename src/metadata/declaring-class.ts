@@ -1,9 +1,7 @@
-// biome-ignore lint/complexity/noBannedTypes: constructor identity requires Function for prototype walk parity with src/metadata/store.ts.
-type Ctor = Function;
+import { hasOwnMetadata, readOwnMetadata } from "../runtime/symbol-metadata";
 
-// Symbol.metadata may be undefined in environments without Stage 3 decorator support.
-// Fall back to a well-known global symbol so tests and runtime share the same key.
-const METADATA_SYM: symbol = Symbol.metadata ?? Symbol.for("Symbol.metadata");
+// biome-ignore lint/complexity/noBannedTypes: Constructor identity uses Function for parity with runtime/symbol-metadata.
+type Ctor = Function;
 
 /**
  * Walk the constructor prototype chain from `instance.constructor` upward,
@@ -11,7 +9,7 @@ const METADATA_SYM: symbol = Symbol.metadata ?? Symbol.for("Symbol.metadata");
  * `correlation`. Falls back to `instance.constructor` when `correlation` is
  * nullish or unmatched.
  *
- * The own-bag check (`Object.hasOwn`) is essential: tslib installs each class's
+ * The own-bag check (`hasOwnMetadata`) is essential: tslib installs each class's
  * metadata bag as `Object.create(super[Symbol.metadata])`, so an inherited-only
  * read leaks the parent's bag through `ctor[Symbol.metadata]`. Without the
  * guard, `class B extends A {}` (no decorations on B) would match A's
@@ -24,10 +22,7 @@ export function resolveDeclaringClass(instance: object, correlation: object | nu
 	}
 	let ctor: Ctor | null = start;
 	while (ctor && ctor !== Function.prototype) {
-		if (
-			Object.hasOwn(ctor, METADATA_SYM) &&
-			(ctor as unknown as Record<symbol, object | undefined>)[METADATA_SYM] === correlation
-		) {
+		if (hasOwnMetadata(ctor) && readOwnMetadata(ctor) === correlation) {
 			return ctor;
 		}
 		ctor = Object.getPrototypeOf(ctor) as Ctor | null;
