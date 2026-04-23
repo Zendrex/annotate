@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
+import { DuplicateMetadataError } from "../../../src/errors";
 import {
 	appendClassMeta,
 	appendMemberMeta,
@@ -30,7 +31,7 @@ describe("class metadata store", () => {
 		const key = Symbol("k");
 		class A {}
 		appendClassMeta(A, key, "first", { unique: true });
-		expect(() => appendClassMeta(A, key, "second", { unique: true })).toThrow();
+		expect(() => appendClassMeta(A, key, "second", { unique: true })).toThrow(DuplicateMetadataError);
 	});
 
 	test("isolates entries per class", () => {
@@ -76,7 +77,9 @@ describe("member metadata store", () => {
 		const key = Symbol("k");
 		class A {}
 		appendMemberMeta(A, key, "foo", "x", Symbol("t1"), { unique: true });
-		expect(() => appendMemberMeta(A, key, "foo", "y", Symbol("t2"), { unique: true })).toThrow();
+		expect(() => appendMemberMeta(A, key, "foo", "y", Symbol("t2"), { unique: true })).toThrow(
+			DuplicateMetadataError
+		);
 	});
 
 	test("hasOwnMemberMeta is per-name, not per-factory-key", () => {

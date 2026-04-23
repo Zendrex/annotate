@@ -28,7 +28,7 @@ export function _internalReset(): void {
 }
 
 // biome-ignore lint/complexity/noBannedTypes: store API accepts raw constructor identity for cross-file WeakMap parity.
-export function getClassMeta<T>(ctor: Function, key: symbol): T[] {
+export function getClassMeta<T>(ctor: Function, key: symbol): readonly T[] {
 	return (classMetaStore.get(ctor)?.get(key) as T[] | undefined) ?? [];
 }
 
@@ -57,7 +57,7 @@ export function appendClassMeta<T>(ctor: Function, key: symbol, value: T, option
 }
 
 // biome-ignore lint/complexity/noBannedTypes: store API accepts raw constructor identity for cross-file WeakMap parity.
-export function getMemberMeta<T>(ctor: Function, key: symbol, name: string | symbol): T[] {
+export function getMemberMeta<T>(ctor: Function, key: symbol, name: string | symbol): readonly T[] {
 	return (memberMetaStore.get(ctor)?.get(key)?.get(name) as T[] | undefined) ?? [];
 }
 
