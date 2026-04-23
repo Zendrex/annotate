@@ -5,12 +5,10 @@ import type { ClassBucket, Deferred, MemberBucket } from "./types";
 const classMetaStore = new WeakMap<Function, ClassBucket>();
 
 // biome-ignore lint/complexity/noBannedTypes: WeakMap key requires Function for constructor identity.
-// biome-ignore lint/correctness/noUnusedVariables: Scaffold storage — populated in Phase C2-C5.
 const memberMetaStore = new WeakMap<Function, MemberBucket>();
 
 // Spec writes WeakSet; ES forbids symbol WeakSet keys, so we use Set. Tokens are short-lived per decoration batch.
 // biome-ignore lint/complexity/noBannedTypes: WeakMap key requires Function for constructor identity.
-// biome-ignore lint/correctness/noUnusedVariables: Scaffold storage — populated in Phase C2-C5.
 const committedTokens = new WeakMap<Function, Set<symbol>>();
 
 // biome-ignore lint/correctness/noUnusedVariables: Scaffold storage — populated in Phase C2-C5.
@@ -56,4 +54,55 @@ export function appendClassMeta<T>(ctor: Function, key: symbol, value: T, option
 		throw new DuplicateMetadataError(ctor as new (...args: unknown[]) => unknown, key, "class");
 	}
 	list.push(value);
+}
+
+// biome-ignore lint/complexity/noBannedTypes: store API accepts raw constructor identity for cross-file WeakMap parity.
+export function getMemberMeta<T>(ctor: Function, key: symbol, name: string | symbol): T[] {
+	return (memberMetaStore.get(ctor)?.get(key)?.get(name) as T[] | undefined) ?? [];
+}
+
+// biome-ignore lint/complexity/noBannedTypes: store API accepts raw constructor identity for cross-file WeakMap parity.
+export function hasOwnMemberMeta(ctor: Function, key: symbol, name: string | symbol): boolean {
+	const list = memberMetaStore.get(ctor)?.get(key)?.get(name);
+	return !!list && list.length > 0;
+}
+
+export function appendMemberMeta<T>(
+	// biome-ignore lint/complexity/noBannedTypes: store API accepts raw constructor identity for cross-file WeakMap parity.
+	ctor: Function,
+	key: symbol,
+	name: string | symbol,
+	meta: T,
+	token: symbol,
+	options: { unique: boolean }
+): void {
+	let tokens = committedTokens.get(ctor);
+	if (!tokens) {
+		tokens = new Set();
+		committedTokens.set(ctor, tokens);
+	}
+	if (tokens.has(token)) {
+		return;
+	}
+
+	let outer = memberMetaStore.get(ctor);
+	if (!outer) {
+		outer = new Map();
+		memberMetaStore.set(ctor, outer);
+	}
+	let inner = outer.get(key);
+	if (!inner) {
+		inner = new Map();
+		outer.set(key, inner);
+	}
+	let list = inner.get(name);
+	if (!list) {
+		list = [];
+		inner.set(name, list);
+	}
+	if (options.unique && list.length > 0) {
+		throw new DuplicateMetadataError(ctor as new (...args: unknown[]) => unknown, key, "method", name);
+	}
+	list.push(meta);
+	tokens.add(token);
 }
