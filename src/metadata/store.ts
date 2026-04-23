@@ -1,45 +1,39 @@
 import { DuplicateMetadataError } from "../errors";
 import type { ClassBucket, Deferred, MemberBucket } from "./types";
 
-// biome-ignore lint/complexity/noBannedTypes: WeakMap key requires Function for constructor identity.
-const classMetaStore = new WeakMap<Function, ClassBucket>();
+// biome-ignore lint/complexity/noBannedTypes: Store API accepts raw constructor identity for WeakMap parity; aliased once to avoid suppression noise throughout this file.
+type Ctor = Function;
 
-// biome-ignore lint/complexity/noBannedTypes: WeakMap key requires Function for constructor identity.
-const memberMetaStore = new WeakMap<Function, MemberBucket>();
+const classMetaStore = new WeakMap<Ctor, ClassBucket>();
+const memberMetaStore = new WeakMap<Ctor, MemberBucket>();
 
 // Spec writes WeakSet; ES forbids symbol WeakSet keys, so we use Set. Tokens are short-lived per decoration batch.
-// biome-ignore lint/complexity/noBannedTypes: WeakMap key requires Function for constructor identity.
-const committedTokens = new WeakMap<Function, Set<symbol>>();
+const committedTokens = new WeakMap<Ctor, Set<symbol>>();
 
 // biome-ignore lint/correctness/noUnusedVariables: Scaffold storage — populated in Phase C2-C5.
 const pendingByMetadata: WeakMap<object, Deferred[]> = new WeakMap();
 
-// biome-ignore lint/complexity/noBannedTypes: WeakMap value stores constructor references for reverse lookup.
 // biome-ignore lint/correctness/noUnusedVariables: Scaffold storage — populated in Phase C2-C5.
-const metadataToCtor: WeakMap<object, Function> = new WeakMap();
+const metadataToCtor: WeakMap<object, Ctor> = new WeakMap();
 
-// biome-ignore lint/complexity/noBannedTypes: WeakMap key requires Function for constructor identity.
 // biome-ignore lint/correctness/noUnusedVariables: Scaffold storage — populated in Phase C2-C5.
-const ctorToMetadata = new WeakMap<Function, object>();
+const ctorToMetadata = new WeakMap<Ctor, object>();
 
 export function _internalReset(): void {
 	// Test-only reset hook is not provided — WeakMaps cannot be enumerated.
 	// Tests must use fresh classes per scenario; class identity is the GC root.
 }
 
-// biome-ignore lint/complexity/noBannedTypes: store API accepts raw constructor identity for cross-file WeakMap parity.
-export function getClassMeta<T>(ctor: Function, key: symbol): readonly T[] {
+export function getClassMeta<T>(ctor: Ctor, key: symbol): readonly T[] {
 	return (classMetaStore.get(ctor)?.get(key) as T[] | undefined) ?? [];
 }
 
-// biome-ignore lint/complexity/noBannedTypes: store API accepts raw constructor identity for cross-file WeakMap parity.
-export function hasOwnClassMeta(ctor: Function, key: symbol): boolean {
+export function hasOwnClassMeta(ctor: Ctor, key: symbol): boolean {
 	const list = classMetaStore.get(ctor)?.get(key);
 	return !!list && list.length > 0;
 }
 
-// biome-ignore lint/complexity/noBannedTypes: store API accepts raw constructor identity for cross-file WeakMap parity.
-export function appendClassMeta<T>(ctor: Function, key: symbol, value: T, options: { unique: boolean }): void {
+export function appendClassMeta<T>(ctor: Ctor, key: symbol, value: T, options: { unique: boolean }): void {
 	let bucket = classMetaStore.get(ctor);
 	if (!bucket) {
 		bucket = new Map();
@@ -56,20 +50,17 @@ export function appendClassMeta<T>(ctor: Function, key: symbol, value: T, option
 	list.push(value);
 }
 
-// biome-ignore lint/complexity/noBannedTypes: store API accepts raw constructor identity for cross-file WeakMap parity.
-export function getMemberMeta<T>(ctor: Function, key: symbol, name: string | symbol): readonly T[] {
+export function getMemberMeta<T>(ctor: Ctor, key: symbol, name: string | symbol): readonly T[] {
 	return (memberMetaStore.get(ctor)?.get(key)?.get(name) as T[] | undefined) ?? [];
 }
 
-// biome-ignore lint/complexity/noBannedTypes: store API accepts raw constructor identity for cross-file WeakMap parity.
-export function hasOwnMemberMeta(ctor: Function, key: symbol, name: string | symbol): boolean {
+export function hasOwnMemberMeta(ctor: Ctor, key: symbol, name: string | symbol): boolean {
 	const list = memberMetaStore.get(ctor)?.get(key)?.get(name);
 	return !!list && list.length > 0;
 }
 
 export function appendMemberMeta<T>(
-	// biome-ignore lint/complexity/noBannedTypes: store API accepts raw constructor identity for cross-file WeakMap parity.
-	ctor: Function,
+	ctor: Ctor,
 	key: symbol,
 	name: string | symbol,
 	meta: T,
@@ -107,43 +98,35 @@ export function appendMemberMeta<T>(
 	tokens.add(token);
 }
 
-// biome-ignore lint/complexity/noBannedTypes: store API accepts raw constructor identity for cross-file WeakMap parity.
-export function collectMemberMeta<T>(ctor: Function, key: symbol, name: string | symbol): T[] {
+export function collectMemberMeta<T>(ctor: Ctor, key: symbol, name: string | symbol): T[] {
 	const out: T[] = [];
-	// biome-ignore lint/complexity/noBannedTypes: store API accepts raw constructor identity for cross-file WeakMap parity.
-	let current: Function | null = ctor;
+	let current: Ctor | null = ctor;
 	while (current && current !== Function.prototype) {
 		const list = memberMetaStore.get(current)?.get(key)?.get(name) as T[] | undefined;
 		if (list && list.length > 0) {
 			out.push(...list);
 		}
-		// biome-ignore lint/complexity/noBannedTypes: store API accepts raw constructor identity for cross-file WeakMap parity.
-		current = Object.getPrototypeOf(current) as Function | null;
+		current = Object.getPrototypeOf(current) as Ctor | null;
 	}
 	return out;
 }
 
-// biome-ignore lint/complexity/noBannedTypes: store API accepts raw constructor identity for cross-file WeakMap parity.
-export function collectClassMeta<T>(ctor: Function, key: symbol): T[] {
+export function collectClassMeta<T>(ctor: Ctor, key: symbol): T[] {
 	const out: T[] = [];
-	// biome-ignore lint/complexity/noBannedTypes: store API accepts raw constructor identity for cross-file WeakMap parity.
-	let current: Function | null = ctor;
+	let current: Ctor | null = ctor;
 	while (current && current !== Function.prototype) {
 		const list = classMetaStore.get(current)?.get(key) as T[] | undefined;
 		if (list && list.length > 0) {
 			out.push(...list);
 		}
-		// biome-ignore lint/complexity/noBannedTypes: store API accepts raw constructor identity for cross-file WeakMap parity.
-		current = Object.getPrototypeOf(current) as Function | null;
+		current = Object.getPrototypeOf(current) as Ctor | null;
 	}
 	return out;
 }
 
-// biome-ignore lint/complexity/noBannedTypes: store API accepts raw constructor identity for cross-file WeakMap parity.
-export function collectMemberNames(ctor: Function, key: symbol): Set<string | symbol> {
+export function collectMemberNames(ctor: Ctor, key: symbol): Set<string | symbol> {
 	const out = new Set<string | symbol>();
-	// biome-ignore lint/complexity/noBannedTypes: store API accepts raw constructor identity for cross-file WeakMap parity.
-	let current: Function | null = ctor;
+	let current: Ctor | null = ctor;
 	while (current && current !== Function.prototype) {
 		const inner = memberMetaStore.get(current)?.get(key);
 		if (inner) {
@@ -151,38 +134,31 @@ export function collectMemberNames(ctor: Function, key: symbol): Set<string | sy
 				out.add(name);
 			}
 		}
-		// biome-ignore lint/complexity/noBannedTypes: store API accepts raw constructor identity for cross-file WeakMap parity.
-		current = Object.getPrototypeOf(current) as Function | null;
+		current = Object.getPrototypeOf(current) as Ctor | null;
 	}
 	return out;
 }
 
-// biome-ignore lint/complexity/noBannedTypes: store API accepts raw constructor identity for cross-file WeakMap parity.
-export function hasAnyClassMeta(ctor: Function): boolean {
-	// biome-ignore lint/complexity/noBannedTypes: store API accepts raw constructor identity for cross-file WeakMap parity.
-	let current: Function | null = ctor;
+export function hasAnyClassMeta(ctor: Ctor): boolean {
+	let current: Ctor | null = ctor;
 	while (current && current !== Function.prototype) {
 		const bucket = classMetaStore.get(current);
 		if (bucket && bucket.size > 0) {
 			return true;
 		}
-		// biome-ignore lint/complexity/noBannedTypes: store API accepts raw constructor identity for cross-file WeakMap parity.
-		current = Object.getPrototypeOf(current) as Function | null;
+		current = Object.getPrototypeOf(current) as Ctor | null;
 	}
 	return false;
 }
 
-// biome-ignore lint/complexity/noBannedTypes: store API accepts raw constructor identity for cross-file WeakMap parity.
-export function hasAnyMemberMeta(ctor: Function): boolean {
-	// biome-ignore lint/complexity/noBannedTypes: store API accepts raw constructor identity for cross-file WeakMap parity.
-	let current: Function | null = ctor;
+export function hasAnyMemberMeta(ctor: Ctor): boolean {
+	let current: Ctor | null = ctor;
 	while (current && current !== Function.prototype) {
 		const bucket = memberMetaStore.get(current);
 		if (bucket && bucket.size > 0) {
 			return true;
 		}
-		// biome-ignore lint/complexity/noBannedTypes: store API accepts raw constructor identity for cross-file WeakMap parity.
-		current = Object.getPrototypeOf(current) as Function | null;
+		current = Object.getPrototypeOf(current) as Ctor | null;
 	}
 	return false;
 }

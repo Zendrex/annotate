@@ -4,9 +4,13 @@ import { DuplicateMetadataError } from "../../../src/errors";
 import {
 	appendClassMeta,
 	appendMemberMeta,
+	collectClassMeta,
 	collectMemberMeta,
+	collectMemberNames,
 	getClassMeta,
 	getMemberMeta,
+	hasAnyClassMeta,
+	hasAnyMemberMeta,
 	hasOwnClassMeta,
 	hasOwnMemberMeta,
 } from "../../../src/metadata/store";
@@ -132,5 +136,105 @@ describe("collectMemberMeta ancestor walk", () => {
 		const key = Symbol("k");
 		class A {}
 		expect(() => collectMemberMeta(A, key, "missing")).not.toThrow();
+	});
+});
+
+describe("collectClassMeta ancestor walk", () => {
+	test("returns own entries when no ancestor data", () => {
+		const key = Symbol("k");
+		class A {}
+		appendClassMeta(A, key, "a", { unique: false });
+		expect(collectClassMeta<string>(A, key)).toEqual(["a"]);
+	});
+
+	test("most-derived-first concatenation", () => {
+		const key = Symbol("k");
+		class A {}
+		class B extends A {}
+		class C extends B {}
+		appendClassMeta(A, key, "from-a", { unique: false });
+		appendClassMeta(B, key, "from-b", { unique: false });
+		appendClassMeta(C, key, "from-c", { unique: false });
+		expect(collectClassMeta<string>(C, key)).toEqual(["from-c", "from-b", "from-a"]);
+	});
+
+	test("returns empty when no link in chain has entries", () => {
+		const key = Symbol("k");
+		class A {}
+		class B extends A {}
+		expect(collectClassMeta(B, key)).toEqual([]);
+	});
+
+	test("stops at Function.prototype", () => {
+		const key = Symbol("k");
+		class A {}
+		expect(() => collectClassMeta(A, key)).not.toThrow();
+	});
+});
+
+describe("collectMemberNames ancestor walk", () => {
+	test("returns empty set when no entries", () => {
+		const key = Symbol("k");
+		class A {}
+		expect(collectMemberNames(A, key).size).toBe(0);
+	});
+
+	test("unions names across chain without duplicates", () => {
+		const key = Symbol("k");
+		class A {}
+		class B extends A {}
+		appendMemberMeta(A, key, "a", "x", Symbol("t1"), { unique: false });
+		appendMemberMeta(B, key, "b", "y", Symbol("t2"), { unique: false });
+		appendMemberMeta(B, key, "a", "z", Symbol("t3"), { unique: false });
+		const names = collectMemberNames(B, key);
+		expect(names.size).toBe(2);
+		expect(names.has("a")).toBe(true);
+		expect(names.has("b")).toBe(true);
+	});
+
+	test("stops at Function.prototype", () => {
+		const key = Symbol("k");
+		class A {}
+		expect(() => collectMemberNames(A, key)).not.toThrow();
+	});
+});
+
+describe("hasAnyClassMeta / hasAnyMemberMeta", () => {
+	test("hasAnyClassMeta false when empty, true after append", () => {
+		const key = Symbol("k");
+		class A {}
+		expect(hasAnyClassMeta(A)).toBe(false);
+		appendClassMeta(A, key, "x", { unique: false });
+		expect(hasAnyClassMeta(A)).toBe(true);
+	});
+
+	test("hasAnyClassMeta walks ancestors", () => {
+		const key = Symbol("k");
+		class A {}
+		class B extends A {}
+		appendClassMeta(A, key, "a", { unique: false });
+		expect(hasAnyClassMeta(B)).toBe(true);
+	});
+
+	test("hasAnyMemberMeta false when empty, true after append", () => {
+		const key = Symbol("k");
+		class A {}
+		expect(hasAnyMemberMeta(A)).toBe(false);
+		appendMemberMeta(A, key, "foo", "v", Symbol("t"), { unique: false });
+		expect(hasAnyMemberMeta(A)).toBe(true);
+	});
+
+	test("hasAnyMemberMeta walks ancestors", () => {
+		const key = Symbol("k");
+		class A {}
+		class B extends A {}
+		appendMemberMeta(A, key, "foo", "v", Symbol("t"), { unique: false });
+		expect(hasAnyMemberMeta(B)).toBe(true);
+	});
+
+	test("stops at Function.prototype", () => {
+		class A {}
+		expect(() => hasAnyClassMeta(A)).not.toThrow();
+		expect(() => hasAnyMemberMeta(A)).not.toThrow();
 	});
 });
