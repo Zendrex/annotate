@@ -9,6 +9,7 @@ import {
 	collectMemberNames,
 	flushFor,
 	getClassMeta,
+	getCorrelationFor,
 	getMemberMeta,
 	hasAnyClassMeta,
 	hasAnyMemberMeta,
@@ -250,6 +251,7 @@ describe("pending registration + correlation", () => {
 		class A {}
 		registerCtor(A, correlation);
 		expect(resolveCtorFromMetadata(correlation)).toBe(A);
+		expect(getCorrelationFor(A)).toBe(correlation);
 	});
 
 	test("registerCtor is first-write-wins", () => {
