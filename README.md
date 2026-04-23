@@ -30,7 +30,6 @@ Requires TypeScript 5.0+ with `experimentalDecorators` and `emitDecoratorMetadat
 }
 ```
 
-
 ## Quick Start
 
 ```typescript
@@ -51,7 +50,7 @@ class UserController {
 }
 
 // Reflect on the metadata
-const routes = Route.methods(UserController);
+const routes = Route.reflect(UserController).methods();
 
 for (const route of routes) {
   console.log(route.name, route.metadata);
@@ -64,7 +63,10 @@ for (const route of routes) {
 
 ### Decorator Factories
 
-Each factory creates a typed decorator with built-in reflection:
+Each factory creates a typed decorator with built-in reflection. Options use a
+single `DecoratorOptions` shape: optional `compose`, `name` (for error
+prefixes), and `unique` (class / method / property / interceptors; not on
+parameters).
 
 ```typescript
 import {
@@ -74,34 +76,34 @@ import {
   createParameterDecorator,
 } from "@zendrex/annotate";
 
-// Simple decorators pass through their argument as metadata
 const Tag = createClassDecorator<string>();
 const Route = createMethodDecorator<string>();
 const Column = createPropertyDecorator<string>();
 const Param = createParameterDecorator<string>();
 ```
 
-### Compose Functions
+### Compose
 
-For richer metadata, pass a compose function to transform decorator arguments:
+Pass `compose` to transform multiple decorator arguments into metadata:
 
 ```typescript
-const Route = createMethodDecorator((path: string, method: "GET" | "POST") => ({
-  path,
-  method,
-}));
+const Route = createMethodDecorator({
+  compose: (path: string, method: "GET" | "POST") => ({ path, method }),
+});
 
 class Api {
   @Route("/users", "GET")
   getUsers() {}
 }
-
-// Metadata is { path: "/users", method: "GET" }
 ```
 
 ### Reflection
 
-Every decorator factory includes reflection methods:
+Factories expose `key`, `reflect(target)` (class constructor or instance),
+scalar lookups, and `applied` / `appliedOwn` where applicable. Use
+`Factory.reflect(ctorOrInstance).methods()` (and the same for `properties()`,
+`parameters()`) for collections; `methodsSingular` / `propertiesSingular` live
+on `ScopedReflector` only.
 
 ```typescript
 const Column = createPropertyDecorator<{ type: string; nullable?: boolean }>();
@@ -114,19 +116,14 @@ class User {
   age!: number;
 }
 
-// Get all decorated properties
-const columns = Column.properties(User);
+const columns = Column.reflect(User).properties();
 
 for (const col of columns) {
   console.log(col.name, col.metadata);
 }
-// name [{ type: "varchar" }]
-// age [{ type: "int", nullable: true }]
 ```
 
-### Property Injection
-
-Property decorators can mark fields for dependency injection:
+### Property injection
 
 ```typescript
 import { createPropertyDecorator } from "@zendrex/annotate";
@@ -141,116 +138,96 @@ class UserService {
   logger!: Logger;
 }
 
-// Reflect and resolve
-const deps = Inject.properties(UserService);
-// => [{ kind: "property", name: "db", metadata: ["database"] },
-//     { kind: "property", name: "logger", metadata: ["logger"] }]
-
+const deps = Inject.reflect(UserService).properties();
 const instance = new UserService();
 for (const dep of deps) {
   (instance as any)[dep.name] = container.get(dep.metadata[0]);
 }
 ```
 
-### General Reflection
+### Class metadata scalars
 
-Use `reflect()` when you need to query multiple decorator types on a single class:
+Use `metadata(target)` (or `requireMetadata(target)`) for the first value, with
+inheritance along the class constructor chain. `applied` / `appliedOwn` report
+array presence; use `appliedOwn` to ignore inherited class metadata on
+subclasses.
 
 ```typescript
-import { reflect } from "@zendrex/annotate";
+const Controller = createClassDecorator<string>();
 
-const reflector = reflect(UserController);
+@Controller("users")
+class UserController {}
 
-// Query by decorator key
-const routes = reflector.methods(Route.key);
-const columns = reflector.properties(Column.key);
-const params = reflector.parameters(Param.key);
+class AdminController extends UserController {}
+
+Controller.metadata(AdminController);  // => "users" (inherited)
+Controller.applied(AdminController);   // => true
+Controller.appliedOwn(AdminController); // => false when only the parent is decorated
 ```
 
-## Interceptors
+### Singular method and property lists
 
-Interceptors wrap the original method or property with custom behavior:
+```typescript
+const EventHandler = createMethodDecorator<EventHandlerMeta>();
+
+class Component {
+  @EventHandler({ event: "click" })
+  onClick() {}
+}
+
+for (const { name, metadata } of EventHandler.reflect(Component).methodsSingular()) {
+  bind(name, metadata);
+}
+
+EventHandler.metadata(Component, "onClick");
+EventHandler.requireMetadata(Component, "onClick");
+```
+
+### `reflect()`
+
+`reflect(ctorOrInstance)` returns an unscoped `Reflector` (pass a
+`MetadataKey` into each call). The same constructor resolution applies as for
+`factory.reflect`: you may pass a class, or an object whose
+`object.constructor` is a valid class constructor. Plain `{}`, `Object`, arrow
+functions, and other invalid targets throw `TypeError` with stable message
+prefixes (see source tests for patterns).
+
+## Interceptors
 
 ```typescript
 import { createMethodInterceptor } from "@zendrex/annotate";
 
 const Timed = createMethodInterceptor<string>({
-  interceptor: (original, metadata, ctx) =>
+  intercept: (original, metadata, ctx) =>
     function (...args) {
       const start = performance.now();
       const result = original.apply(this, args);
-      console.log(`${String(ctx.propertyKey)} took ${performance.now() - start}ms`);
+      console.log(`${String(ctx.name)} took ${performance.now() - start}ms`);
       return result;
     },
 });
-
-class Service {
-  @Timed("database")
-  fetchData() {
-    // ...
-  }
-}
 ```
 
-Property interceptors can hook into get/set operations:
+`InterceptorContext` uses `owner` (declaration object: prototype or
+constructor) and `name` (member key), plus `descriptor`.
 
-```typescript
-import { createPropertyInterceptor } from "@zendrex/annotate";
+Property interceptors require at least one of `onGet` / `onSet`. Calling
+`createPropertyInterceptor({})` throws `TypeError`.
 
-const Observable = createPropertyInterceptor<string>({
-  onSet: (original, metadata, ctx) =>
-    function (value) {
-      console.log(`${String(ctx.propertyKey)} changed to ${value}`);
-      original.call(this, value);
-    },
-});
+## `AnnotateError`
 
-class Store {
-  @Observable("count")
-  count = 0;
-}
-```
+Thrown for missing or duplicate (when `unique: true`) metadata. Public fields
+include `key`, `kind` (`DecoratedKind`), `code` (`"missing"` | `"duplicate"`),
+`target` (always a constructor), and optional `memberName` and `parameterIndex`
+for `MISSING` on members or parameters. Invalid factory options (for example
+empty property interceptors) use `TypeError`, not `AnnotateError`.
 
-## API Reference
+## API summary
 
-### Decorator Factories
-
-| Function | Creates | Reflection Method |
-|----------|---------|-------------------|
-| `createClassDecorator<T>()` | Class decorator | `.class(Target)` |
-| `createMethodDecorator<T>()` | Method decorator | `.methods(Target)` |
-| `createPropertyDecorator<T>()` | Property decorator | `.properties(Target)` |
-| `createParameterDecorator<T>()` | Parameter decorator | `.parameters(Target)` |
-| `createMethodInterceptor<T>(opts)` | Method interceptor | `.methods(Target)` |
-| `createPropertyInterceptor<T>(opts)` | Property interceptor | `.properties(Target)` |
-
-### Reflection Results
-
-Each reflection method returns an array of decorated items:
-
-```typescript
-interface DecoratedMethod<T> {
-  kind: "method";
-  name: string | symbol;
-  metadata: T[];
-  target: Function;
-}
-
-interface DecoratedProperty<T> {
-  kind: "property";
-  name: string | symbol;
-  metadata: T[];
-}
-
-interface DecoratedParameter<T> {
-  kind: "parameter";
-  name: string | symbol;
-  metadata: T[];
-  parameterIndex: number;
-}
-```
+- **Class factory:** `key`, `reflect`, `metadata`, `requireMetadata`, `applied`, `appliedOwn`
+- **Method / property (and interceptors):** `key`, `reflect`, `metadata(target, name)`, `requireMetadata`, `applied`, `appliedOwn`
+- **Parameter factory:** `key`, `reflect`, `metadata(target, index, methodName?)`, `requireMetadata`, `applied`, `appliedOwn` — omit `methodName` for constructor parameters
 
 ## License
 
 MIT
-

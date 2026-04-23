@@ -29,6 +29,9 @@
 		"access": "public"
 	},
 	"scripts": {
+		"test": "bun test",
+		"test:unit": "bun test tests/unit",
+		"test:integration": "bun test tests/integration",
 		"build": "tsdown",
 		"check": "bunx ultracite check",
 		"fix": "bunx ultracite fix",
