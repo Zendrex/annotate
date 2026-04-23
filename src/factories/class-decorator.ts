@@ -14,6 +14,24 @@ import {
 } from "./shared";
 import type { DecoratedClassFactory, DecoratorOptions } from "./types";
 
+/**
+ * Create a typed class decorator factory with a unique metadata key and
+ * pre-bound reflection helpers.
+ *
+ * The returned decorator appends metadata per application so later decorators
+ * at the same site add to the array rather than overwriting. When
+ * `options.unique` is set, a second application on the same class throws
+ * {@link AnnotateError} with `code: "duplicate"`.
+ *
+ * Reflection via `metadata` / `applied` walks the prototype chain; use
+ * `appliedOwn` / `metadata(Subclass)` with awareness that subclasses inherit
+ * parent decorations.
+ *
+ * @typeParam TMeta - Metadata stored per application
+ * @typeParam TArgs - Arguments accepted by the decorator call; defaults to `[TMeta]`
+ * @throws {AnnotateError} `code: "duplicate"` on a second application when `unique` is set
+ * @throws {AnnotateError} `code: "missing"` from `requireMetadata` when no metadata is present
+ */
 export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
 	options?: DecoratorOptions<TMeta, TArgs>
 ): DecoratedClassFactory<TMeta, TArgs> {

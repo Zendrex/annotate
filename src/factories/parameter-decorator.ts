@@ -12,6 +12,17 @@ import {
 } from "./shared";
 import type { DecoratedParameterFactory, ParameterDecoratorOptions } from "./types";
 
+/**
+ * Create a typed parameter decorator factory with reflection helpers scoped to
+ * parameters.
+ *
+ * Metadata is stored in a `Map<parameterIndex, TMeta[]>`, keyed by method
+ * property key (or the target directly for constructor parameters). Multiple
+ * applications to the same slot append; there is no `unique` option because
+ * parameter indices are intrinsically stable identifiers.
+ *
+ * @throws {AnnotateError} `code: "missing"` from `requireMetadata` when the slot has none
+ */
 export function createParameterDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
 	options?: ParameterDecoratorOptions<TMeta, TArgs>
 ): DecoratedParameterFactory<TMeta, TArgs> {

@@ -1,22 +1,42 @@
 import type { MetadataArray, MetadataKey, ParameterMetadataMap } from "./types";
 import "reflect-metadata";
 
-/** Walks prototype chain (class inheritance). */
+/**
+ * Read metadata via `reflect-metadata`, walking the prototype chain so
+ * subclasses observe inherited metadata.
+ *
+ * Prefer the factory-level helpers (`factory.metadata`, `factory.reflect`) for
+ * consumer code; this function is exported for custom integrations that need
+ * to share storage with foreign decorator systems.
+ */
 export function getMetadata<T>(key: MetadataKey, target: object, propertyKey?: string | symbol): T | undefined {
 	return propertyKey ? Reflect.getMetadata(key, target, propertyKey) : Reflect.getMetadata(key, target);
 }
 
-/** Does not walk prototype chain. */
+/**
+ * Read metadata defined directly on `target` without walking the prototype
+ * chain. Use this to distinguish own metadata from inherited metadata.
+ */
 export function getOwnMetadata<T>(key: MetadataKey, target: object, propertyKey?: string | symbol): T | undefined {
 	return propertyKey ? Reflect.getOwnMetadata(key, target, propertyKey) : Reflect.getOwnMetadata(key, target);
 }
 
-/** Own metadata array for key, or empty array if none. */
+/**
+ * Read the own metadata array for `key`, returning an empty array when absent.
+ *
+ * The returned array is the live storage array when metadata exists; callers
+ * that mutate it are expected to re-define via {@link defineMetadata} to keep
+ * `reflect-metadata` in a consistent state.
+ */
 export function getMetadataArray<T>(key: MetadataKey, target: object, propertyKey?: string | symbol): MetadataArray<T> {
 	return getOwnMetadata<MetadataArray<T>>(key, target, propertyKey) ?? [];
 }
 
-/** Own parameter map for key, or empty Map if none. */
+/**
+ * Read the own parameter metadata map for `key`, returning a fresh empty `Map`
+ * when absent. The fresh map is not written back; use {@link setParameterMap}
+ * after populating it.
+ */
 export function getParameterMap<T>(
 	key: MetadataKey,
 	target: object,
@@ -25,6 +45,7 @@ export function getParameterMap<T>(
 	return getOwnMetadata<ParameterMetadataMap<T>>(key, target, propertyKey) ?? new Map();
 }
 
+/** Define metadata on `target`, overwriting any prior value at the same key. */
 export function defineMetadata<T>(key: MetadataKey, value: T, target: object, propertyKey?: string | symbol): void {
 	if (propertyKey) {
 		Reflect.defineMetadata(key, value, target, propertyKey);
@@ -34,8 +55,11 @@ export function defineMetadata<T>(key: MetadataKey, value: T, target: object, pr
 }
 
 /**
- * Append value to own metadata array. Returns the updated array so callers
- * (e.g. interceptors) can consume it without a re-read.
+ * Append `value` to the own metadata array for `key`, creating the array when
+ * needed.
+ *
+ * @returns The updated array, so callers (e.g. interceptors) can consume it
+ *   without a re-read.
  */
 export function appendMetadata<T>(
 	key: MetadataKey,
@@ -49,6 +73,7 @@ export function appendMetadata<T>(
 	return array;
 }
 
+/** Persist a parameter metadata map for `key` on `target`. */
 export function setParameterMap<T>(
 	key: MetadataKey,
 	target: object,

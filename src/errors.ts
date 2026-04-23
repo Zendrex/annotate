@@ -1,7 +1,13 @@
 import type { MetadataKey } from "./metadata/types";
 import type { AnyConstructor, DecoratedKind } from "./reflector/types";
 
-/** Error codes for {@link AnnotateError}. */
+/**
+ * Discriminator values for {@link AnnotateError.code}.
+ *
+ * - `DUPLICATE` — thrown at decoration time when `unique` is violated.
+ * - `MISSING` — thrown at reflection time by `requireMetadata` when the
+ *   requested slot has no recorded metadata.
+ */
 export const AnnotateErrorCode = {
 	DUPLICATE: "duplicate",
 	MISSING: "missing",
@@ -20,20 +26,33 @@ export interface AnnotateErrorOptions {
 }
 
 /**
- * Thrown by decorator factories on invariant violation.
+ * Thrown by decorator factories when a library invariant is violated.
  *
- * Decoration time: uniqueness violations (`code: "duplicate"`).
- * Reflection time: required metadata absent (`code: "missing"`).
- * Distinguish from domain errors via `instanceof`.
+ * Two failure modes share this type, discriminated by `code`:
+ *
+ * - Decoration-time `"duplicate"` — a factory with `unique: true` was applied
+ *   to a site that already has metadata.
+ * - Reflection-time `"missing"` — `factory.requireMetadata(...)` was called on
+ *   a site without recorded metadata.
+ *
+ * Always thrown with `target` resolved to a class constructor (never an
+ * instance or prototype). `memberName` and `parameterIndex` are populated only
+ * when they apply to the kind. Distinguish from consumer domain errors with
+ * `instanceof AnnotateError`.
  */
 export class AnnotateError extends Error {
 	override readonly name: string = "AnnotateError";
 
+	/** Factory-level metadata key identifying which decorator raised the error. */
 	readonly key: MetadataKey;
+	/** Decoration site kind where the violation occurred. */
 	readonly kind: DecoratedKind;
 	readonly code: AnnotateErrorCode;
+	/** Always a constructor; instances and prototypes are normalized before throw. */
 	readonly target: AnyConstructor;
+	/** Set for method/property/method-parameter sites. */
 	readonly memberName?: string | symbol;
+	/** Set for constructor-parameter and method-parameter sites. */
 	readonly parameterIndex?: number;
 
 	constructor(options: AnnotateErrorOptions) {

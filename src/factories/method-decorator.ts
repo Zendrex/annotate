@@ -14,6 +14,19 @@ import {
 } from "./shared";
 import type { DecoratedMethodFactory, DecoratorOptions } from "./types";
 
+/**
+ * Create a typed method decorator factory with a unique metadata key and
+ * reflection helpers scoped to methods.
+ *
+ * Metadata is stored per method property key and appended per application.
+ * `unique` constrains each (class, method) slot to a single application; a
+ * second application throws {@link AnnotateError} with `code: "duplicate"`.
+ *
+ * Static and instance methods are stored independently; reflection returns
+ * both with a `static` flag.
+ *
+ * @throws {AnnotateError} `code: "duplicate"` when `unique` is set and the same slot is decorated twice
+ */
 export function createMethodDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
 	options?: DecoratorOptions<TMeta, TArgs>
 ): DecoratedMethodFactory<TMeta, TArgs> {

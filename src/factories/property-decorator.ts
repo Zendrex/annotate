@@ -15,6 +15,17 @@ import {
 } from "./shared";
 import type { DecoratedPropertyFactory, DecoratorOptions } from "./types";
 
+/**
+ * Create a typed property decorator factory with reflection helpers scoped to
+ * properties.
+ *
+ * Because TypeScript field declarations are not enumerable on the prototype by
+ * default, the factory installs a zero-value descriptor so reflection can
+ * discover the decorated property without relying on field initialization.
+ * `unique` enforces single application per (class, property) slot.
+ *
+ * @throws {AnnotateError} `code: "duplicate"` when `unique` is set and the slot is decorated twice
+ */
 export function createPropertyDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
 	options?: DecoratorOptions<TMeta, TArgs>
 ): DecoratedPropertyFactory<TMeta, TArgs> {

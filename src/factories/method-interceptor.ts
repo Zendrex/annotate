@@ -14,6 +14,23 @@ import {
 } from "./shared";
 import type { DecoratedMethodFactory, MethodInterceptorOptions } from "./types";
 
+/**
+ * Create a method decorator that both records metadata and wraps the method's
+ * call behavior via `options.intercept`.
+ *
+ * The factory stores metadata like {@link createMethodDecorator} and, when a
+ * `PropertyDescriptor` is available at decoration time, replaces
+ * `descriptor.value` with the wrapper returned by `intercept`. The wrapper's
+ * `name` is set to the original function's name so stack traces and reflection
+ * remain accurate. If no descriptor is available (e.g. the target isn't a
+ * method), metadata is recorded but no wrapping occurs.
+ *
+ * `intercept` receives the current metadata array — including the value just
+ * appended — so interceptors can compose across multiple applications without
+ * re-reading storage.
+ *
+ * @throws {AnnotateError} `code: "duplicate"` when `unique` is set and the slot is decorated twice
+ */
 export function createMethodInterceptor<TMeta, TArgs extends unknown[] = [TMeta]>(
 	options: MethodInterceptorOptions<TMeta, TArgs>
 ): DecoratedMethodFactory<TMeta, TArgs> {

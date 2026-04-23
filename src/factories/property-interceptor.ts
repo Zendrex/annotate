@@ -15,6 +15,19 @@ import {
 } from "./shared";
 import type { DecoratedPropertyFactory, PropertyGetter, PropertyInterceptorOptions, PropertySetter } from "./types";
 
+/**
+ * Create a property decorator that records metadata and wraps access via
+ * `onGet` / `onSet`.
+ *
+ * Data fields are promoted to accessors so the hooks can run; the property is
+ * redefined on the declaration target (prototype or constructor). A hook is
+ * only invoked when its side of the accessor exists — `onGet` runs when the
+ * descriptor has a getter, `onSet` when it has a setter. Supplying neither
+ * option is a programmer error and throws `TypeError` at factory creation.
+ *
+ * @throws {TypeError} When neither `onGet` nor `onSet` is provided
+ * @throws {AnnotateError} `code: "duplicate"` when `unique` is set and the slot is decorated twice
+ */
 export function createPropertyInterceptor<TMeta, TArgs extends unknown[] = [TMeta]>(
 	options: PropertyInterceptorOptions<TMeta, TArgs>
 ): DecoratedPropertyFactory<TMeta, TArgs> {
