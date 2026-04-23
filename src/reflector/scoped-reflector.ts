@@ -12,7 +12,12 @@ import type {
 	ScopedReflector,
 } from "./types";
 
-/** @internal */
+/**
+ * Build a {@link ScopedReflector} pre-bound to `(ctor, key)`. Invoked from
+ * factory helpers so callers never construct the implementation directly.
+ *
+ * @internal
+ */
 export function createScopedReflector<TMeta>(ctor: AnyConstructor, key: MetadataKey): ScopedReflector<TMeta> {
 	return new ScopedReflectorImpl<TMeta>(ctor, key);
 }

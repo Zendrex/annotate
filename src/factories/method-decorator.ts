@@ -1,6 +1,16 @@
 import { compose, createMemberFactoryHelpers, emitMemberDecoration, generateKey, labelFor } from "./shared";
 import type { AnyFn, DecoratedMethodFactory, DecoratorOptions } from "./types";
 
+/**
+ * Create a typed method decorator that records metadata without replacing the
+ * method body. `TMethod` constrains the method signature the decorator may
+ * apply to — narrowing it rejects applications to methods with incompatible
+ * shapes at compile time.
+ *
+ * Applies to both instance and static methods. Instance applications register
+ * lazily on first instantiation; static applications register at class-body
+ * evaluation and drain the pending buffer.
+ */
 export function createMethodDecorator<TMeta, TArgs extends unknown[] = [TMeta], TMethod extends AnyFn = AnyFn>(
 	options?: DecoratorOptions<TMeta, TArgs>
 ): DecoratedMethodFactory<TMeta, TArgs, TMethod> {

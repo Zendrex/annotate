@@ -5,21 +5,29 @@ import type { ClassBucket, Ctor, Deferred, MemberBucket, MemberKind } from "./ty
 const classMetaStore = new WeakMap<Ctor, ClassBucket>();
 const memberMetaStore = new WeakMap<Ctor, MemberBucket>();
 
-// Spec writes WeakSet; ES forbids symbol WeakSet keys, so we use Set. Tokens are short-lived per decoration batch.
+// Per-ctor set of already-committed decoration tokens; dedupes eager flush vs.
+// lazy-initializer commits for the same decoration site. Spec prescribes
+// WeakSet but ES rejects symbol keys there, so Set is used instead.
 const committedTokens = new WeakMap<Ctor, Set<symbol>>();
 
-// Static-bit tracking per (ctor, member name). Written at decoration time from
-// `context.static`; read by the reflector to classify members without probing
-// descriptors (which misfires on built-in ctor properties like `name`/`length`).
+// Static-bit is recorded at decoration time from `context.static` so the
+// reflector never needs to probe descriptors (which misfires on built-in
+// ctor properties like `name` / `length`).
 const memberStaticStore = new WeakMap<Ctor, Map<string | symbol, boolean>>();
 
 const pendingByMetadata: WeakMap<object, Deferred[]> = new WeakMap();
 const metadataToCtor: WeakMap<object, Ctor> = new WeakMap();
 const ctorToMetadata = new WeakMap<Ctor, object>();
 
+/**
+ * Intentional no-op. A global reset is impossible because every store is a
+ * WeakMap keyed by class identity; tests must use fresh classes per scenario
+ * so entries become unreachable and get collected.
+ *
+ * @internal
+ */
 export function _internalReset(): void {
-	// Test-only reset hook is not provided — WeakMaps cannot be enumerated.
-	// Tests must use fresh classes per scenario; class identity is the GC root.
+	// No-op by design.
 }
 
 export function getClassMeta<T>(ctor: Ctor, key: symbol): readonly T[] {
@@ -31,6 +39,11 @@ export function hasOwnClassMeta(ctor: Ctor, key: symbol): boolean {
 	return !!list && list.length > 0;
 }
 
+/**
+ * Append a class-scoped metadata value under `key`.
+ *
+ * @throws {DuplicateMetadataError} When `options.unique` is true and a value is already registered for `key`.
+ */
 export function appendClassMeta<T>(ctor: Ctor, key: symbol, value: T, options: { unique: boolean }): void {
 	let bucket = classMetaStore.get(ctor);
 	if (!bucket) {
@@ -57,6 +70,13 @@ export function hasOwnMemberMeta(ctor: Ctor, key: symbol, name: string | symbol)
 	return !!list && list.length > 0;
 }
 
+/**
+ * Append a member-scoped metadata value under `(key, name)`. The `token`
+ * dedupes the append against prior commits of the same decoration site, so
+ * eager flush and the lazy per-instance initializer can both run safely.
+ *
+ * @throws {DuplicateMetadataError} When `options.unique` is true and a value is already registered for `(key, name)`.
+ */
 export function appendMemberMeta<T>(
 	ctor: Ctor,
 	key: symbol,
@@ -103,6 +123,11 @@ export function appendMemberMeta<T>(
 	staticMap.set(name, options.static);
 }
 
+/**
+ * Resolve the static-bit for `name`, walking the prototype chain so overrides
+ * in subclasses shadow the base. Returns `false` when `name` was never
+ * registered on any ancestor.
+ */
 export function getMemberStatic(ctor: Ctor, name: string | symbol): boolean {
 	let current: Ctor | null = ctor;
 	while (current && current !== Function.prototype) {
@@ -115,6 +140,10 @@ export function getMemberStatic(ctor: Ctor, name: string | symbol): boolean {
 	return false;
 }
 
+/**
+ * Collect all metadata values for `(key, name)` across the prototype chain,
+ * in subclass-first order. Preserves declaration order within each class.
+ */
 export function collectMemberMeta<T>(ctor: Ctor, key: symbol, name: string | symbol): T[] {
 	const out: T[] = [];
 	let current: Ctor | null = ctor;
@@ -128,6 +157,7 @@ export function collectMemberMeta<T>(ctor: Ctor, key: symbol, name: string | sym
 	return out;
 }
 
+/** Collect all class-scoped metadata for `key` across the prototype chain, subclass-first. */
 export function collectClassMeta<T>(ctor: Ctor, key: symbol): T[] {
 	const out: T[] = [];
 	let current: Ctor | null = ctor;
@@ -141,6 +171,7 @@ export function collectClassMeta<T>(ctor: Ctor, key: symbol): T[] {
 	return out;
 }
 
+/** Collect every member name decorated under `key` across the prototype chain. */
 export function collectMemberNames(ctor: Ctor, key: symbol): Set<string | symbol> {
 	const out = new Set<string | symbol>();
 	let current: Ctor | null = ctor;
@@ -180,6 +211,11 @@ export function hasAnyMemberMeta(ctor: Ctor): boolean {
 	return false;
 }
 
+/**
+ * Bind `ctor` to its `correlation` bag (both directions). First write wins —
+ * later registrations for the same correlation or ctor are ignored so the
+ * declaring class remains stable once observed.
+ */
 export function registerCtor(ctor: Ctor, correlation: object | null): void {
 	if (!correlation) {
 		return;
@@ -200,6 +236,11 @@ export function getCorrelationFor(ctor: Ctor): object | undefined {
 	return ctorToMetadata.get(ctor);
 }
 
+/**
+ * Queue a member registration against a correlation bag whose declaring class
+ * is not yet known. Drained by {@link flushFor} once the class is registered,
+ * or by the lazy per-instance initializer on first construction.
+ */
 export function queueDeferred(correlation: object | null, deferred: Deferred): void {
 	if (!correlation) {
 		return;
@@ -216,6 +257,11 @@ export function hasPendingFor(correlation: object): boolean {
 	return pendingByMetadata.has(correlation);
 }
 
+/**
+ * Commit every deferred registration buffered under `correlation` onto `ctor`
+ * and clear the queue. Safe to call multiple times; committed tokens are
+ * deduped inside {@link appendMemberMeta}.
+ */
 export function flushFor(ctor: Ctor, correlation: object | null): void {
 	if (!correlation) {
 		return;

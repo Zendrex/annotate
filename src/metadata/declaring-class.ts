@@ -2,16 +2,9 @@ import { hasOwnMetadata, readOwnMetadata } from "../runtime/symbol-metadata";
 import type { Ctor } from "./types";
 
 /**
- * Walk the constructor prototype chain from `instance.constructor` upward,
- * returning the first ancestor whose **own** `[Symbol.metadata]` matches
+ * Find the ancestor on `instance`'s prototype chain whose decoration produced
  * `correlation`. Falls back to `instance.constructor` when `correlation` is
  * nullish or unmatched.
- *
- * The own-bag check (`hasOwnMetadata`) is essential: tslib installs each class's
- * metadata bag as `Object.create(super[Symbol.metadata])`, so an inherited-only
- * read leaks the parent's bag through `ctor[Symbol.metadata]`. Without the
- * guard, `class B extends A {}` (no decorations on B) would match A's
- * correlation at the B link and return B incorrectly.
  */
 export function resolveDeclaringClass(instance: object, correlation: object | null): Ctor {
 	const start = (instance as { constructor: Ctor }).constructor;
@@ -20,6 +13,9 @@ export function resolveDeclaringClass(instance: object, correlation: object | nu
 	}
 	let ctor: Ctor | null = start;
 	while (ctor && ctor !== Function.prototype) {
+		// Own-bag check is load-bearing: tslib installs each class's metadata as
+		// `Object.create(super[Symbol.metadata])`, so inherited reads would leak the
+		// parent's correlation through a subclass that has no decorations of its own.
 		if (hasOwnMetadata(ctor) && readOwnMetadata(ctor) === correlation) {
 			return ctor;
 		}

@@ -19,20 +19,32 @@ import { materialize } from "../runtime/materialize";
 import type { Ctor, MemberKind, MetadataKey } from "../metadata/types";
 import type { AnyConstructor, DecoratedKind, ScopedReflector } from "../reflector/types";
 
+/**
+ * Fold decorator arguments into a single metadata value. Uses `options.compose`
+ * when provided, otherwise treats the first positional argument as the
+ * metadata payload.
+ */
 export function compose<TMeta, TArgs extends unknown[]>(args: TArgs, fn?: (...a: TArgs) => TMeta): TMeta {
 	return fn ? fn(...args) : (args[0] as TMeta);
 }
 
 let keyCounter = 0;
+
+/**
+ * Mint a fresh {@link MetadataKey} per factory invocation. The monotonic
+ * counter guarantees uniqueness even when callers reuse `label`.
+ */
 export function generateKey(label?: string): MetadataKey {
 	keyCounter += 1;
 	return Symbol(`${label ?? "decorator"}:${keyCounter}`);
 }
 
+/** Resolve the human-readable label used by factory error messages. */
 export function labelFor(name: string | undefined, key: MetadataKey): string {
 	return name ?? String(key.description ?? key);
 }
 
+/** @throws {AnnotateError} With code `MISSING` — class-level metadata absent for `key`. */
 export function throwMissingClass(key: MetadataKey, ctor: AnyConstructor, label: string): never {
 	throw new AnnotateError({
 		key,
@@ -43,6 +55,7 @@ export function throwMissingClass(key: MetadataKey, ctor: AnyConstructor, label:
 	});
 }
 
+/** @throws {AnnotateError} With code `MISSING` — member-level metadata absent for `key` on `member`. */
 export function throwMissingMember(
 	key: MetadataKey,
 	kind: Extract<DecoratedKind, "method" | "property">,
@@ -60,9 +73,13 @@ export function throwMissingMember(
 	});
 }
 
-// Factory metadata / requireMetadata helpers throw UnregisteredClassError
-// when the class has no annotate metadata anywhere (after auto-materialize).
-// Parity with reflector collection methods.
+/**
+ * Guard used by `metadata` / `requireMetadata` helpers to surface a clear
+ * failure when a caller reflects on a class that never saw any annotate
+ * decorator — mirrors the reflector's collection-method behavior.
+ *
+ * @throws {UnregisteredClassError} Class has no class- or member-level metadata after auto-materialize.
+ */
 export function ensureClassRegistered(ctor: Ctor): void {
 	if (!(hasAnyClassMeta(ctor) || hasAnyMemberMeta(ctor))) {
 		throw new UnregisteredClassError(ctor as AnyConstructor);

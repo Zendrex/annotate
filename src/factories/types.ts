@@ -20,17 +20,33 @@ export interface InterceptorContext {
 	static: boolean;
 }
 
+/**
+ * Base options shared by every factory. `compose` folds decorator arguments
+ * into the stored metadata value; without it the first positional argument is
+ * used as-is. `unique: true` replaces prior entries for the same key on the
+ * same target instead of appending.
+ */
 export interface DecoratorOptions<TMeta, TArgs extends unknown[] = [TMeta]> {
 	compose?: (...args: TArgs) => TMeta;
 	name?: string;
 	unique?: boolean;
 }
 
+/**
+ * Options for {@link createMethodInterceptor}. `intercept` returns the
+ * replacement function installed in place of the original method and receives
+ * a metadata reader evaluated lazily at call time.
+ */
 export interface MethodInterceptorOptions<TMeta, TArgs extends unknown[] = [TMeta], TMethod extends AnyFn = AnyFn>
 	extends DecoratorOptions<TMeta, TArgs> {
 	intercept: (original: TMethod, readMetadata: (instance: object) => TMeta[], context: InterceptorContext) => TMethod;
 }
 
+/**
+ * Options for {@link createAccessorInterceptor}. Provide `onGet`, `onSet`, or
+ * both — supplying neither is a factory-time error. Each hook returns the
+ * replacement accessor installed on the auto-accessor.
+ */
 export interface AccessorInterceptorOptions<TMeta, TArgs extends unknown[] = [TMeta], TValue = unknown>
 	extends DecoratorOptions<TMeta, TArgs> {
 	onGet?: (

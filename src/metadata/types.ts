@@ -14,27 +14,21 @@ export type Ctor = Function;
 /** Per-factory metadata key. Each factory generates a unique symbol at construction. */
 export type MetadataKey = symbol;
 
-/** Bucket of class-scoped metadata, keyed per factory symbol. */
 export type ClassBucket = Map<symbol, unknown[]>;
 
 /**
- * Bucket of member-scoped metadata.
- *
- * Outer key: per-factory symbol (`MetadataKey`).
- * Inner key: member name (`string | symbol`).
- *
- * `Map` is used at both nesting levels to avoid prototype-pollution hazards
- * present with plain object records.
+ * Member-scoped metadata. Outer key is the factory's {@link MetadataKey};
+ * inner key is the member name. `Map` is used at both levels to avoid
+ * prototype-pollution hazards of plain object records.
  */
 export type MemberBucket = Map<symbol, Map<string | symbol, unknown[]>>;
 
-/** Decoration site kind for member-level registrations. */
 export type MemberKind = "method" | "property";
 
 /**
- * Pending instance-member registration captured at decoration time and
- * committed when the declaring class is correlated (eager flush via
- * `flushFor`, or lazy commit via the per-instance initializer).
+ * Pending instance-member registration captured at decoration time. Committed
+ * once the declaring class is correlated — eagerly via `flushFor`, or lazily
+ * via the per-instance initializer on first construction.
  *
  * @internal
  */
@@ -48,5 +42,4 @@ export interface Deferred {
 	unique: boolean;
 }
 
-// Thin alias retained for downstream compatibility. Phase C+ consumers migrate to ClassBucket / MemberBucket.
 export type MetadataArray<T = unknown> = readonly T[];

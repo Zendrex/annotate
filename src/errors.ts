@@ -69,10 +69,9 @@ export class AnnotateError extends Error {
 }
 
 /**
- * Thrown when a decorator factory with `unique: true` is applied to a site
- * that already has metadata for the same key.
- *
- * @throws {DuplicateMetadataError} At decoration time, before any state mutation.
+ * Thrown at decoration time (before any state mutation) when a decorator
+ * factory with `unique: true` is applied to a site that already has metadata
+ * for the same key.
  */
 export class DuplicateMetadataError extends AnnotateError {
 	override readonly name: string = "DuplicateMetadataError";

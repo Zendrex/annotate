@@ -1,8 +1,12 @@
 import type { AnyConstructor } from "./types";
 
 /**
- * Non-exported: resolve an instance to its constructor; used when normalizing
- * `AnnotateError.target` for prototype or instance.
+ * Resolve an instance (or prototype) to its concrete constructor, rejecting
+ * anything that would degrade reflection (`Object`, missing prototype, etc.).
+ * Used when normalizing `AnnotateError.target` and as a helper for
+ * {@link resolveReflectTarget}.
+ *
+ * @throws {TypeError} With a `reflect(target):` message prefix when the argument cannot be resolved.
  */
 export function resolveConstructorFromInstance(instance: object): AnyConstructor {
 	if (instance === null || typeof instance !== "object") {
@@ -26,8 +30,10 @@ export function resolveConstructorFromInstance(instance: object): AnyConstructor
 }
 
 /**
- * Resolve an object to the constructor used for reflection.
- * @throws TypeError with stable `reflect(target):` prefixes (see spec).
+ * Resolve any reflection entry-point argument — a class, prototype, or
+ * instance — to the constructor used for metadata lookups.
+ *
+ * @throws {TypeError} With a stable `reflect(target):` message prefix when the argument is unusable.
  */
 export function resolveReflectTarget(target: unknown): AnyConstructor {
 	if (typeof target === "function") {

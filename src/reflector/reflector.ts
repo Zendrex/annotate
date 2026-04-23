@@ -28,11 +28,11 @@ export interface Reflector {
 	properties<T>(key: MetadataKey): DecoratedProperty<T>[];
 }
 
-// Per plan EA-6: classify by descriptor value only. Auto-accessors expose
-// get/set functions on the prototype and are intentionally classified as
-// properties, not methods. `isStatic` comes from the store (set at decoration
-// time from `context.static`) so built-in constructor properties like `name`
-// or `length` never misclassify a user instance field.
+// Classify strictly by descriptor value: only plain function descriptors count
+// as methods. Auto-accessors expose get/set on the prototype and are therefore
+// reported as properties by design. `isStatic` is sourced from the store (set
+// from `context.static` at decoration time) so built-in ctor properties like
+// `name` / `length` never misclassify an instance field.
 function isMethodLike(ctor: Ctor, name: string | symbol, isStatic: boolean): boolean {
 	const target = isStatic ? (ctor as object) : (ctor.prototype as object);
 	const desc = Object.getOwnPropertyDescriptor(target, name);
