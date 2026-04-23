@@ -34,3 +34,14 @@ jobs:
 
             - name: Run Ultracite
               run: bunx ultracite check
+
+    test:
+        name: Test
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        steps:
+            - uses: actions/checkout@v6
+            - uses: ./.github/actions/setup-bun
+
+            - name: Run Tests
+              run: bun test
