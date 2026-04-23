@@ -30,7 +30,7 @@ export function normalizeAnnotateErrorTarget(decorationTarget: object): AnyConst
 export function classMetadataFirst<TMeta>(key: MetadataKey, ctor: AnyConstructor): TMeta | undefined {
 	const value = getMetadata<MetadataArray<TMeta>>(key, ctor);
 	if (!value || value.length === 0) {
-		return undefined;
+		return;
 	}
 	return value[0] as TMeta;
 }
@@ -57,7 +57,7 @@ export function lookupMemberMetadataScalar<TMeta>(
 	if (staticOwn && staticOwn.length > 0) {
 		return staticOwn[0];
 	}
-	return undefined;
+	return;
 }
 
 export function memberMetadataApplied<TMeta>(key: MetadataKey, ctor: AnyConstructor, member: string | symbol): boolean {

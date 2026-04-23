@@ -54,7 +54,7 @@ export class ReflectorImpl implements Reflector {
 	class<T>(key: MetadataKey): DecoratedClass<T> | undefined {
 		const metadata = getMetadata<MetadataArray<T>>(key, this.ctor);
 		if (!metadata || metadata.length === 0) {
-			return undefined;
+			return;
 		}
 		return {
 			kind: "class",
