@@ -6,7 +6,7 @@
 /** biome-ignore-all lint/performance/noBarrelFile: main index file */
 import "reflect-metadata";
 
-export { AnnotateError, AnnotateErrorCode } from "./errors";
+export { AnnotateError, AnnotateErrorCode, UnregisteredClassError } from "./errors";
 export { createClassDecorator } from "./factories/class-decorator";
 export { createMethodDecorator } from "./factories/method-decorator";
 export { createMethodInterceptor } from "./factories/method-interceptor";
@@ -23,6 +23,7 @@ export {
 	setParameterMap,
 } from "./metadata/store";
 export { reflect } from "./reflector/reflector";
+export { materialize } from "./runtime/materialize";
 export type {
 	DecoratedClassFactory,
 	DecoratedMethodFactory,
