@@ -7,12 +7,12 @@
 import "reflect-metadata";
 
 export { AnnotateError, AnnotateErrorCode, UnregisteredClassError } from "./errors";
+export { createAccessorInterceptor } from "./factories/accessor-interceptor";
 export { createClassDecorator } from "./factories/class-decorator";
 export { createMethodDecorator } from "./factories/method-decorator";
 export { createMethodInterceptor } from "./factories/method-interceptor";
 export { createParameterDecorator } from "./factories/parameter-decorator";
 export { createPropertyDecorator } from "./factories/property-decorator";
-export { createPropertyInterceptor } from "./factories/property-interceptor";
 export {
 	appendMetadata,
 	defineMetadata,
