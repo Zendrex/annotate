@@ -7,12 +7,17 @@ import {
 	collectClassMeta,
 	collectMemberMeta,
 	collectMemberNames,
+	flushFor,
 	getClassMeta,
 	getMemberMeta,
 	hasAnyClassMeta,
 	hasAnyMemberMeta,
 	hasOwnClassMeta,
 	hasOwnMemberMeta,
+	hasPendingFor,
+	queueDeferred,
+	registerCtor,
+	resolveCtorFromMetadata,
 } from "../../../src/metadata/store";
 
 describe("class metadata store", () => {
@@ -236,5 +241,63 @@ describe("hasAnyClassMeta / hasAnyMemberMeta", () => {
 		class A {}
 		expect(() => hasAnyClassMeta(A)).not.toThrow();
 		expect(() => hasAnyMemberMeta(A)).not.toThrow();
+	});
+});
+
+describe("pending registration + correlation", () => {
+	test("registerCtor maps both directions", () => {
+		const correlation = {};
+		class A {}
+		registerCtor(A, correlation);
+		expect(resolveCtorFromMetadata(correlation)).toBe(A);
+	});
+
+	test("registerCtor is first-write-wins", () => {
+		const correlation = {};
+		class A {}
+		class B {}
+		registerCtor(A, correlation);
+		registerCtor(B, correlation);
+		expect(resolveCtorFromMetadata(correlation)).toBe(A);
+	});
+
+	test("queueDeferred + flushFor commits pending entries", () => {
+		const correlation = {};
+		const key = Symbol("k");
+		const token = Symbol("t");
+		class A {}
+		queueDeferred(correlation, {
+			key,
+			name: "foo",
+			meta: "v",
+			token,
+			unique: false,
+		});
+		expect(hasPendingFor(correlation)).toBe(true);
+		flushFor(A, correlation);
+		expect(hasPendingFor(correlation)).toBe(false);
+		expect(getMemberMeta<string>(A, key, "foo")).toEqual(["v"]);
+	});
+
+	test("flushFor is idempotent (no double-write)", () => {
+		const correlation = {};
+		const key = Symbol("k");
+		const token = Symbol("t");
+		class A {}
+		queueDeferred(correlation, { key, name: "foo", meta: "v", token, unique: false });
+		flushFor(A, correlation);
+		flushFor(A, correlation);
+		expect(getMemberMeta<string>(A, key, "foo")).toEqual(["v"]);
+	});
+
+	test("flushFor with nullish correlation is a no-op", () => {
+		class A {}
+		expect(() => flushFor(A, null)).not.toThrow();
+	});
+
+	test("queueDeferred with nullish correlation is a no-op", () => {
+		expect(() =>
+			queueDeferred(null, { key: Symbol("k"), name: "x", meta: 1, token: Symbol("t"), unique: false })
+		).not.toThrow();
 	});
 });

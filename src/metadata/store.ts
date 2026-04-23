@@ -10,13 +10,8 @@ const memberMetaStore = new WeakMap<Ctor, MemberBucket>();
 // Spec writes WeakSet; ES forbids symbol WeakSet keys, so we use Set. Tokens are short-lived per decoration batch.
 const committedTokens = new WeakMap<Ctor, Set<symbol>>();
 
-// biome-ignore lint/correctness/noUnusedVariables: Scaffold storage — populated in Phase C2-C5.
 const pendingByMetadata: WeakMap<object, Deferred[]> = new WeakMap();
-
-// biome-ignore lint/correctness/noUnusedVariables: Scaffold storage — populated in Phase C2-C5.
 const metadataToCtor: WeakMap<object, Ctor> = new WeakMap();
-
-// biome-ignore lint/correctness/noUnusedVariables: Scaffold storage — populated in Phase C2-C5.
 const ctorToMetadata = new WeakMap<Ctor, object>();
 
 export function _internalReset(): void {
@@ -161,4 +156,54 @@ export function hasAnyMemberMeta(ctor: Ctor): boolean {
 		current = Object.getPrototypeOf(current) as Ctor | null;
 	}
 	return false;
+}
+
+export function registerCtor(ctor: Ctor, correlation: object | null): void {
+	if (!correlation) {
+		return;
+	}
+	if (!metadataToCtor.has(correlation)) {
+		metadataToCtor.set(correlation, ctor);
+	}
+	if (!ctorToMetadata.has(ctor)) {
+		ctorToMetadata.set(ctor, correlation);
+	}
+}
+
+export function resolveCtorFromMetadata(correlation: object): Ctor | undefined {
+	return metadataToCtor.get(correlation);
+}
+
+export function getCorrelationFor(ctor: Ctor): object | undefined {
+	return ctorToMetadata.get(ctor);
+}
+
+export function queueDeferred(correlation: object | null, deferred: Deferred): void {
+	if (!correlation) {
+		return;
+	}
+	let list = pendingByMetadata.get(correlation);
+	if (!list) {
+		list = [];
+		pendingByMetadata.set(correlation, list);
+	}
+	list.push(deferred);
+}
+
+export function hasPendingFor(correlation: object): boolean {
+	return pendingByMetadata.has(correlation);
+}
+
+export function flushFor(ctor: Ctor, correlation: object | null): void {
+	if (!correlation) {
+		return;
+	}
+	const list = pendingByMetadata.get(correlation);
+	if (!list) {
+		return;
+	}
+	for (const d of list) {
+		appendMemberMeta(ctor, d.key, d.name, d.meta, d.token, { unique: d.unique });
+	}
+	pendingByMetadata.delete(correlation);
 }
