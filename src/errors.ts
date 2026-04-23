@@ -1,3 +1,4 @@
+import { targetDisplayName } from "./reflector/class-name";
 import type { MetadataKey } from "./metadata/types";
 import type { AnyConstructor, DecoratedKind } from "./reflector/types";
 
@@ -62,5 +63,32 @@ export class AnnotateError extends Error {
 		this.target = options.target;
 		this.memberName = options.memberName;
 		this.parameterIndex = options.parameterIndex;
+	}
+}
+
+/**
+ * Thrown by reflector collection methods when a class has no registered
+ * annotate metadata (after auto-materialization). Distinguished from "no
+ * metadata for this factory" — that condition returns an empty collection.
+ *
+ * Common causes: the class was authored under `experimentalDecorators: true`,
+ * `reflect-metadata` is still imported, the bundler dropped the decoration
+ * module, or a class decorator was expected but never applied. Call
+ * `materialize(ctor)` on instance-member-only classes if pre-instantiation
+ * reflection is required and the class has no class decorator or static decorations.
+ */
+export class UnregisteredClassError extends Error {
+	override readonly name: string = "UnregisteredClassError";
+
+	readonly target: AnyConstructor;
+
+	constructor(target: AnyConstructor) {
+		super(
+			`@zendrex/annotate: no registered metadata for "${targetDisplayName(target)}". ` +
+				"Causes: missing decorator import, bundler tree-shake of the decoration module, " +
+				`legacy "experimentalDecorators: true" emit, or instance-member-only class with ` +
+				"no class decorator (call materialize(ctor) before reflect)."
+		);
+		this.target = target;
 	}
 }
