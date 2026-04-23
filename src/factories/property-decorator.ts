@@ -1,61 +1,65 @@
-import { appendMetadata, getMetadataArray } from "../metadata/store";
+import { resolveDeclaringClass } from "../metadata/declaring-class";
+import { appendMemberMeta, collectMemberMeta, hasOwnMemberMeta, queueDeferred, registerCtor } from "../metadata/store";
 import { resolveReflectTarget } from "../reflector/resolve-instance";
 import { createScopedReflector } from "../reflector/scoped-reflector";
-import {
-	compose,
-	ensureProperty,
-	generateKey,
-	labelFor,
-	lookupMemberMetadataScalar,
-	memberMetadataApplied,
-	memberMetadataAppliedOwn,
-	normalizeAnnotateErrorTarget,
-	throwDuplicateMember,
-	throwMissingMember,
-} from "./shared";
+import { compose, generateKey, labelFor, throwMissingMember } from "./shared";
 import type { DecoratedPropertyFactory, DecoratorOptions } from "./types";
 
+// biome-ignore lint/complexity/noBannedTypes: constructor identity uses Function for parity with metadata/store
+type Ctor = Function;
+
 /**
- * Create a typed property decorator factory with reflection helpers scoped to
- * properties.
+ * Create a typed field decorator. `TField` constrains the declared type of the
+ * decorated field — `createPropertyDecorator<M, [M], number>()` rejects
+ * `@Dec() flag!: boolean;` at compile time via the structural assignability of
+ * `ClassFieldDecoratorContext<This, Value>`.
  *
- * Because TypeScript field declarations are not enumerable on the prototype by
- * default, the factory installs a zero-value descriptor so reflection can
- * discover the decorated property without relying on field initialization.
- * `unique` enforces single application per (class, property) slot.
- *
- * @throws {AnnotateError} `code: "duplicate"` when `unique` is set and the slot is decorated twice
+ * Field decorators register lazily on first instantiation. For pre-instantiation
+ * reflection on instance-member-only classes, call `materialize(ctor)` first or
+ * apply a class decorator (which drains the pending buffer at class-body eval).
  */
-export function createPropertyDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
+export function createPropertyDecorator<TMeta, TArgs extends unknown[] = [TMeta], TField = unknown>(
 	options?: DecoratorOptions<TMeta, TArgs>
-): DecoratedPropertyFactory<TMeta, TArgs> {
-	const key = generateKey();
-	const { compose: composeFn, name, unique } = options ?? {};
+): DecoratedPropertyFactory<TMeta, TArgs, TField> {
+	const key = generateKey(options?.name);
+	const { compose: composeFn, name, unique = false } = options ?? {};
 	const label = labelFor(name, key);
 
 	const decoratorFn =
 		(...args: TArgs) =>
-		(target: object, propertyKey: string | symbol): void => {
-			if (unique && getMetadataArray<TMeta>(key, target, propertyKey).length > 0) {
-				throwDuplicateMember(key, "property", normalizeAnnotateErrorTarget(target), propertyKey, label);
-			}
-			appendMetadata(key, target, compose(args, composeFn), propertyKey);
-			ensureProperty(target, propertyKey);
+		// biome-ignore lint/suspicious/noExplicitAny: EA-3 — ClassFieldDecoratorContext's This generic must default to `any` so typed `this:` on fields type-checks
+		(_value: undefined, context: ClassFieldDecoratorContext<any, TField>): void => {
+			const meta = compose(args, composeFn);
+			const token = Symbol("propertyDecoration");
+			const correlation = context.metadata;
+			const memberName = context.name;
+
+			queueDeferred(correlation, { key, name: memberName, meta, token, unique });
+
+			context.addInitializer(function (this: unknown) {
+				const ctor = resolveDeclaringClass(this as object, correlation);
+				registerCtor(ctor, correlation);
+				appendMemberMeta(ctor, key, memberName, meta, token, { unique });
+			});
 		};
+
+	const firstMemberMeta = (ctor: Ctor, member: string | symbol): TMeta | undefined => {
+		const list = collectMemberMeta<TMeta>(ctor, key, member);
+		return list.length > 0 ? list[0] : undefined;
+	};
 
 	return Object.assign(decoratorFn, {
 		key,
 		reflect: (target: object) => createScopedReflector<TMeta>(resolveReflectTarget(target), key),
-		metadata: (target: object, name: string | symbol): TMeta | undefined =>
-			lookupMemberMetadataScalar<TMeta>(key, resolveReflectTarget(target), name),
-		requireMetadata: (target: object, name: string | symbol): TMeta => {
+		metadata: (target: object, member: string | symbol) => firstMemberMeta(resolveReflectTarget(target), member),
+		requireMetadata: (target: object, member: string | symbol): TMeta => {
 			const ctor = resolveReflectTarget(target);
-			const value = lookupMemberMetadataScalar<TMeta>(key, ctor, name);
-			return value === undefined ? throwMissingMember(key, "property", ctor, name, label) : value;
+			const first = firstMemberMeta(ctor, member);
+			return first === undefined ? throwMissingMember(key, "property", ctor, member, label) : first;
 		},
-		applied: (target: object, name: string | symbol): boolean =>
-			memberMetadataApplied<TMeta>(key, resolveReflectTarget(target), name),
-		appliedOwn: (target: object, name: string | symbol): boolean =>
-			memberMetadataAppliedOwn<TMeta>(key, resolveReflectTarget(target), name),
-	}) as DecoratedPropertyFactory<TMeta, TArgs>;
+		applied: (target: object, member: string | symbol) =>
+			collectMemberMeta<TMeta>(resolveReflectTarget(target), key, member).length > 0,
+		appliedOwn: (target: object, member: string | symbol) =>
+			hasOwnMemberMeta(resolveReflectTarget(target), key, member),
+	}) as DecoratedPropertyFactory<TMeta, TArgs, TField>;
 }

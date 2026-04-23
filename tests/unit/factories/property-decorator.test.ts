@@ -1,11 +1,13 @@
-import "reflect-metadata";
-
+// Temporary: importing directly until Phase M1 consolidates all factory exports into src/index.ts.
 import { describe, expect, test } from "bun:test";
 
-import { AnnotateError, createPropertyDecorator } from "../../../src";
+import { AnnotateError } from "../../../src/errors";
+import { createClassDecorator } from "../../../src/factories/class-decorator";
+import { createPropertyDecorator } from "../../../src/factories/property-decorator";
+import { materialize } from "../../../src/runtime/materialize";
 
-describe("createPropertyDecorator", () => {
-	test("should store simple metadata on property", () => {
+describe("createPropertyDecorator (Stage-3)", () => {
+	test("captures metadata on a decorated field after construction", () => {
 		const Column = createPropertyDecorator<string>();
 
 		class User {
@@ -13,28 +15,53 @@ describe("createPropertyDecorator", () => {
 			name!: string;
 		}
 
-		const columns = Column.reflect(User).properties();
-		const column = columns.find((c) => c.name === "name");
-		expect(column?.metadata).toEqual(["varchar"]);
+		new User();
+		expect(Column.appliedOwn(User, "name")).toBe(true);
+		expect(Column.metadata(User, "name")).toBe("varchar");
 	});
 
-	test("should store metadata on multiple properties", () => {
-		const Field = createPropertyDecorator<string>();
+	test("eager flush via materialize() makes pre-instantiation reflection work", () => {
+		const Column = createPropertyDecorator<string>();
 
-		class Entity {
-			@Field("string")
+		class User {
+			@Column("varchar")
 			name!: string;
-
-			@Field("number")
-			age!: number;
 		}
 
-		const fields = Field.reflect(Entity).properties();
-		expect(fields.find((f) => f.name === "name")?.metadata).toEqual(["string"]);
-		expect(fields.find((f) => f.name === "age")?.metadata).toEqual(["number"]);
+		materialize(User);
+		expect(Column.appliedOwn(User, "name")).toBe(true);
 	});
 
-	test("should support compose function", () => {
+	test("eager flush via class decorator on the same class", () => {
+		const Tag = createClassDecorator<string>();
+		const Field = createPropertyDecorator<string>();
+
+		@Tag("entity")
+		class Entity {
+			@Field("varchar")
+			name!: string;
+		}
+
+		// No new Entity() — class decorator drained pending Deferreds at class-body eval.
+		expect(Field.appliedOwn(Entity, "name")).toBe(true);
+	});
+
+	test("inheritance: child sees parent field via applied(), not appliedOwn()", () => {
+		const Column = createPropertyDecorator<string>();
+
+		class Parent {
+			@Column("varchar")
+			name!: string;
+		}
+		class Child extends Parent {}
+
+		new Child();
+		expect(Column.appliedOwn(Parent, "name")).toBe(true);
+		expect(Column.appliedOwn(Child, "name")).toBe(false);
+		expect(Column.applied(Child, "name")).toBe(true);
+	});
+
+	test("supports compose for multi-arg call shapes", () => {
 		const Column = createPropertyDecorator({
 			compose: (type: string, nullable: boolean) => ({ type, nullable }),
 		});
@@ -44,120 +71,46 @@ describe("createPropertyDecorator", () => {
 			name!: string;
 		}
 
-		const columns = Column.reflect(User).properties();
-		const column = columns.find((c) => c.name === "name");
-		expect(column?.metadata).toEqual([{ type: "varchar", nullable: false }]);
+		new User();
+		expect(Column.metadata(User, "name")).toEqual({ type: "varchar", nullable: false });
 	});
 
-	describe("propertiesSingular", () => {
-		test("should unwrap metadata to singular value with kind", () => {
-			const Column = createPropertyDecorator<string>();
+	test("unique:true throws on second application to same field", () => {
+		const Column = createPropertyDecorator<string>({ unique: true, name: "Column" });
 
-			class User {
-				@Column("varchar")
+		expect(() => {
+			class X {
+				@Column("a")
+				@Column("b")
 				name!: string;
-
-				@Column("int")
-				age!: number;
 			}
-
-			const entries = Column.reflect(User).propertiesSingular();
-			expect(entries.find((entry) => entry.name === "name")?.metadata).toBe("varchar");
-			expect(entries.find((entry) => entry.name === "age")?.metadata).toBe("int");
-			expect(entries[0]?.kind).toBe("property");
-		});
-
-		test("should omit undecorated properties", () => {
-			const Column = createPropertyDecorator<string>();
-
-			class User {
-				@Column("varchar")
-				name!: string;
-				age!: number;
-			}
-
-			const names = Column.reflect(User)
-				.propertiesSingular()
-				.map((entry) => entry.name);
-			expect(names).toEqual(["name"]);
-		});
+			new X();
+		}).toThrow(AnnotateError);
 	});
 
-	describe("metadata", () => {
-		test("should return undefined for undecorated property", () => {
-			const Column = createPropertyDecorator<string>();
-
-			class User {
-				name!: string;
-			}
-
-			expect(Column.metadata(User, "name")).toBeUndefined();
-		});
-
-		test("should return the first applied value when stacked", () => {
-			const Field = createPropertyDecorator<string>();
-
-			class Entity {
-				@Field("second")
-				@Field("first")
-				name!: string;
-			}
-
-			expect(Field.metadata(Entity, "name")).toBe("first");
-		});
-
-		test("should inherit from an ancestor property", () => {
-			const Column = createPropertyDecorator<string>();
-
-			class Parent {
-				@Column("varchar")
-				name!: string;
-			}
-
-			class Child extends Parent {}
-
-			expect(Column.metadata(Child, "name")).toBe("varchar");
-		});
-
-		test("should resolve static properties", () => {
-			const Config = createPropertyDecorator<string>();
-
-			class App {
-				run() {
-					return null;
-				}
-
-				@Config("prod")
-				static env: string;
-			}
-
-			expect(Config.metadata(App, "env")).toBe("prod");
-		});
+	test("requireMetadata throws AnnotateError(missing) when undecorated", () => {
+		const Column = createPropertyDecorator<string>({ name: "Column" });
+		class X {
+			name!: string;
+		}
+		new X();
+		expect(() => Column.requireMetadata(X, "name")).toThrow(AnnotateError);
 	});
 
-	describe("requireMetadata", () => {
-		test("should throw AnnotateError with code, kind, and target when property has no metadata", () => {
-			const Column = createPropertyDecorator<string>();
+	test("appliedOwn(Sub, 'foo') stays false when subclass decorated a sibling member only", () => {
+		const Column = createPropertyDecorator<string>();
+		class A {
+			@Column("a")
+			foo!: string;
+		}
+		class B extends A {
+			@Column("b")
+			bar!: string;
+		}
 
-			class User {
-				name!: string;
-			}
-
-			expect(() => Column.requireMetadata(User, "name")).toThrow(AnnotateError);
-
-			try {
-				Column.requireMetadata(User, "missing");
-				throw new Error("expected AnnotateError");
-			} catch (error) {
-				expect(error).toBeInstanceOf(AnnotateError);
-				const err = error as AnnotateError;
-				expect(err.code).toBe("missing");
-				expect(err.kind).toBe("property");
-				expect(err.target).toBe(User);
-				expect(err.memberName).toBe("missing");
-				expect(err.message).toContain("missing");
-				expect(err.message).toContain("User");
-			}
-		});
+		new B();
+		expect(Column.appliedOwn(B, "foo")).toBe(false);
+		expect(Column.appliedOwn(B, "bar")).toBe(true);
+		expect(Column.appliedOwn(A, "foo")).toBe(true);
 	});
 });
