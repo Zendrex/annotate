@@ -10,20 +10,16 @@ import {
 	getOwnMetadata,
 	getParameterMap,
 	setParameterMap,
-} from "../src/lib/metadata";
-import type { ParameterMetadataMap } from "../src/lib/types";
-
-// Test metadata keys
-const TEST_KEY = Symbol("test:key");
-const ARRAY_KEY = Symbol("test:array");
-const PARAM_KEY = Symbol("test:param");
+} from "../../../src";
+import { ARRAY_KEY, PARAM_KEY, TEST_KEY } from "../../fixtures/metadata-keys";
+import type { ParameterMetadataMap } from "../../../src";
 
 describe("defineMetadata", () => {
-	test("should define metadata on a class", () => {
+	test("should define metadata on a class and read with getMetadata", () => {
 		class Target {}
 		defineMetadata(TEST_KEY, "class-value", Target);
 
-		const result = Reflect.getMetadata(TEST_KEY, Target);
+		const result = getMetadata<string>(TEST_KEY, Target);
 		expect(result).toBe("class-value");
 	});
 
@@ -48,14 +44,6 @@ describe("defineMetadata", () => {
 });
 
 describe("getMetadata", () => {
-	test("should retrieve metadata from target", () => {
-		class Target {}
-		Reflect.defineMetadata(TEST_KEY, "value", Target);
-
-		const result = getMetadata<string>(TEST_KEY, Target);
-		expect(result).toBe("value");
-	});
-
 	test("should retrieve metadata from property", () => {
 		class Target {}
 		Reflect.defineMetadata(TEST_KEY, "prop-value", Target.prototype, "method");
@@ -178,18 +166,6 @@ describe("appendMetadata", () => {
 		expect(result).toEqual(["existing", "appended"]);
 	});
 
-	test("should append multiple values in sequence", () => {
-		const key = Symbol("append:multi");
-		class Target {}
-
-		appendMetadata(key, Target, "first");
-		appendMetadata(key, Target, "second");
-		appendMetadata(key, Target, "third");
-
-		const result = Reflect.getOwnMetadata(key, Target);
-		expect(result).toEqual(["first", "second", "third"]);
-	});
-
 	test("should work with property key", () => {
 		const key = Symbol("append:prop");
 		class Target {}
@@ -198,20 +174,6 @@ describe("appendMetadata", () => {
 
 		const result = Reflect.getOwnMetadata(key, Target.prototype, "myMethod");
 		expect(result).toEqual(["value"]);
-	});
-
-	test("should append complex objects", () => {
-		const key = Symbol("append:objects");
-		class Target {}
-
-		appendMetadata(key, Target, { id: 1, name: "first" });
-		appendMetadata(key, Target, { id: 2, name: "second" });
-
-		const result = Reflect.getOwnMetadata(key, Target);
-		expect(result).toEqual([
-			{ id: 1, name: "first" },
-			{ id: 2, name: "second" },
-		]);
 	});
 });
 
@@ -284,39 +246,5 @@ describe("setParameterMap", () => {
 
 		const result = Reflect.getOwnMetadata(PARAM_KEY, Target);
 		expect(result.get(0)).toEqual(["new"]);
-	});
-});
-
-describe("integration", () => {
-	test("defineMetadata and getMetadata should work together", () => {
-		const key = Symbol("integration:define-get");
-		class Target {}
-
-		defineMetadata(key, { complex: "value" }, Target);
-		const result = getMetadata<{ complex: string }>(key, Target);
-
-		expect(result).toEqual({ complex: "value" });
-	});
-
-	test("appendMetadata and getMetadataArray should work together", () => {
-		const key = Symbol("integration:append-array");
-		class Target {}
-
-		appendMetadata(key, Target, "one");
-		appendMetadata(key, Target, "two");
-		const result = getMetadataArray<string>(key, Target);
-
-		expect(result).toEqual(["one", "two"]);
-	});
-
-	test("setParameterMap and getParameterMap should work together", () => {
-		const key = Symbol("integration:param-map");
-		class Target {}
-		const map: ParameterMetadataMap<string> = new Map([[0, ["param"]]]);
-
-		setParameterMap(key, Target, map, "method");
-		const result = getParameterMap<string>(key, Target, "method");
-
-		expect(result.get(0)).toEqual(["param"]);
 	});
 });

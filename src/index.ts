@@ -2,30 +2,17 @@
  * @packageDocumentation
  *
  * A TypeScript decorator factory library with metadata storage and reflection capabilities.
- *
- * This package provides:
- * - **Decorator Factories**: {@link createClassDecorator}, {@link createMethodDecorator},
- *   {@link createPropertyDecorator}, {@link createParameterDecorator} - Create type-safe
- *   decorators that automatically store metadata for later reflection.
- * - **Interceptors**: {@link createMethodInterceptor}, {@link createPropertyInterceptor} -
- *   Create decorators that wrap method calls or property access for cross-cutting concerns.
- * - **Metadata Utilities**: {@link getMetadata}, {@link defineMetadata}, {@link appendMetadata} -
- *   Low-level functions for reading and writing metadata on targets.
- * - **Reflection**: {@link Reflector}, {@link reflect}, {@link createScopedReflector} -
- *   Retrieve stored metadata from decorated classes and their members.
  */
-
 /** biome-ignore-all lint/performance/noBarrelFile: main index file */
 import "reflect-metadata";
 
-export {
-	createClassDecorator,
-	createMethodDecorator,
-	createMethodInterceptor,
-	createParameterDecorator,
-	createPropertyDecorator,
-	createPropertyInterceptor,
-} from "./lib/factories";
+export { AnnotateError, AnnotateErrorCode } from "./errors";
+export { createClassDecorator } from "./factories/class-decorator";
+export { createMethodDecorator } from "./factories/method-decorator";
+export { createMethodInterceptor } from "./factories/method-interceptor";
+export { createParameterDecorator } from "./factories/parameter-decorator";
+export { createPropertyDecorator } from "./factories/property-decorator";
+export { createPropertyInterceptor } from "./factories/property-interceptor";
 export {
 	appendMetadata,
 	defineMetadata,
@@ -34,34 +21,33 @@ export {
 	getOwnMetadata,
 	getParameterMap,
 	setParameterMap,
-} from "./lib/metadata";
-export { createScopedReflector, Reflector, reflect } from "./lib/reflector";
+} from "./metadata/store";
+export { reflect } from "./reflector/reflector";
 export type {
-	ClassDecoratorFactory,
-	ClassDecoratorReflection,
-	DecoratedClass,
 	DecoratedClassFactory,
-	DecoratedItem,
-	DecoratedKind,
-	DecoratedMethod,
 	DecoratedMethodFactory,
-	DecoratedParameter,
 	DecoratedParameterFactory,
-	DecoratedProperty,
 	DecoratedPropertyFactory,
+	DecoratorOptions,
 	InterceptorContext,
-	MetadataArray,
-	MetadataKey,
-	MethodDecoratorFactory,
-	MethodDecoratorReflection,
 	MethodInterceptorOptions,
-	ParameterDecoratorFactory,
-	ParameterDecoratorReflection,
-	ParameterMetadataMap,
-	PropertyDecoratorFactory,
-	PropertyDecoratorReflection,
+	ParameterDecoratorOptions,
 	PropertyGetter,
 	PropertyInterceptorOptions,
 	PropertySetter,
+} from "./factories/types";
+export type { MetadataArray, MetadataKey, ParameterMetadataMap } from "./metadata/types";
+export type { Reflector } from "./reflector/reflector";
+export type {
+	DecoratedClass,
+	DecoratedConstructorParameter,
+	DecoratedItem,
+	DecoratedKind,
+	DecoratedMethod,
+	DecoratedMethodParameter,
+	DecoratedMethodSingle,
+	DecoratedParameter,
+	DecoratedProperty,
+	DecoratedPropertySingle,
 	ScopedReflector,
-} from "./lib/types";
+} from "./reflector/types";

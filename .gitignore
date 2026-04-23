@@ -39,6 +39,7 @@ Thumbs.db
 .claude/
 .cursor/
 .worktrees/
+docs/
 
 # =====================
 # Logs

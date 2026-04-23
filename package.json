@@ -29,6 +29,9 @@
 		"access": "public"
 	},
 	"scripts": {
+		"test": "bun test",
+		"test:unit": "bun test tests/unit",
+		"test:integration": "bun test tests/integration",
 		"build": "tsdown",
 		"check": "bunx ultracite check",
 		"fix": "bunx ultracite fix",
@@ -41,14 +44,14 @@
 	"devDependencies": {
 		"@biomejs/biome": "2.4.10",
 		"@changesets/changelog-github": "^0.6.0",
-		"@changesets/cli": "^2.30.0",
-		"@swc/core": "^1.15.21",
-		"@types/bun": "^1.3.11",
-		"bun-types": "^1.3.11",
-		"lefthook": "^2.0.0",
-		"tsdown": "^0.21.7",
-		"typescript": "^6.0.2",
-		"ultracite": "^7.4.3"
+		"@changesets/cli": "^2.31.0",
+		"@swc/core": "^1.15.30",
+		"@types/bun": "^1.3.13",
+		"bun-types": "^1.3.13",
+		"lefthook": "^2.1.6",
+		"tsdown": "^0.21.10",
+		"typescript": "^6.0.3",
+		"ultracite": "^7.6.1"
 	},
 	"peerDependencies": {
 		"reflect-metadata": "^0.2.2"

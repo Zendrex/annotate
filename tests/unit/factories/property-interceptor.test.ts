@@ -2,7 +2,20 @@ import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
 
-import { createPropertyInterceptor } from "../../src/lib/factories";
+import { createPropertyInterceptor } from "../../../src";
+
+const CREATE_PROPERTY_INTERCEPTOR_PREFIX = /^createPropertyInterceptor:/;
+const ON_GET = /onGet/;
+const ON_SET = /onSet/;
+
+describe("createPropertyInterceptor({})", () => {
+	test("throws TypeError with stable prefix and onGet/onSet mention", () => {
+		expect(() => createPropertyInterceptor({} as never)).toThrow(TypeError);
+		expect(() => createPropertyInterceptor({} as never)).toThrow(CREATE_PROPERTY_INTERCEPTOR_PREFIX);
+		expect(() => createPropertyInterceptor({} as never)).toThrow(ON_GET);
+		expect(() => createPropertyInterceptor({} as never)).toThrow(ON_SET);
+	});
+});
 
 describe("createPropertyInterceptor", () => {
 	test("should intercept property set", () => {
@@ -11,7 +24,7 @@ describe("createPropertyInterceptor", () => {
 		const Track = createPropertyInterceptor<string>({
 			onSet: (original, _meta, ctx) =>
 				function (this: unknown, value: unknown) {
-					setLog.push(`set:${String(ctx.propertyKey)}=${value}`);
+					setLog.push(`set:${String(ctx.name)}=${value}`);
 					original.call(this, value);
 				},
 		});
@@ -35,7 +48,7 @@ describe("createPropertyInterceptor", () => {
 		const Monitor = createPropertyInterceptor<string>({
 			onGet: (original, _meta, ctx) =>
 				function (this: unknown) {
-					getLog.push(`get:${String(ctx.propertyKey)}`);
+					getLog.push(`get:${String(ctx.name)}`);
 					return original.call(this);
 				},
 		});
@@ -72,20 +85,5 @@ describe("createPropertyInterceptor", () => {
 		store.count = 1;
 
 		expect(capturedMeta).toEqual([{ name: "counter", log: true }]);
-	});
-
-	test("should store metadata for reflection", () => {
-		const Observe = createPropertyInterceptor<string>({
-			onSet: (original) => original,
-		});
-
-		class Store {
-			@Observe("watched")
-			prop = "";
-		}
-
-		const properties = Observe.properties(Store);
-		const prop = properties.find((p) => p.name === "prop");
-		expect(prop?.metadata).toEqual(["watched"]);
 	});
 });

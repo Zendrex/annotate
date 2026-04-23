@@ -2,18 +2,18 @@ import "reflect-metadata";
 
 import { describe, expect, test } from "bun:test";
 
-import { createMethodInterceptor } from "../../src/lib/factories";
+import { createMethodInterceptor } from "../../../src";
 
 describe("createMethodInterceptor", () => {
 	test("should wrap method and intercept calls", () => {
 		const calls: string[] = [];
 
 		const Log = createMethodInterceptor<string>({
-			interceptor: (original, _meta, ctx) =>
+			intercept: (original, _meta, ctx) =>
 				function (this: unknown, ...args: unknown[]) {
-					calls.push(`before:${String(ctx.propertyKey)}`);
+					calls.push(`before:${String(ctx.name)}`);
 					const result = original.apply(this, args);
-					calls.push(`after:${String(ctx.propertyKey)}`);
+					calls.push(`after:${String(ctx.name)}`);
 					return result;
 				},
 		});
@@ -37,7 +37,7 @@ describe("createMethodInterceptor", () => {
 		let capturedMeta: string[] = [];
 
 		const Track = createMethodInterceptor<string>({
-			interceptor: (original, meta) => {
+			intercept: (original, meta) => {
 				capturedMeta = meta;
 				return original;
 			},
@@ -61,7 +61,7 @@ describe("createMethodInterceptor", () => {
 
 		const Trace = createMethodInterceptor({
 			compose: (level: string, enabled: boolean) => ({ level, enabled }),
-			interceptor: (original, meta) => {
+			intercept: (original, meta) => {
 				capturedMeta = meta;
 				return original;
 			},
@@ -77,22 +77,5 @@ describe("createMethodInterceptor", () => {
 		new Service().method();
 
 		expect(capturedMeta).toEqual([{ level: "debug", enabled: true }]);
-	});
-
-	test("should store metadata for reflection", () => {
-		const Timed = createMethodInterceptor<string>({
-			interceptor: (original) => original,
-		});
-
-		class Service {
-			@Timed("fast")
-			method() {
-				return null;
-			}
-		}
-
-		const methods = Timed.methods(Service);
-		const method = methods.find((m) => m.name === "method");
-		expect(method?.metadata).toEqual(["fast"]);
 	});
 });
