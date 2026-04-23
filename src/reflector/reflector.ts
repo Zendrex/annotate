@@ -39,19 +39,30 @@ function isMethodLike(ctor: Ctor, name: string | symbol): boolean {
 		}
 		current = Object.getPrototypeOf(current);
 	}
-	const staticDesc = Object.getOwnPropertyDescriptor(ctor, name);
-	if (staticDesc) {
-		return (
-			typeof staticDesc.value === "function" ||
-			typeof staticDesc.get === "function" ||
-			typeof staticDesc.set === "function"
-		);
+	let currentCtor: Ctor | null = ctor;
+	while (currentCtor && currentCtor !== Function.prototype) {
+		const staticDesc = Object.getOwnPropertyDescriptor(currentCtor, name);
+		if (staticDesc) {
+			return (
+				typeof staticDesc.value === "function" ||
+				typeof staticDesc.get === "function" ||
+				typeof staticDesc.set === "function"
+			);
+		}
+		currentCtor = Object.getPrototypeOf(currentCtor) as Ctor | null;
 	}
 	return false;
 }
 
 function isStaticMember(ctor: Ctor, name: string | symbol): boolean {
-	return Object.hasOwn(ctor, name);
+	let currentCtor: Ctor | null = ctor;
+	while (currentCtor && currentCtor !== Function.prototype) {
+		if (Object.hasOwn(currentCtor, name)) {
+			return true;
+		}
+		currentCtor = Object.getPrototypeOf(currentCtor) as Ctor | null;
+	}
+	return false;
 }
 
 /** @internal */
