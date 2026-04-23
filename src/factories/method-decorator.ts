@@ -24,7 +24,8 @@ export function createMethodDecorator<TMeta, TArgs extends unknown[] = [TMeta], 
 
 	const decoratorFn =
 		(...args: TArgs) =>
-		(_value: TMethod, context: ClassMethodDecoratorContext<unknown, TMethod>): void => {
+		// biome-ignore lint/suspicious/noExplicitAny: EA-3 — ClassMethodDecoratorContext's This generic must default to `any` so typed `this:` on methods type-checks
+		(_value: TMethod, context: ClassMethodDecoratorContext<any, TMethod>): void => {
 			const meta = compose(args, composeFn);
 			const token = Symbol("methodDecoration");
 			const correlation = context.metadata;
