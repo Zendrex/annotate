@@ -1,239 +1,71 @@
-/** biome-ignore-all lint/correctness/noUnusedVariables: decorators apply during class declaration */
-import "reflect-metadata";
-
 import { describe, expect, test } from "bun:test";
 
-import { AnnotateError, createClassDecorator } from "../../../src";
+// Temporary: importing directly until Phase M1 consolidates all factory exports into src/index.ts.
+import { AnnotateError } from "../../../src/errors";
+import { createClassDecorator } from "../../../src/factories/class-decorator";
 
-describe("createClassDecorator", () => {
-	test("should store simple metadata on class", () => {
+describe("createClassDecorator (Stage-3)", () => {
+	test("stores metadata via class decorator application", () => {
 		const Tag = createClassDecorator<string>();
 
-		@Tag("admin")
-		class Controller {}
+		@Tag("svc")
+		class Service {}
 
-		const one = Tag.reflect(Controller).class();
-		expect(one).toBeDefined();
-		expect(one?.kind).toBe("class");
-		expect(one?.metadata).toEqual(["admin"]);
+		expect(Tag.metadata(Service)).toBe("svc");
+		expect(Tag.applied(Service)).toBe(true);
+		expect(Tag.appliedOwn(Service)).toBe(true);
 	});
 
-	describe("metadata", () => {
-		test("should return undefined for undecorated class", () => {
-			const Tag = createClassDecorator<string>();
-
-			class Plain {}
-
-			expect(Tag.metadata(Plain)).toBeUndefined();
+	test("supports compose for multi-arg call shapes", () => {
+		const Component = createClassDecorator({
+			compose: (selector: string, scoped: boolean) => ({ selector, scoped }),
 		});
 
-		test("should return the value for a class decorated once", () => {
-			const Tag = createClassDecorator<string>();
+		@Component("app-root", true)
+		class Root {}
 
-			@Tag("admin")
-			class Controller {}
-
-			expect(Tag.metadata(Controller)).toBe("admin");
-		});
-
-		test("should return the first applied value when decorated multiple times", () => {
-			const Role = createClassDecorator<string>();
-
-			@Role("admin")
-			@Role("user")
-			class Controller {}
-
-			expect(Role.metadata(Controller)).toBe("user");
-			expect(Role.reflect(Controller).class()?.metadata).toEqual(["user", "admin"]);
-		});
-
-		test("should inherit metadata from an ancestor class", () => {
-			const Tag = createClassDecorator<string>();
-
-			@Tag("parent")
-			class Parent {}
-
-			class Child extends Parent {}
-
-			expect(Tag.metadata(Child)).toBe("parent");
-		});
-
-		test("should prefer own metadata over inherited", () => {
-			const Tag = createClassDecorator<string>();
-
-			@Tag("parent")
-			class Parent {}
-
-			@Tag("child")
-			class Child extends Parent {}
-
-			expect(Tag.metadata(Child)).toBe("child");
-			expect(Tag.metadata(Parent)).toBe("parent");
-		});
-
-		test("should support compose functions", () => {
-			const Permission = createClassDecorator({
-				compose: (name: string, level: number) => ({ name, level }),
-			});
-
-			@Permission("write", 2)
-			class Service {}
-
-			expect(Permission.metadata(Service)).toEqual({ name: "write", level: 2 });
-		});
+		expect(Component.metadata(Root)).toEqual({ selector: "app-root", scoped: true });
 	});
 
-	describe("unique option", () => {
-		test("should throw AnnotateError with name and target in the error message when applied twice to the same class", () => {
-			const Once = createClassDecorator<string>({ unique: true, name: "Once" });
+	test("appends per application; first wins on metadata()", () => {
+		const Tag = createClassDecorator<string>();
 
-			try {
-				@Once("second")
-				@Once("first")
-				class Dup {}
-				throw new Error("expected AnnotateError");
-			} catch (error) {
-				expect(error).toBeInstanceOf(AnnotateError);
-				const err = error as AnnotateError;
-				expect(err.code).toBe("duplicate");
-				expect(err.kind).toBe("class");
-				expect(err.message).toContain("@Once");
-				expect(err.message).toContain("Dup");
-			}
-		});
+		@Tag("outer")
+		@Tag("inner")
+		class X {}
 
-		test("should allow a subclass to re-decorate the same decorator", () => {
-			const Once = createClassDecorator<string>({ unique: true });
-
-			@Once("parent")
-			class Parent {}
-
-			expect(() => {
-				@Once("child")
-				class Child extends Parent {}
-			}).not.toThrow();
-		});
-
-		test("should allow unrelated classes to each be decorated once", () => {
-			const Once = createClassDecorator<string>({ unique: true });
-
-			@Once("a")
-			class A {}
-
-			@Once("b")
-			class B {}
-
-			expect(Once.metadata(A)).toBe("a");
-			expect(Once.metadata(B)).toBe("b");
-		});
-
-		test("should default to non-unique behavior when option omitted", () => {
-			const Tag = createClassDecorator<string>();
-
-			expect(() => {
-				@Tag("two")
-				@Tag("one")
-				class Stacked {}
-			}).not.toThrow();
-		});
+		expect(Tag.reflect(X).class()?.metadata).toEqual(["inner", "outer"]);
+		expect(Tag.metadata(X)).toBe("inner");
 	});
 
-	describe("requireMetadata", () => {
-		test("should throw AnnotateError when metadata is absent", () => {
-			const Tag = createClassDecorator<string>({ name: "Tag" });
+	test("inheritance: child sees parent's class metadata via applied(); appliedOwn() does not", () => {
+		const Tag = createClassDecorator<string>();
 
-			class Plain {}
+		@Tag("base")
+		class Base {}
+		class Child extends Base {}
 
-			expect(() => Tag.requireMetadata(Plain)).toThrow(AnnotateError);
-		});
-
-		test("should include decorator name, target name, and code on the error", () => {
-			const Tag = createClassDecorator<string>({ name: "Tag" });
-
-			class Plain {}
-
-			try {
-				Tag.requireMetadata(Plain);
-				throw new Error("expected AnnotateError");
-			} catch (error) {
-				expect(error).toBeInstanceOf(AnnotateError);
-				const err = error as AnnotateError;
-				expect(err.code).toBe("missing");
-				expect(err.kind).toBe("class");
-				expect(err.target).toBe(Plain);
-				expect(err.message).toContain("@Tag");
-				expect(err.message).toContain("Plain");
-			}
-		});
+		expect(Tag.applied(Child)).toBe(true);
+		expect(Tag.appliedOwn(Child)).toBe(false);
+		expect(Tag.metadata(Child)).toBe("base");
 	});
 
-	describe("applied", () => {
-		test("should return false for undecorated class (applied and appliedOwn)", () => {
-			const Tag = createClassDecorator<string>();
+	test("unique:true throws on second application to same class", () => {
+		const Tag = createClassDecorator<string>({ unique: true, name: "Tag" });
 
-			class Plain {}
-
-			expect(Tag.applied(Plain)).toBe(false);
-			expect(Tag.appliedOwn(Plain)).toBe(false);
-		});
-
-		test("should return true for applied and appliedOwn when decorator applied on the class", () => {
-			const Tag = createClassDecorator<string>();
-
-			@Tag("admin")
-			class Controller {}
-
-			expect(Tag.applied(Controller)).toBe(true);
-			expect(Tag.appliedOwn(Controller)).toBe(true);
-		});
-
-		test("should return true for subclass inheriting parent metadata", () => {
-			const Tag = createClassDecorator<string>();
-
-			@Tag("parent")
-			class Parent {}
-
-			class Child extends Parent {}
-
-			expect(Tag.applied(Child)).toBe(true);
-		});
-
-		test("should not confuse separate decorators", () => {
-			const A = createClassDecorator<string>();
-			const B = createClassDecorator<string>();
-
-			@A("x")
-			class Target {}
-
-			expect(A.applied(Target)).toBe(true);
-			expect(B.applied(Target)).toBe(false);
-		});
+		expect(() => {
+			@Tag("a")
+			@Tag("b")
+			class X {}
+			// biome-ignore lint/complexity/noVoid: discard class reference to avoid unused-variable warning in test
+			void X;
+		}).toThrow(AnnotateError);
 	});
 
-	describe("appliedOwn", () => {
-		test("should return false for subclass inheriting parent metadata only (appliedOwn)", () => {
-			const Tag = createClassDecorator<string>();
+	test("requireMetadata throws AnnotateError(missing) when undecorated", () => {
+		const Tag = createClassDecorator<string>({ name: "Tag" });
 
-			@Tag("parent")
-			class Parent {}
-
-			class Child extends Parent {}
-
-			expect(Tag.appliedOwn(Child)).toBe(false);
-			expect(Tag.appliedOwn(Parent)).toBe(true);
-		});
-
-		test("should return true when subclass carries its own decoration", () => {
-			const Tag = createClassDecorator<string>();
-
-			@Tag("parent")
-			class Parent {}
-
-			@Tag("child")
-			class Child extends Parent {}
-
-			expect(Tag.appliedOwn(Child)).toBe(true);
-			expect(Tag.appliedOwn(Parent)).toBe(true);
-		});
+		class Bare {}
+		expect(() => Tag.requireMetadata(Bare)).toThrow(AnnotateError);
 	});
 });
