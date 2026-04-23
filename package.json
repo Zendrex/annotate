@@ -53,9 +53,6 @@
 		"typescript": "^6.0.3",
 		"ultracite": "^7.6.1"
 	},
-	"peerDependencies": {
-		"reflect-metadata": "^0.2.2"
-	},
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/Zendrex/annotate.git"
