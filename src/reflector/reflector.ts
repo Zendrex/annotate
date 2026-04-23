@@ -1,7 +1,7 @@
-import { collectClassMeta, getMemberMeta } from "../metadata/store";
+import { getMetadata, getMetadataArray, getParameterMap } from "../metadata/store";
 import { targetDisplayName } from "./class-name";
 import { resolveReflectTarget } from "./resolve-instance";
-import type { MetadataKey } from "../metadata/types";
+import type { MetadataArray, MetadataKey } from "../metadata/types";
 import type {
 	AnyConstructor,
 	DecoratedClass,
@@ -52,8 +52,8 @@ export class ReflectorImpl implements Reflector {
 	}
 
 	class<T>(key: MetadataKey): DecoratedClass<T> | undefined {
-		const metadata = collectClassMeta<T>(this.ctor, key);
-		if (metadata.length === 0) {
+		const metadata = getMetadata<MetadataArray<T>>(key, this.ctor);
+		if (!metadata || metadata.length === 0) {
 			return;
 		}
 		return {
@@ -72,10 +72,22 @@ export class ReflectorImpl implements Reflector {
 		return this.collectMembers<T, DecoratedProperty<T>>(key, "property", false);
 	}
 
-	parameters<T>(_key: MetadataKey): DecoratedParameter<T>[] {
-		// Parameter metadata storage was removed in the Stage-3 store refactor.
-		// This method is a stub until Phase P rewrites parameter support.
-		return [];
+	parameters<T>(key: MetadataKey): DecoratedParameter<T>[] {
+		const results: DecoratedParameter<T>[] = [];
+		this.collectParams(key, this.ctor, "constructor", results, true, undefined, false);
+		const seen = new Set<string | symbol>();
+		for (const { target, name } of this.getKeysWithTarget(this.proto)) {
+			if (seen.has(name)) {
+				continue;
+			}
+			if (this.collectParams(key, target, name, results, false, name, false)) {
+				seen.add(name);
+			}
+		}
+		for (const name of this.getOwnKeys(this.ctor)) {
+			this.collectParams(key, this.ctor, name, results, false, name, true);
+		}
+		return results;
 	}
 
 	private collectMembers<T, R extends DecoratedMethod<T> | DecoratedProperty<T>>(
@@ -93,11 +105,10 @@ export class ReflectorImpl implements Reflector {
 			if (!isMemberMatch(desc, wantFunction)) {
 				continue;
 			}
-			// biome-ignore lint/complexity/noBannedTypes: prototype chain nodes are Function-keyed in the store
-			const metadata = getMemberMeta<T>(target as Function, key, name);
+			const metadata = getMetadataArray<T>(key, target, name);
 			if (metadata.length > 0) {
 				seen.add(name);
-				results.push({ kind, name, static: false, metadata: [...metadata] } as R);
+				results.push({ kind, name, static: false, metadata } as R);
 			}
 		}
 		for (const name of this.getOwnKeys(this.ctor)) {
@@ -105,12 +116,45 @@ export class ReflectorImpl implements Reflector {
 			if (!isMemberMatch(desc, wantFunction)) {
 				continue;
 			}
-			const metadata = getMemberMeta<T>(this.ctor, key, name);
+			const metadata = getMetadataArray<T>(key, this.ctor, name);
 			if (metadata.length > 0) {
-				results.push({ kind, name, static: true, metadata: [...metadata] } as R);
+				results.push({ kind, name, static: true, metadata } as R);
 			}
 		}
 		return results;
+	}
+
+	private collectParams<T>(
+		key: MetadataKey,
+		target: object,
+		name: string | symbol,
+		results: DecoratedParameter<T>[],
+		isCtor: boolean,
+		methodName: string | symbol | undefined,
+		isStatic: boolean
+	): boolean {
+		const map = getParameterMap<T>(key, target, isCtor ? undefined : name);
+		if (!(map instanceof Map)) {
+			return false;
+		}
+		let added = false;
+		for (const [index, metadata] of map) {
+			if (metadata.length > 0) {
+				added = true;
+				if (isCtor) {
+					results.push({ kind: "constructor-parameter", parameterIndex: index, metadata });
+				} else {
+					results.push({
+						kind: "method-parameter",
+						methodName: methodName as string | symbol,
+						parameterIndex: index,
+						static: isStatic,
+						metadata,
+					});
+				}
+			}
+		}
+		return added;
 	}
 
 	private getOwnKeys(target: object): (string | symbol)[] {

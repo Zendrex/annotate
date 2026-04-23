@@ -1,49 +1,61 @@
-import { appendClassMeta, collectClassMeta, flushFor, hasOwnClassMeta, registerCtor } from "../metadata/store";
+import { appendMetadata, getMetadataArray } from "../metadata/store";
 import { resolveReflectTarget } from "../reflector/resolve-instance";
 import { createScopedReflector } from "../reflector/scoped-reflector";
-import { compose, generateKey, labelFor, throwMissingClass } from "./shared";
+import {
+	classMetadataApplied,
+	classMetadataAppliedOwn,
+	classMetadataFirst,
+	compose,
+	generateKey,
+	labelFor,
+	normalizeAnnotateErrorTarget,
+	throwDuplicateClass,
+	throwMissingClass,
+} from "./shared";
 import type { DecoratedClassFactory, DecoratorOptions } from "./types";
 
-// biome-ignore lint/complexity/noBannedTypes: Constructor identity uses Function for parity with metadata/store module.
-type Ctor = Function;
-
 /**
- * Create a typed class decorator with reflection helpers pre-bound to a unique
- * metadata key. `TInstance` constrains the class the decorator may apply to —
- * narrowing it (e.g. to `Component`) rejects applications to classes whose
- * instances do not extend the bound at compile time.
+ * Create a typed class decorator factory with a unique metadata key and
+ * pre-bound reflection helpers.
+ *
+ * The returned decorator appends metadata per application so later decorators
+ * at the same site add to the array rather than overwriting. When
+ * `options.unique` is set, a second application on the same class throws
+ * `AnnotateError` with `code: "duplicate"`.
+ *
+ * Reflection via `metadata` / `applied` walks the prototype chain; use
+ * `appliedOwn` to exclude metadata inherited from parent classes.
+ *
+ * @typeParam TMeta - Metadata stored per application
+ * @typeParam TArgs - Arguments accepted by the decorator call; defaults to `[TMeta]`
+ * @throws `AnnotateError` with `code: "duplicate"` on a second application when `unique` is set
  */
-export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta], TInstance = unknown>(
+export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
 	options?: DecoratorOptions<TMeta, TArgs>
-): DecoratedClassFactory<TMeta, TArgs, TInstance> {
-	const key = generateKey(options?.name);
-	const { compose: composeFn, name, unique = false } = options ?? {};
+): DecoratedClassFactory<TMeta, TArgs> {
+	const key = generateKey();
+	const { compose: composeFn, name, unique } = options ?? {};
 	const label = labelFor(name, key);
 
 	const decoratorFn =
 		(...args: TArgs) =>
-		// biome-ignore lint/suspicious/noExplicitAny: structural Stage-3 generic
-		<T extends abstract new (...a: any[]) => TInstance>(value: T, context: ClassDecoratorContext<T>): void => {
-			appendClassMeta(value, key, compose(args, composeFn), { unique });
-			registerCtor(value, context.metadata);
-			flushFor(value, context.metadata);
+		(target: object): void => {
+			if (unique && getMetadataArray<TMeta>(key, target).length > 0) {
+				throwDuplicateClass(key, normalizeAnnotateErrorTarget(target), label);
+			}
+			appendMetadata(key, target, compose(args, composeFn));
 		};
-
-	const firstClassMeta = (ctor: Ctor): TMeta | undefined => {
-		const list = collectClassMeta<TMeta>(ctor, key);
-		return list.length > 0 ? list[0] : undefined;
-	};
 
 	return Object.assign(decoratorFn, {
 		key,
 		reflect: (target: object) => createScopedReflector<TMeta>(resolveReflectTarget(target), key),
-		metadata: (target: object) => firstClassMeta(resolveReflectTarget(target)),
+		applied: (target: object): boolean => classMetadataApplied<TMeta>(key, resolveReflectTarget(target)),
+		appliedOwn: (target: object): boolean => classMetadataAppliedOwn<TMeta>(key, resolveReflectTarget(target)),
+		metadata: (target: object): TMeta | undefined => classMetadataFirst<TMeta>(key, resolveReflectTarget(target)),
 		requireMetadata: (target: object): TMeta => {
 			const ctor = resolveReflectTarget(target);
-			const first = firstClassMeta(ctor);
+			const first = classMetadataFirst<TMeta>(key, ctor);
 			return first === undefined ? throwMissingClass(key, ctor, label) : first;
 		},
-		applied: (target: object) => collectClassMeta<TMeta>(resolveReflectTarget(target), key).length > 0,
-		appliedOwn: (target: object) => hasOwnClassMeta(resolveReflectTarget(target), key),
-	}) as DecoratedClassFactory<TMeta, TArgs, TInstance>;
+	}) as DecoratedClassFactory<TMeta, TArgs>;
 }
