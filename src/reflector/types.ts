@@ -11,14 +11,13 @@ import type { MetadataArray } from "../metadata/types";
 export type AnyConstructor = Function & { prototype: object };
 
 /** Discriminator for the kind of decorated item in {@link DecoratedItem}. */
-export type DecoratedKind = "class" | "method" | "property" | "constructor-parameter" | "method-parameter";
+export type DecoratedKind = "class" | "method" | "property";
 
 /**
  * Common shape shared by class / method / property reflection results.
  *
  * `metadata` preserves declaration order (bottom-up, matching TypeScript's
- * decorator evaluation). Parameters omit `name` because they are identified by
- * slot rather than identifier.
+ * decorator evaluation).
  */
 export interface DecoratedBase<TMeta> {
 	kind: DecoratedKind;
@@ -27,11 +26,9 @@ export interface DecoratedBase<TMeta> {
 }
 
 /**
- * Reflection result for a decorated class.
- *
- * `name` is derived from the constructor, with a stable fallback when the
- * class is anonymous. `target` is always a resolved constructor, not an
- * instance or prototype.
+ * Reflection result for a decorated class. `name` is derived from the
+ * constructor, with a stable fallback when anonymous. `target` is always a
+ * resolved constructor.
  */
 export type DecoratedClass<TMeta> = DecoratedBase<TMeta> & {
 	kind: "class";
@@ -68,31 +65,8 @@ export type DecoratedPropertySingle<TMeta> = Omit<DecoratedProperty<TMeta>, "met
 	metadata: TMeta;
 };
 
-/** Reflection result for a decorated constructor parameter, keyed by slot. */
-export type DecoratedConstructorParameter<TMeta> = Omit<DecoratedBase<TMeta>, "name"> & {
-	kind: "constructor-parameter";
-	parameterIndex: number;
-};
-
-/**
- * Reflection result for a decorated method parameter. `methodName` identifies
- * the owning method; `static` is `true` when the method lives on the constructor.
- */
-export type DecoratedMethodParameter<TMeta> = Omit<DecoratedBase<TMeta>, "name"> & {
-	kind: "method-parameter";
-	methodName: string | symbol;
-	parameterIndex: number;
-	static: boolean;
-};
-
-export type DecoratedParameter<TMeta> = DecoratedConstructorParameter<TMeta> | DecoratedMethodParameter<TMeta>;
-
 /** Union of every reflection result shape. Narrow by the `kind` discriminator. */
-export type DecoratedItem<TMeta> =
-	| DecoratedClass<TMeta>
-	| DecoratedMethod<TMeta>
-	| DecoratedProperty<TMeta>
-	| DecoratedParameter<TMeta>;
+export type DecoratedItem<TMeta> = DecoratedClass<TMeta> | DecoratedMethod<TMeta> | DecoratedProperty<TMeta>;
 
 /**
  * Reflector pre-bound to a specific metadata key and target class. Returned by
@@ -107,7 +81,6 @@ export interface ScopedReflector<TMeta> {
 	class(): DecoratedClass<TMeta> | undefined;
 	methods(): DecoratedMethod<TMeta>[];
 	methodsSingular(): DecoratedMethodSingle<TMeta>[];
-	parameters(): DecoratedParameter<TMeta>[];
 	properties(): DecoratedProperty<TMeta>[];
 	propertiesSingular(): DecoratedPropertySingle<TMeta>[];
 }
