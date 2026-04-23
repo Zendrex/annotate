@@ -249,7 +249,7 @@ const Timed = createMethodInterceptor<string>({
 });
 ```
 
-`InterceptorContext` carries `name` (member key), `static` (boolean), and `kind` (`"method" | "property" | "accessor"`).
+`InterceptorContext` carries `name` (member key), `static` (boolean), and `kind` (`"method" | "accessor"`).
 
 **Accessor interceptors** wrap `accessor foo: T;` (and `get`/`set` pairs) — not plain class fields. `createAccessorInterceptor` requires at least one of `onGet` / `onSet`; calling it with neither throws `TypeError`. To attach metadata to a plain field without interception, use `createPropertyDecorator`.
 

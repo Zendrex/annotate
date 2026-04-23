@@ -67,4 +67,29 @@ describe("createAccessorInterceptor (Stage-3)", () => {
 		const _read = c.x;
 		expect(c._seen).toEqual(["p"]);
 	});
+
+	// Regression (plan EA-6): accessor-decorated members must reflect into
+	// .properties(), not .methods(), because auto-accessor get/set pairs
+	// previously fooled the descriptor-based classifier.
+	test("accessor appears in reflect().properties(), not .methods()", () => {
+		const Tag = createAccessorInterceptor<string, [string], number>({
+			onGet: (original) =>
+				function (this: unknown) {
+					return original.call(this);
+				},
+		});
+
+		class Box {
+			@Tag("v")
+			accessor x = 0;
+		}
+
+		new Box();
+		const props = Tag.reflect(Box).properties();
+		const methods = Tag.reflect(Box).methods();
+		expect(props).toHaveLength(1);
+		expect(methods).toHaveLength(0);
+		expect(props[0]?.name).toBe("x");
+		expect(props[0]?.static).toBe(false);
+	});
 });

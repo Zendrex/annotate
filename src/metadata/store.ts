@@ -1,5 +1,5 @@
 import { DuplicateMetadataError } from "../errors";
-import type { ClassBucket, Deferred, MemberBucket } from "./types";
+import type { ClassBucket, Deferred, MemberBucket, MemberKind } from "./types";
 
 // biome-ignore lint/complexity/noBannedTypes: Store API accepts raw constructor identity for WeakMap parity; aliased once to avoid suppression noise throughout this file.
 type Ctor = Function;
@@ -9,6 +9,11 @@ const memberMetaStore = new WeakMap<Ctor, MemberBucket>();
 
 // Spec writes WeakSet; ES forbids symbol WeakSet keys, so we use Set. Tokens are short-lived per decoration batch.
 const committedTokens = new WeakMap<Ctor, Set<symbol>>();
+
+// Static-bit tracking per (ctor, member name). Written at decoration time from
+// `context.static`; read by the reflector to classify members without probing
+// descriptors (which misfires on built-in ctor properties like `name`/`length`).
+const memberStaticStore = new WeakMap<Ctor, Map<string | symbol, boolean>>();
 
 const pendingByMetadata: WeakMap<object, Deferred[]> = new WeakMap();
 const metadataToCtor: WeakMap<object, Ctor> = new WeakMap();
@@ -60,7 +65,7 @@ export function appendMemberMeta<T>(
 	name: string | symbol,
 	meta: T,
 	token: symbol,
-	options: { unique: boolean }
+	options: { unique: boolean; static: boolean; kind: MemberKind }
 ): void {
 	let tokens = committedTokens.get(ctor);
 	if (!tokens) {
@@ -87,10 +92,29 @@ export function appendMemberMeta<T>(
 		inner.set(name, list);
 	}
 	if (options.unique && list.length > 0) {
-		throw new DuplicateMetadataError(ctor as new (...args: unknown[]) => unknown, key, "method", name);
+		throw new DuplicateMetadataError(ctor as new (...args: unknown[]) => unknown, key, options.kind, name);
 	}
 	list.push(meta);
 	tokens.add(token);
+
+	let staticMap = memberStaticStore.get(ctor);
+	if (!staticMap) {
+		staticMap = new Map();
+		memberStaticStore.set(ctor, staticMap);
+	}
+	staticMap.set(name, options.static);
+}
+
+export function getMemberStatic(ctor: Ctor, name: string | symbol): boolean {
+	let current: Ctor | null = ctor;
+	while (current && current !== Function.prototype) {
+		const map = memberStaticStore.get(current);
+		if (map?.has(name)) {
+			return map.get(name) as boolean;
+		}
+		current = Object.getPrototypeOf(current) as Ctor | null;
+	}
+	return false;
 }
 
 export function collectMemberMeta<T>(ctor: Ctor, key: symbol, name: string | symbol): T[] {
@@ -203,7 +227,11 @@ export function flushFor(ctor: Ctor, correlation: object | null): void {
 		return;
 	}
 	for (const d of list) {
-		appendMemberMeta(ctor, d.key, d.name, d.meta, d.token, { unique: d.unique });
+		appendMemberMeta(ctor, d.key, d.name, d.meta, d.token, {
+			unique: d.unique,
+			static: d.static,
+			kind: d.kind,
+		});
 	}
 	pendingByMetadata.delete(correlation);
 }

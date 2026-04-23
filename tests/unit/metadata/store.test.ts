@@ -67,8 +67,8 @@ describe("member metadata store", () => {
 		const tokenA = Symbol("tokenA");
 		const tokenB = Symbol("tokenB");
 		class A {}
-		appendMemberMeta(A, key, "foo", "x", tokenA, { unique: false });
-		appendMemberMeta(A, key, "foo", "y", tokenB, { unique: false });
+		appendMemberMeta(A, key, "foo", "x", tokenA, { unique: false, static: false, kind: "method" });
+		appendMemberMeta(A, key, "foo", "y", tokenB, { unique: false, static: false, kind: "method" });
 		expect(getMemberMeta<string>(A, key, "foo")).toEqual(["x", "y"]);
 		expect(hasOwnMemberMeta(A, key, "foo")).toBe(true);
 		expect(hasOwnMemberMeta(A, key, "bar")).toBe(false);
@@ -78,25 +78,25 @@ describe("member metadata store", () => {
 		const key = Symbol("k");
 		const token = Symbol("token");
 		class A {}
-		appendMemberMeta(A, key, "foo", "v", token, { unique: false });
-		appendMemberMeta(A, key, "foo", "v", token, { unique: false });
-		appendMemberMeta(A, key, "foo", "v", token, { unique: false });
+		appendMemberMeta(A, key, "foo", "v", token, { unique: false, static: false, kind: "method" });
+		appendMemberMeta(A, key, "foo", "v", token, { unique: false, static: false, kind: "method" });
+		appendMemberMeta(A, key, "foo", "v", token, { unique: false, static: false, kind: "method" });
 		expect(getMemberMeta<string>(A, key, "foo")).toEqual(["v"]);
 	});
 
 	test("unique:true throws on second distinct decoration of same name", () => {
 		const key = Symbol("k");
 		class A {}
-		appendMemberMeta(A, key, "foo", "x", Symbol("t1"), { unique: true });
-		expect(() => appendMemberMeta(A, key, "foo", "y", Symbol("t2"), { unique: true })).toThrow(
-			DuplicateMetadataError
-		);
+		appendMemberMeta(A, key, "foo", "x", Symbol("t1"), { unique: true, static: false, kind: "method" });
+		expect(() =>
+			appendMemberMeta(A, key, "foo", "y", Symbol("t2"), { unique: true, static: false, kind: "method" })
+		).toThrow(DuplicateMetadataError);
 	});
 
 	test("hasOwnMemberMeta is per-name, not per-factory-key", () => {
 		const key = Symbol("k");
 		class A {}
-		appendMemberMeta(A, key, "bar", "v", Symbol("t"), { unique: false });
+		appendMemberMeta(A, key, "bar", "v", Symbol("t"), { unique: false, static: false, kind: "method" });
 		expect(hasOwnMemberMeta(A, key, "foo")).toBe(false);
 		expect(hasOwnMemberMeta(A, key, "bar")).toBe(true);
 	});
@@ -105,7 +105,7 @@ describe("member metadata store", () => {
 		const key = Symbol("k");
 		class Parent {}
 		class Child extends Parent {}
-		appendMemberMeta(Parent, key, "foo", "p", Symbol("t"), { unique: false });
+		appendMemberMeta(Parent, key, "foo", "p", Symbol("t"), { unique: false, static: false, kind: "method" });
 		expect(getMemberMeta(Child, key, "foo")).toEqual([]);
 		expect(hasOwnMemberMeta(Child, key, "foo")).toBe(false);
 	});
@@ -115,7 +115,7 @@ describe("collectMemberMeta ancestor walk", () => {
 	test("returns own entries when no ancestor data", () => {
 		const key = Symbol("k");
 		class A {}
-		appendMemberMeta(A, key, "foo", "a", Symbol("t"), { unique: false });
+		appendMemberMeta(A, key, "foo", "a", Symbol("t"), { unique: false, static: false, kind: "method" });
 		expect(collectMemberMeta<string>(A, key, "foo")).toEqual(["a"]);
 	});
 
@@ -124,10 +124,10 @@ describe("collectMemberMeta ancestor walk", () => {
 		class A {}
 		class B extends A {}
 		class C extends B {}
-		appendMemberMeta(A, key, "foo", "from-a", Symbol("ta"), { unique: false });
-		appendMemberMeta(B, key, "foo", "from-b", Symbol("tb"), { unique: false });
-		appendMemberMeta(C, key, "foo", "from-c1", Symbol("tc1"), { unique: false });
-		appendMemberMeta(C, key, "foo", "from-c2", Symbol("tc2"), { unique: false });
+		appendMemberMeta(A, key, "foo", "from-a", Symbol("ta"), { unique: false, static: false, kind: "method" });
+		appendMemberMeta(B, key, "foo", "from-b", Symbol("tb"), { unique: false, static: false, kind: "method" });
+		appendMemberMeta(C, key, "foo", "from-c1", Symbol("tc1"), { unique: false, static: false, kind: "method" });
+		appendMemberMeta(C, key, "foo", "from-c2", Symbol("tc2"), { unique: false, static: false, kind: "method" });
 		expect(collectMemberMeta<string>(C, key, "foo")).toEqual(["from-c1", "from-c2", "from-b", "from-a"]);
 	});
 
@@ -189,9 +189,9 @@ describe("collectMemberNames ancestor walk", () => {
 		const key = Symbol("k");
 		class A {}
 		class B extends A {}
-		appendMemberMeta(A, key, "a", "x", Symbol("t1"), { unique: false });
-		appendMemberMeta(B, key, "b", "y", Symbol("t2"), { unique: false });
-		appendMemberMeta(B, key, "a", "z", Symbol("t3"), { unique: false });
+		appendMemberMeta(A, key, "a", "x", Symbol("t1"), { unique: false, static: false, kind: "method" });
+		appendMemberMeta(B, key, "b", "y", Symbol("t2"), { unique: false, static: false, kind: "method" });
+		appendMemberMeta(B, key, "a", "z", Symbol("t3"), { unique: false, static: false, kind: "method" });
 		const names = collectMemberNames(B, key);
 		expect(names.size).toBe(2);
 		expect(names.has("a")).toBe(true);
@@ -226,7 +226,7 @@ describe("hasAnyClassMeta / hasAnyMemberMeta", () => {
 		const key = Symbol("k");
 		class A {}
 		expect(hasAnyMemberMeta(A)).toBe(false);
-		appendMemberMeta(A, key, "foo", "v", Symbol("t"), { unique: false });
+		appendMemberMeta(A, key, "foo", "v", Symbol("t"), { unique: false, static: false, kind: "method" });
 		expect(hasAnyMemberMeta(A)).toBe(true);
 	});
 
@@ -234,7 +234,7 @@ describe("hasAnyClassMeta / hasAnyMemberMeta", () => {
 		const key = Symbol("k");
 		class A {}
 		class B extends A {}
-		appendMemberMeta(A, key, "foo", "v", Symbol("t"), { unique: false });
+		appendMemberMeta(A, key, "foo", "v", Symbol("t"), { unique: false, static: false, kind: "method" });
 		expect(hasAnyMemberMeta(B)).toBe(true);
 	});
 
@@ -274,6 +274,8 @@ describe("pending registration + correlation", () => {
 			meta: "v",
 			token,
 			unique: false,
+			static: false,
+			kind: "method",
 		});
 		expect(hasPendingFor(correlation)).toBe(true);
 		flushFor(A, correlation);
@@ -286,7 +288,15 @@ describe("pending registration + correlation", () => {
 		const key = Symbol("k");
 		const token = Symbol("t");
 		class A {}
-		queueDeferred(correlation, { key, name: "foo", meta: "v", token, unique: false });
+		queueDeferred(correlation, {
+			key,
+			name: "foo",
+			meta: "v",
+			token,
+			unique: false,
+			static: false,
+			kind: "method",
+		});
 		flushFor(A, correlation);
 		flushFor(A, correlation);
 		expect(getMemberMeta<string>(A, key, "foo")).toEqual(["v"]);
@@ -299,7 +309,15 @@ describe("pending registration + correlation", () => {
 
 	test("queueDeferred with nullish correlation is a no-op", () => {
 		expect(() =>
-			queueDeferred(null, { key: Symbol("k"), name: "x", meta: 1, token: Symbol("t"), unique: false })
+			queueDeferred(null, {
+				key: Symbol("k"),
+				name: "x",
+				meta: 1,
+				token: Symbol("t"),
+				unique: false,
+				static: false,
+				kind: "method",
+			})
 		).not.toThrow();
 	});
 });

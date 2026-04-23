@@ -22,7 +22,6 @@ export interface AnnotateErrorOptions {
 	kind: DecoratedKind;
 	memberName?: string | symbol;
 	message: string;
-	parameterIndex?: number;
 	target: AnyConstructor;
 }
 
@@ -37,8 +36,8 @@ export interface AnnotateErrorOptions {
  *   a site without recorded metadata.
  *
  * Always thrown with `target` resolved to a class constructor (never an
- * instance or prototype). `memberName` and `parameterIndex` are populated only
- * when they apply to the kind. Distinguish from consumer domain errors with
+ * instance or prototype). `memberName` is populated only when the kind is
+ * `"method"` or `"property"`. Distinguish from consumer domain errors with
  * `instanceof AnnotateError`.
  */
 export class AnnotateError extends Error {
@@ -50,10 +49,8 @@ export class AnnotateError extends Error {
 	readonly kind: DecoratedKind;
 	readonly code: AnnotateErrorCode;
 	readonly target: AnyConstructor;
-	/** Set for method/property/method-parameter sites. */
+	/** Set for method/property sites. */
 	readonly memberName?: string | symbol;
-	/** Set for constructor-parameter and method-parameter sites. */
-	readonly parameterIndex?: number;
 
 	constructor(options: AnnotateErrorOptions) {
 		super(options.message);
@@ -62,7 +59,6 @@ export class AnnotateError extends Error {
 		this.code = options.code;
 		this.target = options.target;
 		this.memberName = options.memberName;
-		this.parameterIndex = options.parameterIndex;
 	}
 }
 

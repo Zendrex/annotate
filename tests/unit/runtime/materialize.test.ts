@@ -26,7 +26,15 @@ describe("materialize(ctor)", () => {
 		const key = Symbol("k");
 		const correlation = {};
 		class A {}
-		queueDeferred(correlation, { key, name: "foo", meta: "v", token: Symbol("token"), unique: false });
+		queueDeferred(correlation, {
+			key,
+			name: "foo",
+			meta: "v",
+			token: Symbol("token"),
+			unique: false,
+			static: false,
+			kind: "method",
+		});
 		registerCtor(A, correlation);
 		materialize(A);
 		expect(hasPendingFor(correlation)).toBe(false);
@@ -38,7 +46,15 @@ describe("materialize(ctor)", () => {
 		const correlation = {};
 		class A {}
 		brand(A, correlation);
-		queueDeferred(correlation, { key, name: "foo", meta: "v", token: Symbol("token"), unique: false });
+		queueDeferred(correlation, {
+			key,
+			name: "foo",
+			meta: "v",
+			token: Symbol("token"),
+			unique: false,
+			static: false,
+			kind: "method",
+		});
 		materialize(A);
 		expect(getMemberMeta<string>(A, key, "foo")).toEqual(["v"]);
 		expect(getCorrelationFor(A)).toBe(correlation);
@@ -50,7 +66,15 @@ describe("materialize(ctor)", () => {
 		class A {}
 		class B extends A {}
 		brand(A, correlation);
-		queueDeferred(correlation, { key, name: "foo", meta: "v", token: Symbol("token"), unique: false });
+		queueDeferred(correlation, {
+			key,
+			name: "foo",
+			meta: "v",
+			token: Symbol("token"),
+			unique: false,
+			static: false,
+			kind: "method",
+		});
 		materialize(B);
 		// Pending was queued under A's correlation; chain walk finds A and flushes.
 		expect(getMemberMeta<string>(A, key, "foo")).toEqual(["v"]);
@@ -61,7 +85,15 @@ describe("materialize(ctor)", () => {
 		const correlation = {};
 		class A {}
 		brand(A, correlation);
-		queueDeferred(correlation, { key, name: "foo", meta: "v", token: Symbol("token"), unique: false });
+		queueDeferred(correlation, {
+			key,
+			name: "foo",
+			meta: "v",
+			token: Symbol("token"),
+			unique: false,
+			static: false,
+			kind: "method",
+		});
 		materialize(A);
 		materialize(A);
 		materialize(A);

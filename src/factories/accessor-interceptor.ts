@@ -10,7 +10,7 @@ import {
 import { resolveReflectTarget } from "../reflector/resolve-instance";
 import { createScopedReflector } from "../reflector/scoped-reflector";
 import { materialize } from "../runtime/materialize";
-import { compose, generateKey, labelFor, throwMissingMember } from "./shared";
+import { compose, ensureClassRegistered, generateKey, labelFor, throwMissingMember } from "./shared";
 import type { AccessorInterceptorOptions, DecoratedAccessorFactory, InterceptorContext } from "./types";
 
 // biome-ignore lint/complexity/noBannedTypes: Constructor identity uses Function for parity with metadata/store module.
@@ -81,16 +81,24 @@ export function createAccessorInterceptor<TMeta, TArgs extends unknown[] = [TMet
 			if (isStatic) {
 				context.addInitializer(function (this: unknown) {
 					const ctor = this as Ctor;
-					appendMemberMeta(ctor, key, memberName, meta, token, { unique });
+					appendMemberMeta(ctor, key, memberName, meta, token, { unique, static: true, kind: "property" });
 					registerCtor(ctor, correlation);
 					flushFor(ctor, correlation);
 				});
 			} else {
-				queueDeferred(correlation, { key, name: memberName, meta, token, unique });
+				queueDeferred(correlation, {
+					key,
+					name: memberName,
+					meta,
+					token,
+					unique,
+					static: false,
+					kind: "property",
+				});
 				context.addInitializer(function (this: unknown) {
 					const ctor = resolveDeclaringClass(this as object, correlation);
 					registerCtor(ctor, correlation);
-					appendMemberMeta(ctor, key, memberName, meta, token, { unique });
+					appendMemberMeta(ctor, key, memberName, meta, token, { unique, static: false, kind: "property" });
 				});
 			}
 
@@ -108,11 +116,13 @@ export function createAccessorInterceptor<TMeta, TArgs extends unknown[] = [TMet
 		metadata: (target: object, member: string | symbol) => {
 			const ctor = resolveReflectTarget(target);
 			materialize(ctor);
+			ensureClassRegistered(ctor);
 			return firstMemberMeta(ctor, member);
 		},
 		requireMetadata: (target: object, member: string | symbol): TMeta => {
 			const ctor = resolveReflectTarget(target);
 			materialize(ctor);
+			ensureClassRegistered(ctor);
 			const first = firstMemberMeta(ctor, member);
 			return first === undefined ? throwMissingMember(key, "property", ctor, member, label) : first;
 		},

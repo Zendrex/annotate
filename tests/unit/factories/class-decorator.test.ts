@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 // Temporary: importing directly until Phase M1 consolidates all factory exports into src/index.ts.
-import { AnnotateError } from "../../../src/errors";
+import { AnnotateError, UnregisteredClassError } from "../../../src/errors";
 import { createClassDecorator } from "../../../src/factories/class-decorator";
 
 describe("createClassDecorator (Stage-3)", () => {
@@ -62,10 +62,28 @@ describe("createClassDecorator (Stage-3)", () => {
 		}).toThrow(AnnotateError);
 	});
 
-	test("requireMetadata throws AnnotateError(missing) when undecorated", () => {
+	test("requireMetadata throws UnregisteredClassError when class never decorated", () => {
 		const Tag = createClassDecorator<string>({ name: "Tag" });
 
 		class Bare {}
-		expect(() => Tag.requireMetadata(Bare)).toThrow(AnnotateError);
+		expect(() => Tag.requireMetadata(Bare)).toThrow(UnregisteredClassError);
+	});
+
+	test("metadata() throws UnregisteredClassError when class never decorated", () => {
+		const Tag = createClassDecorator<string>({ name: "Tag" });
+
+		class Bare {}
+		expect(() => Tag.metadata(Bare)).toThrow(UnregisteredClassError);
+	});
+
+	test("requireMetadata throws AnnotateError(missing) when class registered but factory not applied", () => {
+		const Tag = createClassDecorator<string>({ name: "Tag" });
+		const Other = createClassDecorator<string>({ name: "Other" });
+
+		@Other("o")
+		class X {}
+
+		expect(() => Tag.requireMetadata(X)).toThrow(AnnotateError);
+		expect(() => Tag.requireMetadata(X)).not.toThrow(UnregisteredClassError);
 	});
 });

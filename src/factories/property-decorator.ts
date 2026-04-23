@@ -3,7 +3,7 @@ import { appendMemberMeta, collectMemberMeta, hasOwnMemberMeta, queueDeferred, r
 import { resolveReflectTarget } from "../reflector/resolve-instance";
 import { createScopedReflector } from "../reflector/scoped-reflector";
 import { materialize } from "../runtime/materialize";
-import { compose, generateKey, labelFor, throwMissingMember } from "./shared";
+import { compose, ensureClassRegistered, generateKey, labelFor, throwMissingMember } from "./shared";
 import type { DecoratedPropertyFactory, DecoratorOptions } from "./types";
 
 // biome-ignore lint/complexity/noBannedTypes: constructor identity uses Function for parity with metadata/store
@@ -34,13 +34,22 @@ export function createPropertyDecorator<TMeta, TArgs extends unknown[] = [TMeta]
 			const token = Symbol("propertyDecoration");
 			const correlation = context.metadata;
 			const memberName = context.name;
+			const isStatic = context.static;
 
-			queueDeferred(correlation, { key, name: memberName, meta, token, unique });
+			queueDeferred(correlation, {
+				key,
+				name: memberName,
+				meta,
+				token,
+				unique,
+				static: isStatic,
+				kind: "property",
+			});
 
 			context.addInitializer(function (this: unknown) {
 				const ctor = resolveDeclaringClass(this as object, correlation);
 				registerCtor(ctor, correlation);
-				appendMemberMeta(ctor, key, memberName, meta, token, { unique });
+				appendMemberMeta(ctor, key, memberName, meta, token, { unique, static: isStatic, kind: "property" });
 			});
 		};
 
@@ -55,11 +64,13 @@ export function createPropertyDecorator<TMeta, TArgs extends unknown[] = [TMeta]
 		metadata: (target: object, member: string | symbol) => {
 			const ctor = resolveReflectTarget(target);
 			materialize(ctor);
+			ensureClassRegistered(ctor);
 			return firstMemberMeta(ctor, member);
 		},
 		requireMetadata: (target: object, member: string | symbol): TMeta => {
 			const ctor = resolveReflectTarget(target);
 			materialize(ctor);
+			ensureClassRegistered(ctor);
 			const first = firstMemberMeta(ctor, member);
 			return first === undefined ? throwMissingMember(key, "property", ctor, member, label) : first;
 		},

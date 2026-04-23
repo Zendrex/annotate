@@ -1,7 +1,11 @@
-import { AnnotateError, AnnotateErrorCode } from "../errors";
+import { AnnotateError, AnnotateErrorCode, UnregisteredClassError } from "../errors";
+import { hasAnyClassMeta, hasAnyMemberMeta } from "../metadata/store";
 import { targetDisplayName } from "../reflector/class-name";
 import type { MetadataKey } from "../metadata/types";
 import type { AnyConstructor, DecoratedKind } from "../reflector/types";
+
+// biome-ignore lint/complexity/noBannedTypes: constructor identity uses Function for parity with metadata/store
+type Ctor = Function;
 
 export function compose<TMeta, TArgs extends unknown[]>(args: TArgs, fn?: (...a: TArgs) => TMeta): TMeta {
 	return fn ? fn(...args) : (args[0] as TMeta);
@@ -42,4 +46,13 @@ export function throwMissingMember(
 		memberName: member,
 		message: `@${label} metadata missing on "${targetDisplayName(ctor)}.${String(member)}"`,
 	});
+}
+
+// Plan EA-7: factory metadata / requireMetadata helpers throw
+// UnregisteredClassError when the class has no annotate metadata anywhere
+// (after auto-materialize). Parity with reflector collection methods.
+export function ensureClassRegistered(ctor: Ctor): void {
+	if (!(hasAnyClassMeta(ctor) || hasAnyMemberMeta(ctor))) {
+		throw new UnregisteredClassError(ctor as AnyConstructor);
+	}
 }

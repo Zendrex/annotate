@@ -2,7 +2,7 @@ import { appendClassMeta, collectClassMeta, flushFor, hasOwnClassMeta, registerC
 import { resolveReflectTarget } from "../reflector/resolve-instance";
 import { createScopedReflector } from "../reflector/scoped-reflector";
 import { materialize } from "../runtime/materialize";
-import { compose, generateKey, labelFor, throwMissingClass } from "./shared";
+import { compose, ensureClassRegistered, generateKey, labelFor, throwMissingClass } from "./shared";
 import type { DecoratedClassFactory, DecoratorOptions } from "./types";
 
 // biome-ignore lint/complexity/noBannedTypes: Constructor identity uses Function for parity with metadata/store module.
@@ -41,11 +41,13 @@ export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta], T
 		metadata: (target: object) => {
 			const ctor = resolveReflectTarget(target);
 			materialize(ctor);
+			ensureClassRegistered(ctor);
 			return firstClassMeta(ctor);
 		},
 		requireMetadata: (target: object): TMeta => {
 			const ctor = resolveReflectTarget(target);
 			materialize(ctor);
+			ensureClassRegistered(ctor);
 			const first = firstClassMeta(ctor);
 			return first === undefined ? throwMissingClass(key, ctor, label) : first;
 		},

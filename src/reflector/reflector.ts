@@ -3,6 +3,7 @@ import {
 	collectClassMeta,
 	collectMemberMeta,
 	collectMemberNames,
+	getMemberStatic,
 	hasAnyClassMeta,
 	hasAnyMemberMeta,
 } from "../metadata/store";
@@ -30,39 +31,18 @@ export interface Reflector {
 	properties<T>(key: MetadataKey): DecoratedProperty<T>[];
 }
 
-function isMethodLike(ctor: Ctor, name: string | symbol): boolean {
-	let current: object | null = ctor.prototype as object | null;
-	while (current && current !== Object.prototype) {
-		const desc = Object.getOwnPropertyDescriptor(current, name);
-		if (desc) {
-			return typeof desc.value === "function" || typeof desc.get === "function" || typeof desc.set === "function";
-		}
-		current = Object.getPrototypeOf(current);
+// Per plan EA-6: classify by descriptor value only. Auto-accessors expose
+// get/set functions on the prototype and are intentionally classified as
+// properties, not methods. `isStatic` comes from the store (set at decoration
+// time from `context.static`) so built-in constructor properties like `name`
+// or `length` never misclassify a user instance field.
+function isMethodLike(ctor: Ctor, name: string | symbol, isStatic: boolean): boolean {
+	const target = isStatic ? (ctor as object) : (ctor.prototype as object);
+	const desc = Object.getOwnPropertyDescriptor(target, name);
+	if (!desc) {
+		return false;
 	}
-	let currentCtor: Ctor | null = ctor;
-	while (currentCtor && currentCtor !== Function.prototype) {
-		const staticDesc = Object.getOwnPropertyDescriptor(currentCtor, name);
-		if (staticDesc) {
-			return (
-				typeof staticDesc.value === "function" ||
-				typeof staticDesc.get === "function" ||
-				typeof staticDesc.set === "function"
-			);
-		}
-		currentCtor = Object.getPrototypeOf(currentCtor) as Ctor | null;
-	}
-	return false;
-}
-
-function isStaticMember(ctor: Ctor, name: string | symbol): boolean {
-	let currentCtor: Ctor | null = ctor;
-	while (currentCtor && currentCtor !== Function.prototype) {
-		if (Object.hasOwn(currentCtor, name)) {
-			return true;
-		}
-		currentCtor = Object.getPrototypeOf(currentCtor) as Ctor | null;
-	}
-	return false;
+	return typeof desc.value === "function";
 }
 
 /** @internal */
@@ -113,14 +93,15 @@ export class ReflectorImpl implements Reflector {
 			if (list.length === 0) {
 				continue;
 			}
-			const isMethod = isMethodLike(this.ctor, name);
+			const isStatic = getMemberStatic(this.ctor, name);
+			const isMethod = isMethodLike(this.ctor, name, isStatic);
 			if (wantMethod ? !isMethod : isMethod) {
 				continue;
 			}
 			out.push({
 				kind,
 				name,
-				static: isStaticMember(this.ctor, name),
+				static: isStatic,
 				metadata: list,
 			} as unknown as R);
 		}

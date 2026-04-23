@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 // Temporary: importing directly until Phase M1 consolidates all factory exports into src/index.ts.
-import { AnnotateError } from "../../../src/errors";
+import { AnnotateError, UnregisteredClassError } from "../../../src/errors";
 import { createMethodDecorator } from "../../../src/factories/method-decorator";
 
 describe("createMethodDecorator (Stage-3)", () => {
@@ -88,13 +88,34 @@ describe("createMethodDecorator (Stage-3)", () => {
 		}).toThrow(AnnotateError);
 	});
 
-	test("requireMetadata throws AnnotateError(missing) when undecorated", () => {
+	test("requireMetadata throws UnregisteredClassError when class never decorated", () => {
 		const Route = createMethodDecorator<string>({ name: "Route" });
 		class X {
 			// biome-ignore lint/suspicious/noEmptyBlockStatements: test stub method
 			plain(): void {}
 		}
 		new X();
-		expect(() => Route.requireMetadata(X, "plain")).toThrow(AnnotateError);
+		expect(() => Route.requireMetadata(X, "plain")).toThrow(UnregisteredClassError);
+	});
+
+	test("metadata() throws UnregisteredClassError when class never decorated", () => {
+		const Route = createMethodDecorator<string>({ name: "Route" });
+		class X {}
+		expect(() => Route.metadata(X, "anything")).toThrow(UnregisteredClassError);
+	});
+
+	test("requireMetadata throws AnnotateError(missing) when class registered but member not decorated", () => {
+		const Route = createMethodDecorator<string>({ name: "Route" });
+		const Other = createMethodDecorator<string>({ name: "Other" });
+
+		class X {
+			@Other("o")
+			// biome-ignore lint/suspicious/noEmptyBlockStatements: test stub method
+			elsewhere(): void {}
+		}
+
+		new X();
+		expect(() => Route.requireMetadata(X, "absent")).toThrow(AnnotateError);
+		expect(() => Route.requireMetadata(X, "absent")).not.toThrow(UnregisteredClassError);
 	});
 });

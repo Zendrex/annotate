@@ -9,9 +9,13 @@ export type AnyFn = (...args: any[]) => any;
  * Describes the decorated site to interceptor hooks. Drops the `descriptor`
  * and `owner` fields from v0.x — Stage-3 contexts carry the necessary
  * information (`name`, `static`, `kind`) directly.
+ *
+ * `kind` is `"method"` for `createMethodInterceptor` and `"accessor"` for
+ * `createAccessorInterceptor`. Raw `get` / `set`-only interceptors are out
+ * of scope for v1 (see plan EA-9).
  */
 export interface InterceptorContext {
-	kind: "method" | "getter" | "setter" | "accessor";
+	kind: "method" | "accessor";
 	name: string | symbol;
 	static: boolean;
 }

@@ -88,4 +88,20 @@ describe("Reflector (Stage-3)", () => {
 		expect(methods.find((m) => m.name === "run")?.static).toBe(false);
 		expect(methods.find((m) => m.name === "build")?.static).toBe(true);
 	});
+
+	// Regression: instance field named `name` (or any collision with built-in
+	// constructor own-properties like `length`/`prototype`) was misclassified
+	// as static because the old classifier used `Object.hasOwn(ctor, name)`.
+	test("instance field named 'name' is classified as instance, not static", () => {
+		const Field = createPropertyDecorator<string>();
+
+		class User {
+			@Field("v")
+			name!: string;
+		}
+
+		const props = reflect(User).properties<string>(Field.key);
+		expect(props).toHaveLength(1);
+		expect(props[0]?.static).toBe(false);
+	});
 });

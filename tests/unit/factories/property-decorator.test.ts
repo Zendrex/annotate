@@ -1,7 +1,7 @@
 // Temporary: importing directly until Phase M1 consolidates all factory exports into src/index.ts.
 import { describe, expect, test } from "bun:test";
 
-import { AnnotateError } from "../../../src/errors";
+import { AnnotateError, UnregisteredClassError } from "../../../src/errors";
 import { createClassDecorator } from "../../../src/factories/class-decorator";
 import { createPropertyDecorator } from "../../../src/factories/property-decorator";
 import { materialize } from "../../../src/runtime/materialize";
@@ -88,13 +88,51 @@ describe("createPropertyDecorator (Stage-3)", () => {
 		}).toThrow(AnnotateError);
 	});
 
-	test("requireMetadata throws AnnotateError(missing) when undecorated", () => {
+	test("DuplicateMetadataError reports kind='property' on field duplicate", () => {
+		const Column = createPropertyDecorator<string>({ unique: true, name: "Column" });
+
+		let caught: AnnotateError | undefined;
+		try {
+			class X {
+				@Column("a")
+				@Column("b")
+				name!: string;
+			}
+			new X();
+		} catch (err) {
+			caught = err as AnnotateError;
+		}
+		expect(caught).toBeInstanceOf(AnnotateError);
+		expect(caught?.kind).toBe("property");
+	});
+
+	test("requireMetadata throws UnregisteredClassError when class never decorated", () => {
 		const Column = createPropertyDecorator<string>({ name: "Column" });
 		class X {
 			name!: string;
 		}
 		new X();
-		expect(() => Column.requireMetadata(X, "name")).toThrow(AnnotateError);
+		expect(() => Column.requireMetadata(X, "name")).toThrow(UnregisteredClassError);
+	});
+
+	test("metadata() throws UnregisteredClassError when class never decorated", () => {
+		const Column = createPropertyDecorator<string>({ name: "Column" });
+		class X {}
+		expect(() => Column.metadata(X, "anything")).toThrow(UnregisteredClassError);
+	});
+
+	test("requireMetadata throws AnnotateError(missing) when class registered but member not decorated", () => {
+		const Column = createPropertyDecorator<string>({ name: "Column" });
+		const Other = createPropertyDecorator<string>({ name: "Other" });
+
+		class X {
+			@Other("o")
+			other!: string;
+		}
+
+		new X();
+		expect(() => Column.requireMetadata(X, "absent")).toThrow(AnnotateError);
+		expect(() => Column.requireMetadata(X, "absent")).not.toThrow(UnregisteredClassError);
 	});
 
 	// Skipped: Bun 1.3.13 decorator transpiler emits a shared `_init` variable per
