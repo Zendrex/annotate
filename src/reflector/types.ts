@@ -85,7 +85,6 @@ export type DecoratedMethodParameter<TMeta> = Omit<DecoratedBase<TMeta>, "name">
 	static: boolean;
 };
 
-/** Union of parameter reflection results. */
 export type DecoratedParameter<TMeta> = DecoratedConstructorParameter<TMeta> | DecoratedMethodParameter<TMeta>;
 
 /** Union of every reflection result shape. Narrow by the `kind` discriminator. */

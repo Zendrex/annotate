@@ -25,6 +25,7 @@ export interface Reflector {
 	class<T>(key: MetadataKey): DecoratedClass<T> | undefined;
 	/** Includes static and instance methods; inherited instance methods are deduplicated by name. */
 	methods<T>(key: MetadataKey): DecoratedMethod<T>[];
+	/** Constructor params first, then instance-method params (dedup by method name up the chain), then static-method params. */
 	parameters<T>(key: MetadataKey): DecoratedParameter<T>[];
 	/** Includes static and instance properties; inherited instance properties are deduplicated by name. */
 	properties<T>(key: MetadataKey): DecoratedProperty<T>[];

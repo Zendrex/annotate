@@ -26,7 +26,7 @@ export interface InterceptorContext {
  *
  * - `compose` maps the decorator's call arguments to the stored metadata shape.
  *   Omit it when `TArgs` is `[TMeta]` (the default) and no transformation is needed.
- * - `name` is used as a prefix in {@link AnnotateError} messages to aid debugging.
+ * - `name` is used as a prefix in `AnnotateError` messages to aid debugging.
  * - `unique` causes a second application on the same target to throw
  *   `AnnotateError` with `code: "duplicate"`. Not supported by parameter decorators.
  *
@@ -112,7 +112,7 @@ export type DecoratedClassFactory<TMeta, TArgs extends unknown[] = [TMeta]> = Cl
 	reflect(target: object): ScopedReflector<TMeta>;
 	/** First stored value (per declaration order), walking the prototype chain. */
 	metadata(target: object): TMeta | undefined;
-	/** Like {@link metadata} but throws {@link AnnotateError} with `code: "missing"` when absent. */
+	/** Like {@link DecoratedClassFactory.metadata} but throws `AnnotateError` with `code: "missing"` when absent. */
 	requireMetadata(target: object): TMeta;
 	applied(target: object): boolean;
 	appliedOwn(target: object): boolean;
@@ -132,7 +132,7 @@ export type DecoratedMethodFactory<TMeta, TArgs extends unknown[] = [TMeta]> = M
 	key: MetadataKey;
 	reflect(target: object): ScopedReflector<TMeta>;
 	metadata(target: object, name: string | symbol): TMeta | undefined;
-	/** @throws {AnnotateError} when no metadata is registered on `name` (`code: "missing"`). */
+	/** @throws `AnnotateError` with `code: "missing"` when no metadata is registered on `name`. */
 	requireMetadata(target: object, name: string | symbol): TMeta;
 	applied(target: object, name: string | symbol): boolean;
 	appliedOwn(target: object, name: string | symbol): boolean;
@@ -149,7 +149,7 @@ export type DecoratedPropertyFactory<TMeta, TArgs extends unknown[] = [TMeta]> =
 	key: MetadataKey;
 	reflect(target: object): ScopedReflector<TMeta>;
 	metadata(target: object, name: string | symbol): TMeta | undefined;
-	/** @throws {AnnotateError} when no metadata is registered on `name` (`code: "missing"`). */
+	/** @throws `AnnotateError` with `code: "missing"` when no metadata is registered on `name`. */
 	requireMetadata(target: object, name: string | symbol): TMeta;
 	applied(target: object, name: string | symbol): boolean;
 	appliedOwn(target: object, name: string | symbol): boolean;
@@ -171,7 +171,7 @@ export type DecoratedParameterFactory<TMeta, TArgs extends unknown[] = [TMeta]> 
 	key: MetadataKey;
 	reflect(target: object): ScopedReflector<TMeta>;
 	metadata(target: object, parameterIndex: number, methodName?: string | symbol): TMeta | undefined;
-	/** @throws {AnnotateError} when the slot has no metadata (`code: "missing"`). */
+	/** @throws `AnnotateError` with `code: "missing"` when the slot has no metadata. */
 	requireMetadata(target: object, parameterIndex: number, methodName?: string | symbol): TMeta;
 	applied(target: object, parameterIndex: number, methodName?: string | symbol): boolean;
 	appliedOwn(target: object, parameterIndex: number, methodName?: string | symbol): boolean;

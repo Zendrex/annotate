@@ -48,7 +48,6 @@ export class AnnotateError extends Error {
 	/** Decoration site kind where the violation occurred. */
 	readonly kind: DecoratedKind;
 	readonly code: AnnotateErrorCode;
-	/** Always a constructor; instances and prototypes are normalized before throw. */
 	readonly target: AnyConstructor;
 	/** Set for method/property/method-parameter sites. */
 	readonly memberName?: string | symbol;

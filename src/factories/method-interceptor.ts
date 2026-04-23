@@ -21,9 +21,10 @@ import type { DecoratedMethodFactory, MethodInterceptorOptions } from "./types";
  * The factory stores metadata like {@link createMethodDecorator} and, when a
  * `PropertyDescriptor` is available at decoration time, replaces
  * `descriptor.value` with the wrapper returned by `intercept`. The wrapper's
- * `name` is set to the original function's name so stack traces and reflection
- * remain accurate. If no descriptor is available (e.g. the target isn't a
- * method), metadata is recorded but no wrapping occurs.
+ * `name` is restored to the original's so stack traces and
+ * `Function.prototype.name` lookups stay accurate. If no descriptor is
+ * available (e.g. the target isn't a method), metadata is recorded but no
+ * wrapping occurs.
  *
  * `intercept` receives the current metadata array — including the value just
  * appended — so interceptors can compose across multiple applications without
