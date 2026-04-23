@@ -67,6 +67,30 @@ export class AnnotateError extends Error {
 }
 
 /**
+ * Thrown when a decorator factory with `unique: true` is applied to a site
+ * that already has metadata for the same key.
+ *
+ * @throws {DuplicateMetadataError} At decoration time, before any state mutation.
+ */
+export class DuplicateMetadataError extends AnnotateError {
+	override readonly name: string = "DuplicateMetadataError";
+
+	constructor(ctor: AnyConstructor, key: MetadataKey, kind: DecoratedKind, memberName?: string | symbol) {
+		const slot = memberName
+			? `"${String(memberName)}" on "${targetDisplayName(ctor)}"`
+			: `"${targetDisplayName(ctor)}"`;
+		super({
+			code: AnnotateErrorCode.DUPLICATE,
+			key,
+			kind,
+			target: ctor,
+			memberName,
+			message: `duplicate decoration: ${slot} already has metadata for this factory`,
+		});
+	}
+}
+
+/**
  * Thrown by reflector collection methods when a class has no registered
  * annotate metadata (after auto-materialization). Distinguished from "no
  * metadata for this factory" — that condition returns an empty collection.
