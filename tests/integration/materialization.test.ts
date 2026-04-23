@@ -113,7 +113,7 @@ describe("subclass-of-parent-only-decorated regression", () => {
 	});
 
 	test("accessor-interceptor path", () => {
-		const Tag = createAccessorInterceptor<string>({
+		const Tag = createAccessorInterceptor<string, [string], number>({
 			onGet: (original) =>
 				function (this: unknown) {
 					return original.call(this);

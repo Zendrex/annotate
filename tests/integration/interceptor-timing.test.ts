@@ -113,7 +113,7 @@ describe("interceptor decoration-order independence", () => {
 	});
 
 	test("accessor onGet observes complete metadata on first invocation", () => {
-		const Tag = createAccessorInterceptor<string>({
+		const Tag = createAccessorInterceptor<string, [string], string>({
 			onGet: (original, readMetadata) =>
 				function (this: unknown) {
 					(this as { _meta?: string[] })._meta = readMetadata(this as object);
@@ -138,11 +138,11 @@ describe("interceptor decoration-order independence", () => {
 		// they would close over an empty array. The library does not expose a
 		// decoration-time materialized array — only the reader. This test
 		// confirms the reader at decoration time over a non-instance returns [].
-		let snapshot: string[] | null = null;
+		const state: { snapshot: string[] | null } = { snapshot: null };
 		const Trace = createMethodInterceptor<string>({
 			intercept: (original, readMetadata) => {
 				// Misuse: call readMetadata with a synthetic object at decoration time.
-				snapshot = readMetadata(Object.create(null));
+				state.snapshot = readMetadata(Object.create(null));
 				return original;
 			},
 		});
@@ -153,6 +153,6 @@ describe("interceptor decoration-order independence", () => {
 		}
 		// biome-ignore lint/complexity/noVoid: discard class reference to avoid unused-variable warning in test
 		void X;
-		expect(snapshot).toEqual([]);
+		expect(state.snapshot).toEqual([]);
 	});
 });
