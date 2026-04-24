@@ -1,5 +1,4 @@
 import { AnnotateError, AnnotateErrorCode, UnregisteredClassError } from "../errors";
-import { resolveDeclaringClass } from "../metadata/declaring-class";
 import {
 	appendMemberMeta,
 	collectClassMeta,
@@ -103,7 +102,19 @@ interface MemberEmitContext {
  * Commit a member-decoration registration from any member-level Stage-3
  * decorator body. Static applications append eagerly and drain pending
  * deferreds in the same initializer; instance applications queue a deferred
- * and commit per-instance on first construction.
+ * and register a per-instance initializer whose body materializes the
+ * constructing class so pending metadata lands on the correct bucket.
+ *
+ * The instance initializer body deliberately closes over **nothing** besides
+ * the per-instance `this.constructor`. Bun 1.3.13's Stage-3 runtime has a bug
+ * where `ctx.addInitializer` on instance field/method contexts is globally
+ * shared across classes (only the last-registered initializer survives and
+ * fires on every instance of every class). Capturing per-decoration `meta` or
+ * `memberName` here would cross-pollute one class's bucket with another's;
+ * using only `this.constructor` sidesteps that — whichever initializer Bun
+ * actually invokes, it flushes the pending deferreds for the real class of
+ * the instance being constructed. `materialize` / `flushFor` are idempotent,
+ * so repeated or spurious invocations are safe no-ops.
  */
 export function emitMemberDecoration(params: {
 	context: MemberEmitContext;
@@ -130,9 +141,14 @@ export function emitMemberDecoration(params: {
 
 	queueDeferred(correlation, { key, name: memberName, meta, token, unique, static: false, kind });
 	context.addInitializer(function (this: unknown) {
-		const ctor = resolveDeclaringClass(this as object, correlation);
-		registerCtor(ctor, correlation);
-		appendMemberMeta(ctor, key, memberName, meta, token, { unique, static: false, kind });
+		// Walk the prototype chain so an ancestor's pending deferreds also drain
+		// on construction of the most-derived class — `materialize` short-circuits
+		// at the first class with own `[Symbol.metadata]` by design.
+		let ctor: Ctor | null = (this as { constructor: Ctor }).constructor;
+		while (ctor && ctor !== Function.prototype) {
+			materialize(ctor);
+			ctor = Object.getPrototypeOf(ctor) as Ctor | null;
+		}
 	});
 }
 
