@@ -1,4 +1,5 @@
 import { DuplicateMetadataError } from "../errors";
+import { walkPrototypeChain } from "../runtime/prototype-chain";
 import type { AnyConstructor } from "../reflector/types";
 import type { ClassBucket, Ctor, Deferred, MemberBucket, MemberKind } from "./types";
 
@@ -129,15 +130,15 @@ export function appendMemberMeta<T>(
  * registered on any ancestor.
  */
 export function getMemberStatic(ctor: Ctor, name: string | symbol): boolean {
-	let current: Ctor | null = ctor;
-	while (current && current !== Function.prototype) {
+	let result = false;
+	walkPrototypeChain(ctor, (current) => {
 		const map = memberStaticStore.get(current);
 		if (map?.has(name)) {
-			return map.get(name) as boolean;
+			result = map.get(name) as boolean;
+			return true;
 		}
-		current = Object.getPrototypeOf(current) as Ctor | null;
-	}
-	return false;
+	});
+	return result;
 }
 
 /**
@@ -146,69 +147,63 @@ export function getMemberStatic(ctor: Ctor, name: string | symbol): boolean {
  */
 export function collectMemberMeta<T>(ctor: Ctor, key: symbol, name: string | symbol): T[] {
 	const out: T[] = [];
-	let current: Ctor | null = ctor;
-	while (current && current !== Function.prototype) {
+	walkPrototypeChain(ctor, (current) => {
 		const list = memberMetaStore.get(current)?.get(key)?.get(name) as T[] | undefined;
 		if (list && list.length > 0) {
 			out.push(...list);
 		}
-		current = Object.getPrototypeOf(current) as Ctor | null;
-	}
+	});
 	return out;
 }
 
 /** Collect all class-scoped metadata for `key` across the prototype chain, subclass-first. */
 export function collectClassMeta<T>(ctor: Ctor, key: symbol): T[] {
 	const out: T[] = [];
-	let current: Ctor | null = ctor;
-	while (current && current !== Function.prototype) {
+	walkPrototypeChain(ctor, (current) => {
 		const list = classMetaStore.get(current)?.get(key) as T[] | undefined;
 		if (list && list.length > 0) {
 			out.push(...list);
 		}
-		current = Object.getPrototypeOf(current) as Ctor | null;
-	}
+	});
 	return out;
 }
 
 /** Collect every member name decorated under `key` across the prototype chain. */
 export function collectMemberNames(ctor: Ctor, key: symbol): Set<string | symbol> {
 	const out = new Set<string | symbol>();
-	let current: Ctor | null = ctor;
-	while (current && current !== Function.prototype) {
+	walkPrototypeChain(ctor, (current) => {
 		const inner = memberMetaStore.get(current)?.get(key);
 		if (inner) {
 			for (const name of inner.keys()) {
 				out.add(name);
 			}
 		}
-		current = Object.getPrototypeOf(current) as Ctor | null;
-	}
+	});
 	return out;
 }
 
 export function hasAnyClassMeta(ctor: Ctor): boolean {
-	let current: Ctor | null = ctor;
-	while (current && current !== Function.prototype) {
+	let found = false;
+	walkPrototypeChain(ctor, (current) => {
 		const bucket = classMetaStore.get(current);
 		if (bucket && bucket.size > 0) {
+			found = true;
 			return true;
 		}
-		current = Object.getPrototypeOf(current) as Ctor | null;
-	}
-	return false;
+	});
+	return found;
 }
 
 export function hasAnyMemberMeta(ctor: Ctor): boolean {
-	let current: Ctor | null = ctor;
-	while (current && current !== Function.prototype) {
+	let found = false;
+	walkPrototypeChain(ctor, (current) => {
 		const bucket = memberMetaStore.get(current);
 		if (bucket && bucket.size > 0) {
+			found = true;
 			return true;
 		}
-		current = Object.getPrototypeOf(current) as Ctor | null;
-	}
-	return false;
+	});
+	return found;
 }
 
 /**

@@ -45,18 +45,37 @@ function isMethodLike(ctor: Ctor, name: string | symbol, isStatic: boolean): boo
 /** @internal */
 export class ReflectorImpl implements Reflector {
 	private readonly ctor: AnyConstructor;
+	private registered = false;
+	private readonly methodLikeCache = new Map<string | symbol, boolean>();
 
 	constructor(target: AnyConstructor) {
 		this.ctor = target;
 	}
 
 	all<T>(key: MetadataKey): DecoratedItem<T>[] {
-		const c = this.class<T>(key);
-		return [...(c ? [c] : []), ...this.methods<T>(key), ...this.properties<T>(key)];
+		this.ensureRegistered();
+		const c = this.collectClass<T>(key);
+		const methods = this.collectMembers<T, DecoratedMethod<T>>(key, "method", true);
+		const properties = this.collectMembers<T, DecoratedProperty<T>>(key, "property", false);
+		return c ? [c, ...methods, ...properties] : [...methods, ...properties];
 	}
 
 	class<T>(key: MetadataKey): DecoratedClass<T> | undefined {
 		this.ensureRegistered();
+		return this.collectClass<T>(key);
+	}
+
+	methods<T>(key: MetadataKey): DecoratedMethod<T>[] {
+		this.ensureRegistered();
+		return this.collectMembers<T, DecoratedMethod<T>>(key, "method", true);
+	}
+
+	properties<T>(key: MetadataKey): DecoratedProperty<T>[] {
+		this.ensureRegistered();
+		return this.collectMembers<T, DecoratedProperty<T>>(key, "property", false);
+	}
+
+	private collectClass<T>(key: MetadataKey): DecoratedClass<T> | undefined {
 		const list = collectClassMeta<T>(this.ctor, key);
 		if (list.length === 0) {
 			return;
@@ -69,47 +88,47 @@ export class ReflectorImpl implements Reflector {
 		};
 	}
 
-	methods<T>(key: MetadataKey): DecoratedMethod<T>[] {
-		return this.collectMembers<T, DecoratedMethod<T>>(key, "method", true);
-	}
-
-	properties<T>(key: MetadataKey): DecoratedProperty<T>[] {
-		return this.collectMembers<T, DecoratedProperty<T>>(key, "property", false);
-	}
-
 	private collectMembers<T, R extends DecoratedMethod<T> | DecoratedProperty<T>>(
 		key: MetadataKey,
 		kind: "method" | "property",
 		wantMethod: boolean
 	): R[] {
-		this.ensureRegistered();
 		const names = collectMemberNames(this.ctor, key);
 		const out: R[] = [];
 		for (const name of names) {
-			const list = collectMemberMeta<T>(this.ctor, key, name);
-			if (list.length === 0) {
-				continue;
-			}
 			const isStatic = getMemberStatic(this.ctor, name);
-			const isMethod = isMethodLike(this.ctor, name, isStatic);
-			if (wantMethod ? !isMethod : isMethod) {
+			if (this.isMethod(name, isStatic) !== wantMethod) {
 				continue;
 			}
 			out.push({
 				kind,
 				name,
 				static: isStatic,
-				metadata: list,
+				metadata: collectMemberMeta<T>(this.ctor, key, name),
 			} as unknown as R);
 		}
 		return out;
 	}
 
+	private isMethod(name: string | symbol, isStatic: boolean): boolean {
+		const cached = this.methodLikeCache.get(name);
+		if (cached !== undefined) {
+			return cached;
+		}
+		const result = isMethodLike(this.ctor, name, isStatic);
+		this.methodLikeCache.set(name, result);
+		return result;
+	}
+
 	private ensureRegistered(): void {
+		if (this.registered) {
+			return;
+		}
 		materialize(this.ctor);
 		if (!(hasAnyClassMeta(this.ctor) || hasAnyMemberMeta(this.ctor))) {
 			throw new UnregisteredClassError(this.ctor);
 		}
+		this.registered = true;
 	}
 }
 

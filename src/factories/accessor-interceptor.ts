@@ -1,6 +1,11 @@
-import { collectMemberMeta } from "../metadata/store";
-import { compose, createMemberFactoryHelpers, emitMemberDecoration, generateKey, labelFor } from "./shared";
-import type { Ctor } from "../metadata/types";
+import {
+	compose,
+	createMemberFactoryHelpers,
+	createMemberMetadataReader,
+	emitMemberDecoration,
+	generateKey,
+	labelFor,
+} from "./shared";
 import type { AccessorInterceptorOptions, DecoratedAccessorFactory, InterceptorContext } from "./types";
 
 /**
@@ -46,10 +51,7 @@ export function createAccessorInterceptor<TMeta, TArgs extends unknown[] = [TMet
 				kind: "accessor",
 			};
 
-			const readMetadata = (instance: object): TMeta[] => {
-				const ctor = isStatic ? (instance as unknown as Ctor) : (instance as { constructor: Ctor }).constructor;
-				return collectMemberMeta<TMeta>(ctor, key, memberName);
-			};
+			const readMetadata = createMemberMetadataReader<TMeta>(key, memberName, isStatic);
 
 			// biome-ignore lint/suspicious/noExplicitAny: EA-3 — This defaults to any per lib.es2023.decorators.d.ts
 			const result: ClassAccessorDecoratorResult<any, TValue> = {};

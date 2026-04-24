@@ -1,5 +1,6 @@
 import { UnregisteredClassError } from "../errors";
 import { flushFor, getCorrelationFor, hasPendingFor, registerCtor } from "../metadata/store";
+import { walkPrototypeChain } from "./prototype-chain";
 import { hasOwnMetadata, readOwnMetadata } from "./symbol-metadata";
 import type { Ctor } from "../metadata/types";
 import type { AnyConstructor } from "../reflector/types";
@@ -44,16 +45,15 @@ export function materialize(ctor: Ctor): void {
 		throw new UnregisteredClassError(ctor as AnyConstructor);
 	}
 
-	let current: Ctor | null = Object.getPrototypeOf(ctor) as Ctor | null;
-	while (current && current !== Function.prototype) {
-		if (hasOwnMetadata(current)) {
-			const correlation = readOwnMetadata(current);
-			if (correlation && hasPendingFor(correlation)) {
-				registerCtor(current, correlation);
-				flushFor(current, correlation);
-				return;
-			}
+	walkPrototypeChain(Object.getPrototypeOf(ctor) as Ctor, (current) => {
+		if (!hasOwnMetadata(current)) {
+			return;
 		}
-		current = Object.getPrototypeOf(current) as Ctor | null;
-	}
+		const correlation = readOwnMetadata(current);
+		if (correlation && hasPendingFor(correlation)) {
+			registerCtor(current, correlation);
+			flushFor(current, correlation);
+			return true;
+		}
+	});
 }

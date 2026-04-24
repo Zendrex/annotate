@@ -15,6 +15,7 @@ import { targetDisplayName } from "../reflector/class-name";
 import { resolveReflectTarget } from "../reflector/resolve-instance";
 import { createScopedReflector } from "../reflector/scoped-reflector";
 import { materialize } from "../runtime/materialize";
+import { walkPrototypeChain } from "../runtime/prototype-chain";
 import type { Ctor, MemberKind, MetadataKey } from "../metadata/types";
 import type { AnyConstructor, DecoratedKind, ScopedReflector } from "../reflector/types";
 
@@ -86,6 +87,33 @@ export function ensureClassRegistered(ctor: Ctor): void {
 }
 
 /**
+ * Resolve `target` to a constructor and materialize any pending decorations.
+ * Shared entry-point for the non-throwing helpers (`applied`, `appliedOwn`).
+ */
+function prepareForRead(target: object): Ctor {
+	const ctor = resolveReflectTarget(target);
+	materialize(ctor);
+	return ctor;
+}
+
+/**
+ * Build a lazy reader that returns the full ancestor-merged metadata array for
+ * `(key, memberName)` on the class of `instance`. Shared by method/accessor
+ * interceptors; `isStatic` captures whether `instance` arrives as a
+ * constructor or as an instance at invocation time.
+ */
+export function createMemberMetadataReader<TMeta>(
+	key: MetadataKey,
+	memberName: string | symbol,
+	isStatic: boolean
+): (instance: object) => TMeta[] {
+	return (instance: object): TMeta[] => {
+		const ctor = isStatic ? (instance as unknown as Ctor) : (instance as { constructor: Ctor }).constructor;
+		return collectMemberMeta<TMeta>(ctor, key, memberName);
+	};
+}
+
+/**
  * Minimal shape the Stage-3 decorator contexts share — enough to drive the
  * `emitMemberDecoration` helper without leaking the variant-specific
  * `ClassMethodDecoratorContext` / `ClassFieldDecoratorContext` /
@@ -144,11 +172,9 @@ export function emitMemberDecoration(params: {
 		// Walk the prototype chain so an ancestor's pending deferreds also drain
 		// on construction of the most-derived class — `materialize` short-circuits
 		// at the first class with own `[Symbol.metadata]` by design.
-		let ctor: Ctor | null = (this as { constructor: Ctor }).constructor;
-		while (ctor && ctor !== Function.prototype) {
+		walkPrototypeChain((this as { constructor: Ctor }).constructor, (ctor) => {
 			materialize(ctor);
-			ctor = Object.getPrototypeOf(ctor) as Ctor | null;
-		}
+		});
 	});
 }
 
@@ -166,26 +192,22 @@ export function createClassFactoryHelpers<TMeta>(key: MetadataKey, label: string
 		reflect: (target: object): ScopedReflector<TMeta> =>
 			createScopedReflector<TMeta>(resolveReflectTarget(target), key),
 		metadata: (target: object): TMeta | undefined => {
-			const ctor = resolveReflectTarget(target);
-			materialize(ctor);
+			const ctor = prepareForRead(target);
 			ensureClassRegistered(ctor);
 			return firstClassMeta(ctor);
 		},
 		requireMetadata: (target: object): TMeta => {
-			const ctor = resolveReflectTarget(target);
-			materialize(ctor);
+			const ctor = prepareForRead(target);
 			ensureClassRegistered(ctor);
 			const first = firstClassMeta(ctor);
 			return first === undefined ? throwMissingClass(key, ctor, label) : first;
 		},
 		applied: (target: object): boolean => {
-			const ctor = resolveReflectTarget(target);
-			materialize(ctor);
+			const ctor = prepareForRead(target);
 			return collectClassMeta<TMeta>(ctor, key).length > 0;
 		},
 		appliedOwn: (target: object): boolean => {
-			const ctor = resolveReflectTarget(target);
-			materialize(ctor);
+			const ctor = prepareForRead(target);
 			return hasOwnClassMeta(ctor, key);
 		},
 	};
@@ -212,26 +234,22 @@ export function createMemberFactoryHelpers<TMeta>(
 		reflect: (target: object): ScopedReflector<TMeta> =>
 			createScopedReflector<TMeta>(resolveReflectTarget(target), key),
 		metadata: (target: object, member: string | symbol): TMeta | undefined => {
-			const ctor = resolveReflectTarget(target);
-			materialize(ctor);
+			const ctor = prepareForRead(target);
 			ensureClassRegistered(ctor);
 			return firstMemberMeta(ctor, member);
 		},
 		requireMetadata: (target: object, member: string | symbol): TMeta => {
-			const ctor = resolveReflectTarget(target);
-			materialize(ctor);
+			const ctor = prepareForRead(target);
 			ensureClassRegistered(ctor);
 			const first = firstMemberMeta(ctor, member);
 			return first === undefined ? throwMissingMember(key, kind, ctor, member, label) : first;
 		},
 		applied: (target: object, member: string | symbol): boolean => {
-			const ctor = resolveReflectTarget(target);
-			materialize(ctor);
+			const ctor = prepareForRead(target);
 			return collectMemberMeta<TMeta>(ctor, key, member).length > 0;
 		},
 		appliedOwn: (target: object, member: string | symbol): boolean => {
-			const ctor = resolveReflectTarget(target);
-			materialize(ctor);
+			const ctor = prepareForRead(target);
 			return hasOwnMemberMeta(ctor, key, member);
 		},
 	};

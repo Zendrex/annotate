@@ -1,6 +1,11 @@
-import { collectMemberMeta } from "../metadata/store";
-import { compose, createMemberFactoryHelpers, emitMemberDecoration, generateKey, labelFor } from "./shared";
-import type { Ctor } from "../metadata/types";
+import {
+	compose,
+	createMemberFactoryHelpers,
+	createMemberMetadataReader,
+	emitMemberDecoration,
+	generateKey,
+	labelFor,
+} from "./shared";
 import type { AnyFn, DecoratedMethodFactory, InterceptorContext, MethodInterceptorOptions } from "./types";
 
 /**
@@ -37,12 +42,11 @@ export function createMethodInterceptor<TMeta, TArgs extends unknown[] = [TMeta]
 				kind: "method",
 			};
 
-			const readMetadata = (instance: object): TMeta[] => {
-				const ctor = isStatic ? (instance as unknown as Ctor) : (instance as { constructor: Ctor }).constructor;
-				return collectMemberMeta<TMeta>(ctor, key, memberName);
-			};
-
-			const replacement = intercept(value, readMetadata, interceptorContext);
+			const replacement = intercept(
+				value,
+				createMemberMetadataReader<TMeta>(key, memberName, isStatic),
+				interceptorContext
+			);
 
 			emitMemberDecoration({
 				context,
