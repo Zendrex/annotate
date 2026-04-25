@@ -2,7 +2,7 @@
 /** biome-ignore-all lint/complexity/noVoid: type-only variable bindings discarded to prevent unused-variable errors */
 import { describe, expect, test } from "bun:test";
 
-import { intercept } from "../../../src";
+import { AnnotateError, intercept } from "../../../src";
 import type { ListMetadataKey } from "../../../src";
 
 describe("intercept.method.list", () => {
@@ -163,6 +163,39 @@ describe("intercept.method.list", () => {
 		expect(all).toContain("a");
 		expect(all).toContain("b");
 		expect(all).toContain("c");
+	});
+
+	test("firstOrThrow() returns the first-stored value on a decorated member", () => {
+		const Log = intercept.method.list<string>({
+			intercept: (original) => original,
+		});
+
+		class Svc {
+			@Log("outer")
+			@Log("inner")
+			run(): void {}
+		}
+
+		new Svc();
+		// Inner decorator stores first (Stage-3 applies decorators bottom-up)
+		expect(Log.firstOrThrow(Svc, "run")).toBe("inner");
+	});
+
+	test("firstOrThrow() throws MissingMetadataError on an undecorated member", () => {
+		const Log = intercept.method.list<string>({
+			intercept: (original) => original,
+		});
+		const Other = intercept.method.list<string>({
+			intercept: (original) => original,
+		});
+
+		class Svc {
+			@Other("x")
+			run(): void {}
+		}
+
+		new Svc();
+		expect(() => Log.firstOrThrow(Svc, "run")).toThrow(AnnotateError);
 	});
 
 	test("static method list interception — both wrappers fire, each sees full list", () => {

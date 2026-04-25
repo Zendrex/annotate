@@ -116,4 +116,25 @@ describe("decorate.class.list", () => {
 
 		expect(Tag.all(Sub)).toEqual(["sub", "base"]);
 	});
+
+	test("firstOrThrow() returns the first-stored value on a decorated class", () => {
+		const Tag = decorate.class.list<string>();
+
+		// Stage-3: inner decorator stores first (bottom-up application)
+		@Tag("outer")
+		@Tag("inner")
+		class X {}
+
+		expect(Tag.firstOrThrow(X)).toBe("inner");
+	});
+
+	test("firstOrThrow() throws MissingMetadataError on an undecorated class", () => {
+		const Tag = decorate.class.list<string>();
+		const Other = decorate.class.list<string>();
+
+		@Other("o")
+		class X {}
+
+		expect(() => Tag.firstOrThrow(X)).toThrow(AnnotateError);
+	});
 });

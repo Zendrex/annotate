@@ -2,7 +2,7 @@
 /** biome-ignore-all lint/suspicious/noUnusedExpressions: accessor reads are the side effect under test */
 import { describe, expect, test } from "bun:test";
 
-import { intercept } from "../../../src";
+import { AnnotateError, intercept } from "../../../src";
 import type { ListMetadataKey } from "../../../src";
 
 describe("intercept.accessor.list", () => {
@@ -146,6 +146,48 @@ describe("intercept.accessor.list", () => {
 
 		// Both set wrappers fired
 		expect(observed).toHaveLength(2);
+	});
+
+	test("firstOrThrow() returns the first-stored value on a decorated accessor", () => {
+		const Trace = intercept.accessor.list<string, [string], number>({
+			onGet: (original) =>
+				function (this: unknown) {
+					return original.call(this);
+				},
+		});
+
+		class Box {
+			@Trace("outer")
+			@Trace("inner")
+			accessor x = 0;
+		}
+
+		new Box();
+		// Inner decorator stores first (Stage-3 applies decorators bottom-up)
+		expect(Trace.firstOrThrow(Box, "x")).toBe("inner");
+	});
+
+	test("firstOrThrow() throws MissingMetadataError on an undecorated accessor", () => {
+		const Trace = intercept.accessor.list<string, [string], number>({
+			onGet: (original) =>
+				function (this: unknown) {
+					return original.call(this);
+				},
+		});
+		const Other = intercept.accessor.list<string, [string], number>({
+			onGet: (original) =>
+				function (this: unknown) {
+					return original.call(this);
+				},
+		});
+
+		class Box {
+			@Other("x")
+			accessor x = 0;
+		}
+
+		new Box();
+		expect(() => Trace.firstOrThrow(Box, "x")).toThrow(AnnotateError);
 	});
 
 	test("throws when neither onGet nor onSet provided", () => {

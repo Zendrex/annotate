@@ -120,4 +120,31 @@ describe("decorate.property.list", () => {
 		// Inner decorator stores first (Stage-3 applies decorators bottom-up)
 		expect(Column.first(X, "value")).toBe("inner");
 	});
+
+	test("firstOrThrow() returns the first-stored value on a decorated property", () => {
+		const Column = decorate.property.list<string>();
+
+		class X {
+			@Column("outer")
+			@Column("inner")
+			value!: string;
+		}
+
+		new X();
+		// Inner decorator stores first (Stage-3 applies decorators bottom-up)
+		expect(Column.firstOrThrow(X, "value")).toBe("inner");
+	});
+
+	test("firstOrThrow() throws MissingMetadataError on an undecorated property", () => {
+		const Column = decorate.property.list<string>();
+		const Other = decorate.property.list<string>();
+
+		class X {
+			@Other("x")
+			value!: string;
+		}
+
+		new X();
+		expect(() => Column.firstOrThrow(X, "value")).toThrow(AnnotateError);
+	});
 });

@@ -136,4 +136,31 @@ describe("decorate.method.list", () => {
 		// Inner decorator stores first (Stage-3 applies decorators bottom-up)
 		expect(Route.first(Api, "handle")).toBe("/inner");
 	});
+
+	test("firstOrThrow() returns the first-stored value on a decorated member", () => {
+		const Route = decorate.method.list<string>();
+
+		class Api {
+			@Route("/first")
+			@Route("/second")
+			handle(): void {}
+		}
+
+		new Api();
+		// Inner decorator stores first (Stage-3 applies decorators bottom-up)
+		expect(Route.firstOrThrow(Api, "handle")).toBe("/second");
+	});
+
+	test("firstOrThrow() throws MissingMetadataError on an undecorated member", () => {
+		const Route = decorate.method.list<string>();
+		const Other = decorate.method.list<string>();
+
+		class Api {
+			@Other("/x")
+			handle(): void {}
+		}
+
+		new Api();
+		expect(() => Route.firstOrThrow(Api, "handle")).toThrow(AnnotateError);
+	});
 });
