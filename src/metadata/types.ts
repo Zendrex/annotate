@@ -1,45 +1,70 @@
 /**
- * Internal constructor identity used as the key across metadata WeakMaps.
- *
- * Typed as bare `Function` (not `AnyConstructor`) because WeakMap keys accept
- * any callable — including the raw forms received by the decorator bodies
- * before the reflector coerces them to constructors. Kept internal; public
- * API surfaces use `AnyConstructor` from `reflector/types`.
- *
- * @internal
+ * Class constructor as stored in metadata maps. Uses `Function` so the same
+ * key type lines up with `WeakMap` usage and reflection across the package.
  */
 // biome-ignore lint/complexity/noBannedTypes: WeakMap key parity requires bare Function across the store and related modules.
 export type Ctor = Function;
 
-/** Per-factory metadata key. Each factory generates a unique symbol at construction. */
+/**
+ * Discriminator symbol for a metadata “channel” (e.g. one decorator or feature).
+ */
 export type MetadataKey = symbol;
 
+/**
+ * Per-class own metadata: each key holds an append-only list of values for that class only.
+ */
 export type ClassBucket = Map<symbol, unknown[]>;
 
 /**
- * Member-scoped metadata. Outer key is the factory's {@link MetadataKey};
- * inner key is the member name. `Map` is used at both levels to avoid
- * prototype-pollution hazards of plain object records.
+ * Per-class own member metadata: key → member name → list of values for that member only.
  */
 export type MemberBucket = Map<symbol, Map<string | symbol, unknown[]>>;
 
+/**
+ * Whether metadata was attached to a class method or a property.
+ */
 export type MemberKind = "method" | "property";
 
 /**
- * Pending instance-member registration captured at decoration time. Committed
- * once the declaring class is correlated — eagerly via `flushFor`, or lazily
- * via the per-instance initializer on first construction.
- *
- * @internal
+ * Member metadata that could not be written immediately because the target class
+ * was not the runtime constructor yet. The deferred queue flushes this into
+ * the member store once ctor correlation and the real `Ctor` are known.
  */
 export interface Deferred {
+	/** Metadata channel (same as keys used in `appendMemberMeta`). */
 	key: symbol;
 	kind: MemberKind;
 	meta: unknown;
 	name: string | symbol;
 	static: boolean;
+	/**
+	 * Idempotency token: `appendMemberMeta` skips re-applying the same
+	 * deferred item after a failed partial flush.
+	 */
 	token: symbol;
+	/** When true, only one value is allowed for this member+key; enforced on flush. */
 	unique: boolean;
+	/** Optional checks run on flush before the value is stored. */
+	validators?: readonly DeferredValidatorFn[];
 }
 
+/**
+ * Called during a deferred flush with the final constructor and the pending meta value.
+ */
+export type DeferredValidatorFn = (meta: unknown, context: DeferredValidateContext) => void;
+
+/**
+ * Context passed to deferred validators: enough to reason about the member without re-reading the store.
+ */
+export interface DeferredValidateContext {
+	kind: MemberKind;
+	memberName?: string | symbol;
+	static: boolean;
+	/** The resolved class constructor for this metadata. */
+	target: Ctor;
+}
+
+/**
+ * Read-only list of stored metadata values (append order preserved where relevant).
+ */
 export type MetadataArray<T = unknown> = readonly T[];
