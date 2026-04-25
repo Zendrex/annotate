@@ -42,7 +42,9 @@ let keyCounter = 0;
  */
 export function generateKey(label?: string): MetadataKey {
 	keyCounter += 1;
-	return Symbol(`${label ?? "decorator"}:${keyCounter}`);
+	// Cast is safe: every symbol produced here is a valid metadata key. The
+	// brand is phantom-only — no runtime field is added.
+	return Symbol(`${label ?? "decorator"}:${keyCounter}`) as MetadataKey;
 }
 
 /**

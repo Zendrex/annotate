@@ -39,6 +39,7 @@ describe("reflect() target resolution", () => {
 	test("reflect(Array) constructs but queries throw UnregisteredClassError (no annotate metadata)", () => {
 		expect(() => reflect(Array as unknown as object)).not.toThrow();
 		const r = reflect(Array as unknown as object);
-		expect(() => r.class(Symbol("k"))).toThrow(UnregisteredClassError);
+		// biome-ignore lint/suspicious/noExplicitAny: cast needed to pass a bare symbol to a MetadataKey parameter in this error-path test
+		expect(() => r.class(Symbol("k") as any)).toThrow(UnregisteredClassError);
 	});
 });

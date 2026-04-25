@@ -6,11 +6,13 @@ import {
 	InvalidDecorationTargetError,
 	MissingMetadataError,
 	UnregisteredClassError,
+	UnregisteredMetadataKeyError,
 	ValidationError,
 } from "../../src/errors";
+import { mintUniqueKey } from "../../src/metadata/cardinality-registry";
 
 const HINTS_PATTERN = /experimentalDecorators|reflect|prepare|import/;
-const KEY = Symbol("test-key");
+const KEY = mintUniqueKey("test-key");
 
 describe("UnregisteredClassError", () => {
 	test("carries the offending class on .target", () => {
@@ -175,5 +177,48 @@ describe("ValidationError", () => {
 		// A class-field redeclaration would produce an own property after super();
 		// the native ES2022 contract omits the property entirely when absent.
 		expect(Object.hasOwn(err, "cause")).toBe(false);
+	});
+});
+
+describe("UnregisteredMetadataKeyError", () => {
+	test("is an AnnotateError with code UNREGISTERED_KEY", () => {
+		class Target {}
+		const key = mintUniqueKey<string>("err-test");
+		const err = new UnregisteredMetadataKeyError(Target, key);
+
+		expect(err).toBeInstanceOf(Error);
+		expect(err).toBeInstanceOf(AnnotateError);
+		expect(err).toBeInstanceOf(UnregisteredMetadataKeyError);
+		expect(err.name).toBe("UnregisteredMetadataKeyError");
+		expect(err.code).toBe(AnnotateErrorCode.UNREGISTERED_KEY);
+	});
+
+	test("carries the target constructor on .target", () => {
+		class MyService {}
+		const key = mintUniqueKey("svc-key");
+		const err = new UnregisteredMetadataKeyError(MyService, key);
+
+		expect(err.target).toBe(MyService);
+	});
+
+	test("carries the offending key on .key", () => {
+		class Subject {}
+		const key = mintUniqueKey("subject-key");
+		const err = new UnregisteredMetadataKeyError(Subject, key);
+
+		expect(err.key).toBe(key);
+	});
+
+	test("message is non-empty and references the class name", () => {
+		class Widget {}
+		const key = mintUniqueKey("widget-key");
+		const err = new UnregisteredMetadataKeyError(Widget, key);
+
+		expect(err.message.length).toBeGreaterThan(0);
+		expect(err.message).toContain("Widget");
+	});
+
+	test("UNREGISTERED_KEY is distinct from UNREGISTERED", () => {
+		expect(AnnotateErrorCode.UNREGISTERED_KEY).not.toBe(AnnotateErrorCode.UNREGISTERED);
 	});
 });

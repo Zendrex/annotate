@@ -1,7 +1,7 @@
 import { DuplicateMetadataError } from "../errors";
 import { walkPrototypeChain } from "../runtime/prototype-chain";
 import type { AnyConstructor } from "../reflector/types";
-import type { Ctor, MemberBucket, MemberKind } from "./types";
+import type { Ctor, MemberBucket, MemberKind, MetadataKey } from "./types";
 
 const memberMetaStore = new WeakMap<Ctor, MemberBucket>();
 
@@ -62,7 +62,8 @@ export function appendMemberMeta<T>(
 		inner.set(name, list);
 	}
 	if (options.unique && list.length > 0) {
-		throw new DuplicateMetadataError(ctor as AnyConstructor, key, options.kind, name);
+		// key is plain symbol here; cast to MetadataKey for the structured error (brand is phantom-only).
+		throw new DuplicateMetadataError(ctor as AnyConstructor, key as MetadataKey, options.kind, name);
 	}
 	list.push(meta);
 	tokens.add(token);

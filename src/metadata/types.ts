@@ -6,9 +6,26 @@
 export type Ctor = Function;
 
 /**
- * Discriminator symbol for a metadata “channel” (e.g. one decorator or feature).
+ * Branded symbol for a metadata "channel" that carries cardinality at the type level.
+ *
+ * The phantom field `__metadataKey` is never present at runtime — it exists solely to
+ * prevent bare `symbol` from being assignable to a `MetadataKey<T, C>`. A branded key
+ * IS a `symbol`, so it flows into any API that accepts a raw `symbol`.
+ *
+ * Default params preserve existing `MetadataKey` usage sites (no-arg imports remain valid).
+ *
+ * @typeParam TValue - The value type stored under this key.
+ * @typeParam TCard - Cardinality discriminant: `"unique"` (at most one value) or `"list"`.
  */
-export type MetadataKey = symbol;
+export type MetadataKey<TValue = unknown, TCard extends "unique" | "list" = "unique" | "list"> = symbol & {
+	readonly __metadataKey: { value: TValue; cardinality: TCard };
+};
+
+/** Shorthand for a key that allows exactly one metadata value per site. */
+export type UniqueMetadataKey<T> = MetadataKey<T, "unique">;
+
+/** Shorthand for a key that accumulates a list of metadata values per site. */
+export type ListMetadataKey<T> = MetadataKey<T, "list">;
 
 /**
  * Per-class own metadata: each key holds an append-only list of values for that class only.

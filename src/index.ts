@@ -15,6 +15,7 @@ export {
 	InvalidDecorationTargetError,
 	MissingMetadataError,
 	UnregisteredClassError,
+	UnregisteredMetadataKeyError,
 	ValidationError,
 } from "./errors";
 
@@ -43,6 +44,7 @@ export const intercept = Object.freeze({
 	accessor: createAccessorInterceptor,
 } as const);
 
+export { getKeyCardinality, mintListKey, mintUniqueKey } from "./metadata/cardinality-registry";
 export { reflect } from "./reflector/reflector";
 export { prepare } from "./runtime/prepare";
 export type {
@@ -62,7 +64,7 @@ export type {
 	ValidateContext,
 	ValidatorFn,
 } from "./factories/types";
-export type { MetadataArray, MetadataKey } from "./metadata/types";
+export type { ListMetadataKey, MetadataArray, MetadataKey, UniqueMetadataKey } from "./metadata/types";
 export type { Reflector } from "./reflector/reflector";
 export type {
 	DecoratedClass,

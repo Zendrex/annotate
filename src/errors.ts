@@ -11,6 +11,7 @@ export const AnnotateErrorCode = {
 	DUPLICATE: "duplicate",
 	MISSING: "missing",
 	UNREGISTERED: "unregistered",
+	UNREGISTERED_KEY: "unregisteredKey",
 	INVALID_TARGET: "invalidTarget",
 	VALIDATION: "validation",
 } as const;
@@ -191,6 +192,30 @@ export class InvalidDecorationTargetError extends AnnotateError {
 			message: `@${args.label} cannot decorate ${className}${memberSuffix}: not a subclass of ${baseName}`,
 		});
 		this.requiredBase = args.requiredBase;
+	}
+}
+
+/**
+ * Thrown when a metadata store operation targets a symbol that is absent from the
+ * cardinality registry — i.e. a key not minted via `mintUniqueKey` or `mintListKey`.
+ * `code` is {@link AnnotateErrorCode.UNREGISTERED_KEY}.
+ */
+export class UnregisteredMetadataKeyError extends AnnotateError {
+	override readonly name: string = "UnregisteredMetadataKeyError";
+
+	/**
+	 * @param target - The class whose store was targeted
+	 * @param key - The unregistered metadata key
+	 */
+	constructor(target: AnyConstructor, key: MetadataKey) {
+		super({
+			code: AnnotateErrorCode.UNREGISTERED_KEY,
+			target,
+			key,
+			message:
+				`@zendrex/annotate: metadata key ${String(key)} used on "${targetDisplayName(target)}" ` +
+				"was not minted via mintUniqueKey() or mintListKey() and has no registered cardinality.",
+		});
 	}
 }
 
