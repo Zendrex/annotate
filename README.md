@@ -54,7 +54,7 @@ class Users {
   @Get("/:id")   show() {}
 }
 
-for (const { name, metadata } of Get.reader(Users).methodsScalar()) {
+for (const { name, metadata } of Get.reader(Users).methods()) {
   console.log(metadata, "→", name);
 }
 // "/"     → list
@@ -93,7 +93,7 @@ class Users {
 }
 
 const prefix = Controller.firstOrThrow(Users);
-for (const { name, metadata } of Route.reader(Users).methodsScalar()) {
+for (const { name, metadata } of Route.reader(Users).methods()) {
   app.on(metadata.method, prefix + metadata.path, name);
 }
 ```
@@ -200,7 +200,6 @@ Every factory accepts trailing generics to constrain the target: method signatur
   compose?:           (...args) => TMeta,  // fold arguments into stored value
   validate?:          (meta, ctx) => void, // throw to reject at decoration
   requireInstanceOf?: AnyConstructor,      // enclosing class must extend this
-  unique?:            boolean,             // replace on re-apply instead of append
   name?:              string,              // label in error messages
 }
 ```
@@ -208,18 +207,49 @@ Every factory accepts trailing generics to constrain the target: method signatur
 ### Factory surface
 
 ```typescript
-Route.key                                  // MetadataKey (symbol)
-Route.reader(target).methodsScalar()       // DecoratedMethodScalar<TMeta>[]
-Route.reader(target).methods()             // DecoratedMethod<TMeta>[]
+Route.key                                  // UniqueMetadataKey<TMeta> (branded symbol)
+Route.reader(target).methods()             // DecoratedMethodUnique<TMeta>[]
 Route.first(target, name)                  // TMeta | undefined
 Route.firstOrThrow(target, name)           // TMeta, throws on missing
-Route.all(target, name)                    // MetadataArray<TMeta>, empty if absent
+Route.all(target, name)                    // MetadataArray<TMeta>, capped at length ≤ 1
 Route.has(target, name)                    // boolean, never throws
 Route.hasOwn(target, name)                 // ignores inherited
 Route.derive({ ... })                      // child factory, same key, narrowed
 ```
 
 Class factories drop the `name` argument. Interceptors expose the same surface.
+
+### Unique vs list cardinality
+
+Every factory defaults to **unique** cardinality: at most one metadata value per decoration site. A second application of the same factory to the same method or class throws `DuplicateMetadataError` at decoration time. The `.key` on a unique factory is typed `UniqueMetadataKey<TMeta>`, and the reader's `methods()` / `properties()` / `class()` return entries where `metadata` is `TMeta` directly.
+
+Use the `.list` sibling on the factory namespace when multiple values must stack on the same site:
+
+```typescript
+import { decorate } from "@zendrex/annotate";
+
+// unique (default) — at most one value per method
+const Role = decorate.method<string>();
+
+// list — many values per method, accumulated in application order
+const Tag = decorate.method.list<string>();
+
+class Api {
+  @Role("admin") @Tag("public") @Tag("internal") get() {}
+}
+
+// Role.key is UniqueMetadataKey<string> → metadata: string
+for (const { name, metadata } of Role.reader(Api).methods()) {
+  console.log(name, metadata); // "get", "admin"
+}
+
+// Tag.key is ListMetadataKey<string> → metadata: readonly string[]
+for (const { name, metadata } of Tag.reader(Api).methods()) {
+  console.log(name, metadata); // "get", ["public", "internal"]
+}
+```
+
+The same `.list` sibling is available on every namespace entry: `decorate.class.list`, `decorate.property.list`, `intercept.method.list`, `intercept.accessor.list`.
 
 ### Unscoped reflect
 
@@ -250,8 +280,9 @@ Every domain error extends `AnnotateError` and carries `code`, `target`, `kind?`
 
 | Class | `code` | When |
 |---|---|---|
-| `DuplicateMetadataError` | `"duplicate"` | `unique: true` factory applied twice to the same slot |
+| `DuplicateMetadataError` | `"duplicate"` | unique factory applied twice to the same slot |
 | `UnregisteredClassError` | `"unregistered"` | `reflect()` called on a class with no annotate metadata anywhere on its prototype chain |
+| `UnregisteredMetadataKeyError` | `"unregisteredKey"` | store append targets a key absent from the cardinality registry (key minted outside `mintUniqueKey` / `mintListKey`) |
 | `InvalidDecorationTargetError` | `"invalidTarget"` | `requireInstanceOf` rejects the host class; carries `requiredBase` |
 | `ValidationError` | `"validation"` | a `validate` hook threw; original error attached as `Error.cause` |
 | `MissingMetadataError` | `"missing"` | `firstOrThrow` found nothing |
