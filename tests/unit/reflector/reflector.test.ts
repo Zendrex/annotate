@@ -51,7 +51,6 @@ describe("Reflector", () => {
 
 	test("throws UnregisteredClassError when class never decorated", () => {
 		class Bare {}
-		// biome-ignore lint/suspicious/noExplicitAny: cast needed to pass a bare symbol to a MetadataKey parameter in this error-path test
 		expect(() => reflect(Bare).methods(Symbol("k") as any)).toThrow(UnregisteredClassError);
 	});
 
