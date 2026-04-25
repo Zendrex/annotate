@@ -1,5 +1,3 @@
-import type { MetadataArray } from "../metadata/types";
-
 /**
  * Any class constructor this library treats as a decoration **target**: a `function` with a
  * non-null object `prototype` (ordinary constructor shape).
@@ -11,16 +9,6 @@ export type AnyConstructor = Function & { prototype: object };
  * Which syntactic construct carried the metadata: the class itself, a method, or a property/field.
  */
 export type DecoratedKind = "class" | "method" | "property";
-
-/**
- * Shared fields for every reflected decoration: kind, member or class **name**, and all
- * metadata values stored for that site (array form).
- */
-export interface DecoratedBase<TMeta> {
-	kind: DecoratedKind;
-	metadata: MetadataArray<TMeta>;
-	name: string | symbol;
-}
 
 // ── Class ─────────────────────────────────────────────────────────────────────
 

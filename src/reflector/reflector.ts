@@ -116,6 +116,9 @@ export class ReflectorImpl implements Reflector {
 				target: this.ctor,
 			} satisfies DecoratedClassUnique<T>;
 		}
+		// Unregistered keys (cardinality undefined) can never reach here with data because
+		// appendClassMeta would have thrown UnregisteredMetadataKeyError at decoration time.
+		// In practice this branch only executes for list-cardinality keys.
 		return {
 			kind: "class",
 			name: targetDisplayName(this.ctor),
@@ -155,6 +158,9 @@ export class ReflectorImpl implements Reflector {
 					metadata: raw[0] as T,
 				} as unknown as R);
 			} else {
+				// Unregistered keys (cardinality undefined) can never reach here with data because
+				// appendMemberMeta would have thrown UnregisteredMetadataKeyError at decoration time.
+				// In practice this branch only executes for list-cardinality keys.
 				out.push({
 					kind,
 					name,

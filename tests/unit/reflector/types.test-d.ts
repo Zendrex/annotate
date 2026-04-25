@@ -13,6 +13,7 @@ import { createScopedReflector } from "../../../src/reflector/scoped-reflector";
 import type {
 	DecoratedClassList,
 	DecoratedClassUnique,
+	DecoratedItem,
 	DecoratedMethodList,
 	DecoratedMethodUnique,
 	DecoratedPropertyList,
@@ -85,6 +86,26 @@ void _uniqueAsListClass;
 // @ts-expect-error: list key class result is not assignable to DecoratedClassUnique | undefined
 const _listAsUniqueClass: DecoratedClassUnique<string> | undefined = reflect(Fixture).class(ListClass.key);
 void _listAsUniqueClass;
+
+// ── Reflector.all() narrows on key brand ─────────────────────────────────────
+
+// Unique key → DecoratedItem<T, "unique">[]
+const uniqueAll: DecoratedItem<string, "unique">[] = reflect(Fixture).all(UniqueMethod.key);
+void uniqueAll;
+
+// List key → DecoratedItem<T, "list">[]
+const listAll: DecoratedItem<string, "list">[] = reflect(Fixture).all(ListMethod.key);
+void listAll;
+
+// Unique result is NOT assignable to DecoratedItem<T, "list">[]
+// @ts-expect-error: unique key all() result is not assignable to DecoratedItem<string, "list">[]
+const _uniqueAllAsList: DecoratedItem<string, "list">[] = reflect(Fixture).all(UniqueMethod.key);
+void _uniqueAllAsList;
+
+// List result is NOT assignable to DecoratedItem<T, "unique">[]
+// @ts-expect-error: list key all() result is not assignable to DecoratedItem<string, "unique">[]
+const _listAllAsUnique: DecoratedItem<string, "unique">[] = reflect(Fixture).all(ListMethod.key);
+void _listAllAsUnique;
 
 // ── createScopedReflector infers TCard from key brand ────────────────────────
 
