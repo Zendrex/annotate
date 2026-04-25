@@ -19,29 +19,37 @@ export {
 	ValidationError,
 } from "./errors";
 
-import { createAccessorInterceptor } from "./factories/accessor-interceptor";
-import { createClassDecorator } from "./factories/class-decorator";
-import { createMethodDecorator } from "./factories/method-decorator";
-import { createMethodInterceptor } from "./factories/method-interceptor";
-import { createPropertyDecorator } from "./factories/property-decorator";
+import { createAccessorInterceptor, createAccessorListInterceptor } from "./factories/accessor-interceptor";
+import { createClassDecorator, createClassListDecorator } from "./factories/class-decorator";
+import { createMethodDecorator, createMethodListDecorator } from "./factories/method-decorator";
+import { createMethodInterceptor, createMethodListInterceptor } from "./factories/method-interceptor";
+import { createPropertyDecorator, createPropertyListDecorator } from "./factories/property-decorator";
 
 /**
- * Version-stable registry of decorator factories (class, method, property). Prefer
- * this object over deep imports from `./factories/*` in consuming code.
+ * Version-stable registry of decorator factories (class, method, property). Each
+ * member is callable as the unique factory and exposes a `.list` sibling for
+ * list-cardinality metadata. Prefer this object over deep imports.
+ *
+ * - `decorate.class(opts)` — unique-cardinality class decorator factory
+ * - `decorate.class.list(opts)` — list-cardinality class decorator factory
  */
 export const decorate = Object.freeze({
-	class: createClassDecorator,
-	method: createMethodDecorator,
-	property: createPropertyDecorator,
+	class: Object.assign(createClassDecorator, { list: createClassListDecorator }),
+	method: Object.assign(createMethodDecorator, { list: createMethodListDecorator }),
+	property: Object.assign(createPropertyDecorator, { list: createPropertyListDecorator }),
 } as const);
 
 /**
- * Version-stable registry of method and accessor interceptor factories. Prefer this
- * object over deep imports from `./factories/*` in consuming code.
+ * Version-stable registry of method and accessor interceptor factories. Each
+ * member exposes a `.list` sibling for list-cardinality metadata. Prefer this
+ * object over deep imports.
+ *
+ * - `intercept.method(opts)` — unique-cardinality method interceptor factory
+ * - `intercept.method.list(opts)` — list-cardinality method interceptor factory
  */
 export const intercept = Object.freeze({
-	method: createMethodInterceptor,
-	accessor: createAccessorInterceptor,
+	method: Object.assign(createMethodInterceptor, { list: createMethodListInterceptor }),
+	accessor: Object.assign(createAccessorInterceptor, { list: createAccessorListInterceptor }),
 } as const);
 
 export { mintListKey, mintUniqueKey } from "./metadata/cardinality-registry";
