@@ -85,6 +85,14 @@ void _uniqueClassAsList;
 const _listClassAsUnique: ScopedReflector<string, "unique"> = createScopedReflector(ctor, ListClass.key);
 void _listClassAsUnique;
 
+// @ts-expect-error: unique-key scoped reflector is not assignable to ScopedReflector<string, "list">
+const _uniquePropertyAsList: ScopedReflector<string, "list"> = createScopedReflector(ctor, UniqueProperty.key);
+void _uniquePropertyAsList;
+
+// @ts-expect-error: list-key scoped reflector is not assignable to ScopedReflector<string, "unique">
+const _listPropertyAsUnique: ScopedReflector<string, "unique"> = createScopedReflector(ctor, ListProperty.key);
+void _listPropertyAsUnique;
+
 // ── ScopedReflector<T, "unique">.methods() returns DecoratedMethodUnique<T>[] ─
 
 const uniqueMethodEntries: DecoratedMethodUnique<string>[] = scopedUniqueMethod.methods();
