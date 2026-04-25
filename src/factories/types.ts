@@ -1,4 +1,4 @@
-import type { MetadataArray, MetadataKey } from "../metadata/types";
+import type { Cardinality, MetadataArray, MetadataKey } from "../metadata/types";
 import type { AnyConstructor, ScopedReflector } from "../reflector/types";
 import type { ValidatorFn } from "./validator-types";
 
@@ -99,7 +99,7 @@ export type DecoratedClassFactory<
 	TMeta,
 	TArgs extends unknown[] = [TMeta],
 	TInstance = unknown,
-	TCard extends "unique" | "list" = "unique",
+	TCard extends Cardinality = "unique",
 > = ClassDecoratorFn<TInstance, TArgs> & {
 	key: MetadataKey<TMeta, TCard>;
 	reader(target: object): ScopedReflector<TMeta, TCard>;
@@ -126,7 +126,7 @@ export type DecoratedMethodFactory<
 	TMethod extends AnyFn = AnyFn,
 	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
 	TThis = any,
-	TCard extends "unique" | "list" = "unique",
+	TCard extends Cardinality = "unique",
 > = MethodDecoratorFn<TThis, TMethod, TArgs> & {
 	key: MetadataKey<TMeta, TCard>;
 	reader(target: object): ScopedReflector<TMeta, TCard>;
@@ -152,7 +152,7 @@ export type DecoratedPropertyFactory<
 	TField = unknown,
 	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
 	TThis = any,
-	TCard extends "unique" | "list" = "unique",
+	TCard extends Cardinality = "unique",
 > = FieldDecoratorFn<TThis, TField, TArgs> & {
 	key: MetadataKey<TMeta, TCard>;
 	reader(target: object): ScopedReflector<TMeta, TCard>;
@@ -179,7 +179,7 @@ export type DecoratedAccessorFactory<
 	TValue = unknown,
 	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
 	TThis = any,
-	TCard extends "unique" | "list" = "unique",
+	TCard extends Cardinality = "unique",
 > = AccessorDecoratorFn<TThis, TValue, TArgs> & {
 	key: MetadataKey<TMeta, TCard>;
 	reader(target: object): ScopedReflector<TMeta, TCard>;

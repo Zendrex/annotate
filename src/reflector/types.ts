@@ -1,3 +1,5 @@
+import type { Cardinality } from "../metadata/types";
+
 /**
  * Any class constructor this library treats as a decoration **target**: a `function` with a
  * non-null object `prototype` (ordinary constructor shape).
@@ -107,7 +109,7 @@ export type DecoratedProperty<TMeta> = DecoratedPropertyUnique<TMeta> | Decorate
  * - `DecoratedItem<T, "list">` — every `metadata` field is `readonly T[]`.
  * - `DecoratedItem<T>` (no second param) — union of both (backwards-compatible).
  */
-export type DecoratedItem<TMeta, TCard extends "unique" | "list" = "unique" | "list"> = TCard extends "unique"
+export type DecoratedItem<TMeta, TCard extends Cardinality = Cardinality> = TCard extends "unique"
 	? DecoratedClassUnique<TMeta> | DecoratedMethodUnique<TMeta> | DecoratedPropertyUnique<TMeta>
 	: TCard extends "list"
 		? DecoratedClassList<TMeta> | DecoratedMethodList<TMeta> | DecoratedPropertyList<TMeta>
@@ -123,7 +125,7 @@ export type DecoratedItem<TMeta, TCard extends "unique" | "list" = "unique" | "l
  * @typeParam TMeta - Metadata type associated with the bound key
  * @typeParam TCard - Cardinality brand: `"unique"` or `"list"`
  */
-export interface ScopedReflector<TMeta, TCard extends "unique" | "list" = "unique" | "list"> {
+export interface ScopedReflector<TMeta, TCard extends Cardinality = Cardinality> {
 	all(): DecoratedItem<TMeta, TCard>[];
 	class(): TCard extends "unique" ? DecoratedClassUnique<TMeta> | undefined : DecoratedClassList<TMeta> | undefined;
 	methods(): TCard extends "unique" ? DecoratedMethodUnique<TMeta>[] : DecoratedMethodList<TMeta>[];

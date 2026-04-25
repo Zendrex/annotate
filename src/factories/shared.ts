@@ -1,4 +1,4 @@
-import { MissingMetadataError, UnregisteredClassError } from "../errors";
+import { keyDisplayName, MissingMetadataError, UnregisteredClassError } from "../errors";
 import {
 	collectClassMeta,
 	firstClassMetaForKey,
@@ -21,7 +21,7 @@ import { createScopedReflector } from "../reflector/scoped-reflector";
 import { prepare } from "../runtime/prepare";
 import { walkPrototypeChain } from "../runtime/prototype-chain";
 import { asDeferredValidators, chainValidators, runValidatorChain } from "./validator-chain";
-import type { Ctor, Deferred, MemberKind, MetadataArray, MetadataKey } from "../metadata/types";
+import type { Cardinality, Ctor, Deferred, MemberKind, MetadataArray, MetadataKey } from "../metadata/types";
 import type { AnyConstructor, DecoratedKind, ScopedReflector } from "../reflector/types";
 import type { DecoratorOptions, DeriveOptions } from "./types";
 import type { ValidatorFn } from "./validator-types";
@@ -38,7 +38,7 @@ export function compose<TMeta, TArgs extends unknown[]>(args: TArgs, fn?: (...a:
  * Resolves a stable display name for the decorator, preferring an explicit `name` when provided.
  */
 export function labelFor(name: string | undefined, key: MetadataKey): string {
-	return name ?? String(key.description ?? key);
+	return name ?? keyDisplayName(key);
 }
 
 /**
@@ -194,7 +194,7 @@ export function mergeExtendedOptions<TMeta, TArgs extends unknown[]>(
  * - **has** / **hasOwn** — whether an entry exists anywhere in the class metadata chain / on the constructor only.
  * - **all** — a frozen list of all class-level entries in declaration order.
  */
-export function createClassFactoryHelpers<TMeta, TCard extends "unique" | "list" = "unique">(
+export function createClassFactoryHelpers<TMeta, TCard extends Cardinality = "unique">(
 	key: MetadataKey<TMeta, TCard>,
 	label: string
 ) {
@@ -239,7 +239,7 @@ export function createClassFactoryHelpers<TMeta, TCard extends "unique" | "list"
  * - **has** / **hasOwn** — any vs own entry for that member+key.
  * - **all** — frozen list of all entries for the member+key in declaration order.
  */
-export function createMemberFactoryHelpers<TMeta, TCard extends "unique" | "list" = "unique">(
+export function createMemberFactoryHelpers<TMeta, TCard extends Cardinality = "unique">(
 	key: MetadataKey<TMeta, TCard>,
 	kind: Extract<DecoratedKind, "method" | "property">,
 	label: string

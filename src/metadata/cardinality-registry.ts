@@ -1,4 +1,4 @@
-import type { ListMetadataKey, UniqueMetadataKey } from "./types";
+import type { Cardinality, ListMetadataKey, UniqueMetadataKey } from "./types";
 
 // Branded key aliases are imported for return types only; they are exported from types.ts directly.
 
@@ -9,7 +9,7 @@ import type { ListMetadataKey, UniqueMetadataKey } from "./types";
  * reachable. Only unique symbols (from `Symbol()`) qualify as `WeakMap` keys — our mint
  * helpers always produce unique symbols, so this is always safe.
  */
-const registry = new WeakMap<symbol, "unique" | "list">();
+const registry = new WeakMap<symbol, Cardinality>();
 
 /**
  * Mint a new symbol registered as a `"unique"` metadata key. Each call produces a
@@ -48,6 +48,6 @@ export function mintListKey<T>(description?: string): ListMetadataKey<T> {
  *
  * @param key - Any symbol, including unbranded ones.
  */
-export function getKeyCardinality(key: symbol): "unique" | "list" | undefined {
+export function getKeyCardinality(key: symbol): Cardinality | undefined {
 	return registry.get(key);
 }

@@ -8,7 +8,7 @@ import {
 	mergeExtendedOptions,
 } from "./shared";
 import { buildValidatorChain } from "./validator-chain";
-import type { MetadataKey } from "../metadata/types";
+import type { Cardinality, MetadataKey } from "../metadata/types";
 import type {
 	AccessorInterceptorOptions,
 	DecoratedAccessorFactory,
@@ -73,7 +73,7 @@ export function buildAccessorFactory<
 	TArgs extends unknown[],
 	TValue,
 	TThis,
-	TCard extends "unique" | "list" = "unique",
+	TCard extends Cardinality = "unique",
 >(
 	key: MetadataKey<TMeta, TCard>,
 	options: DecoratorOptions<TMeta, TArgs> | undefined,

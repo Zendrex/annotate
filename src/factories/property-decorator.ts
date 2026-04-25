@@ -1,7 +1,7 @@
 import { mintListKey, mintUniqueKey } from "../metadata/cardinality-registry";
 import { compose, createMemberFactoryHelpers, emitMemberDecoration, labelFor, mergeExtendedOptions } from "./shared";
 import { buildValidatorChain } from "./validator-chain";
-import type { MetadataKey } from "../metadata/types";
+import type { Cardinality, MetadataKey } from "../metadata/types";
 import type { DecoratedPropertyFactory, DecoratorOptions, DeriveOptions } from "./types";
 
 /**
@@ -42,7 +42,7 @@ export function buildPropertyFactory<
 	TArgs extends unknown[],
 	TField,
 	TThis,
-	TCard extends "unique" | "list" = "unique",
+	TCard extends Cardinality = "unique",
 >(
 	key: MetadataKey<TMeta, TCard>,
 	options: DecoratorOptions<TMeta, TArgs> | undefined

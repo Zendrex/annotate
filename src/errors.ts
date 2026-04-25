@@ -21,6 +21,14 @@ export const AnnotateErrorCode = {
 export type AnnotateErrorCode = (typeof AnnotateErrorCode)[keyof typeof AnnotateErrorCode];
 
 /**
+ * Human-readable display string for a metadata key: prefers `description`, falls
+ * back to `String(key)` (e.g. `"Symbol()"`) when the description is missing.
+ */
+export function keyDisplayName(key: MetadataKey): string {
+	return String(key.description ?? key);
+}
+
+/**
  * Arguments for {@link AnnotateError}. Optional fields add reflection context
  * (key, kind, member) for diagnostics; omit when not applicable.
  */
@@ -86,11 +94,8 @@ export class DuplicateMetadataError extends AnnotateError {
 		const slot = memberName
 			? `"${String(memberName)}" on "${targetDisplayName(ctor)}"`
 			: `"${targetDisplayName(ctor)}"`;
-		const keyLabel = key.description ?? String(key);
-		// Look up cardinality at construction time so the message stays accurate
-		// if this error is ever thrown for a non-unique key in the future.
-		// Falls back to "unique" as a safe default — the registry check at the
-		// throw site guarantees the key was registered before we reach this point.
+		const keyLabel = keyDisplayName(key);
+		// Cardinality drives the message wording; registry guarantees registration before this point.
 		const cardinality = getKeyCardinality(key) ?? "unique";
 		super({
 			code: AnnotateErrorCode.DUPLICATE,

@@ -6,6 +6,12 @@
 export type Ctor = Function;
 
 /**
+ * Cardinality discriminant for a metadata key: `"unique"` allows at most one value
+ * per site; `"list"` accumulates an ordered list.
+ */
+export type Cardinality = "unique" | "list";
+
+/**
  * Branded symbol for a metadata "channel" that carries cardinality at the type level.
  *
  * The phantom field `__metadataKey` is never present at runtime — it exists solely to
@@ -17,7 +23,7 @@ export type Ctor = Function;
  * @typeParam TValue - The value type stored under this key.
  * @typeParam TCard - Cardinality discriminant: `"unique"` (at most one value) or `"list"`.
  */
-export type MetadataKey<TValue = unknown, TCard extends "unique" | "list" = "unique" | "list"> = symbol & {
+export type MetadataKey<TValue = unknown, TCard extends Cardinality = Cardinality> = symbol & {
 	readonly __metadataKey: { value: TValue; cardinality: TCard };
 };
 

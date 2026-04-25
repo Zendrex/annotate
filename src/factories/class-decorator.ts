@@ -4,7 +4,7 @@ import { registerCtor } from "../metadata/metadata-ctor-correlation";
 import { flushFor } from "../metadata/metadata-deferred-queue";
 import { compose, createClassFactoryHelpers, labelFor, mergeExtendedOptions } from "./shared";
 import { buildValidatorChain, runValidatorChain } from "./validator-chain";
-import type { MetadataKey } from "../metadata/types";
+import type { Cardinality, MetadataKey } from "../metadata/types";
 import type { AnyConstructor } from "../reflector/types";
 import type { DecoratedClassFactory, DecoratorOptions, DeriveOptions } from "./types";
 
@@ -40,12 +40,7 @@ export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta], T
  * @param key - Metadata key this factory reads and writes.
  * @param options - Optional compose/validation and display `name` for labels.
  */
-export function buildClassFactory<
-	TMeta,
-	TArgs extends unknown[],
-	TInstance,
-	TCard extends "unique" | "list" = "unique",
->(
+export function buildClassFactory<TMeta, TArgs extends unknown[], TInstance, TCard extends Cardinality = "unique">(
 	key: MetadataKey<TMeta, TCard>,
 	options: DecoratorOptions<TMeta, TArgs> | undefined
 ): DecoratedClassFactory<TMeta, TArgs, TInstance, TCard> {
