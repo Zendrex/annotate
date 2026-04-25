@@ -44,7 +44,7 @@ export const intercept = Object.freeze({
 	accessor: createAccessorInterceptor,
 } as const);
 
-export { getKeyCardinality, mintListKey, mintUniqueKey } from "./metadata/cardinality-registry";
+export { mintListKey, mintUniqueKey } from "./metadata/cardinality-registry";
 export { reflect } from "./reflector/reflector";
 export { prepare } from "./runtime/prepare";
 export type {

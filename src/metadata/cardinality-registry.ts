@@ -5,13 +5,11 @@ import type { ListMetadataKey, UniqueMetadataKey } from "./types";
 /**
  * Module-level registry mapping every minted `MetadataKey` symbol to its cardinality.
  *
- * We use a plain `Map` rather than a `WeakMap` because `WeakMap` only accepts object
- * keys — symbol support was added in ES2023 (`WeakMap<symbol>`). While the project
- * targets ESNext, a plain `Map` is simpler and avoids any subtle lib/target mismatch.
- * The set of registered keys is bounded by the number of decorated factories in a
- * process, so memory growth is not a concern.
+ * Uses a `WeakMap` so entries are eligible for GC when the owning symbol is no longer
+ * reachable. Only unique symbols (from `Symbol()`) qualify as `WeakMap` keys — our mint
+ * helpers always produce unique symbols, so this is always safe.
  */
-const registry = new Map<symbol, "unique" | "list">();
+const registry = new WeakMap<symbol, "unique" | "list">();
 
 /**
  * Mint a new symbol registered as a `"unique"` metadata key. Each call produces a
