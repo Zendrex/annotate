@@ -1,286 +1,229 @@
 # @zendrex/annotate
 
-A modern decorator and metadata system for TypeScript. Create typed decorators with built-in reflection.
-
-> **v1.0.0-alpha.0 — Stage-3 decorators.** This is a major rewrite. v0.x callers will not work without code changes. See [CHANGELOG.md](./CHANGELOG.md) for the full migration guide.
-
-## Installation
+Typed decorators with built-in reflection. TC39 Stage-3. Zero dependencies. No `reflect-metadata`.
 
 ```bash
-# Bun
 bun add @zendrex/annotate
-
-# npm
-npm install @zendrex/annotate
-
-# Yarn
-yarn add @zendrex/annotate
-
-# pnpm
-pnpm add @zendrex/annotate
 ```
 
-Requires TypeScript 5.2+ with Stage-3 decorators. No `reflect-metadata` or `experimentalDecorators` needed.
+Works with npm, pnpm, yarn. TypeScript 5.2+. Node ≥ 20.4 (or a transpiler that shims `Symbol.metadata`).
 
 ```jsonc
+// tsconfig.json
 {
   "compilerOptions": {
-    "experimentalDecorators": false,
-    "emitDecoratorMetadata": false,
     "target": "ES2022",
-    "useDefineForClassFields": true
+    "useDefineForClassFields": true,
+    "experimentalDecorators": false,
+    "emitDecoratorMetadata": false
   }
 }
 ```
 
-Runtime floor: Node ≥ 20.4 for native `Symbol.metadata`, or a transpiler-provided shim.
-
-## Quick Start
+## A decorator in three lines
 
 ```typescript
-import { createClassDecorator, createMethodDecorator } from "@zendrex/annotate";
+import { decorate } from "@zendrex/annotate";
 
-// Create typed decorators
-const Controller = createClassDecorator<string>();
-const Route = createMethodDecorator<{ path: string; method: string }>();
+const Get = decorate.method<string>();
 
-// Apply them
-@Controller("users")
-class UserController {
-  @Route({ path: "/", method: "GET" })
-  list() {}
-
-  @Route({ path: "/:id", method: "GET" })
-  get() {}
+class Users {
+  @Get("/")      list() {}
+  @Get("/:id")   show() {}
 }
 
-// Reflect on the metadata
-const routes = Route.reflect(UserController).methods();
-
-for (const route of routes) {
-  console.log(route.name, route.metadata);
+for (const { name, metadata } of Get.reader(Users).methodsScalar()) {
+  console.log(metadata, "→", name);
 }
-// list [{ path: "/", method: "GET" }]
-// get [{ path: "/:id", method: "GET" }]
+// "/"     → list
+// "/:id"  → show
 ```
 
-## Core Concepts
+Three pieces: factory → decorator → reflect.
 
-### Decorator Factories
+## Why
 
-Each factory creates a typed decorator with built-in reflection. Options use a
-single `DecoratorOptions` shape: optional `compose`, `name` (for error
-prefixes), and `unique` (class / method / property / interceptors; not on
-parameters).
+- **Typed end to end.** Arguments, stored metadata, the class, and `this` inside methods all flow through factory generics. Misuse fails at compile time.
+- **Scoped reflection.** `factory.reader(ClassOrInstance)` returns a reader bound to that factory's key. No globals, no string keys.
+- **Composable.** `.derive()` returns a child factory sharing the parent's metadata key. Narrow the target type, chain another validator, or relabel for errors. Reflection through the parent still sees child entries.
+- **Lazy.** Instance metadata commits on first `new`; statics commit immediately. No walking on every read.
 
-```typescript
-import {
-  createClassDecorator,
-  createMethodDecorator,
-  createPropertyDecorator,
-} from "@zendrex/annotate";
+## HTTP router in ~20 lines
 
-const Tag = createClassDecorator<string>();
-const Route = createMethodDecorator<string>();
-const Column = createPropertyDecorator<string>();
-```
-
-### Constraint generics
-
-Each factory accepts an optional third generic that constrains what the decorator can be applied to. If the constraint fails, the compiler rejects the decoration at the call site — no runtime check needed.
+Class metadata, method metadata, composed arguments, a wrapping interceptor, and reflection wiring it up:
 
 ```typescript
-const IsNumber = createPropertyDecorator<{ kind: "number" }, [], number>();
+import { decorate, intercept } from "@zendrex/annotate";
 
-class Account {
-  @IsNumber()
-  balance!: number;  // ✓ ok
+const Controller = decorate.class<string>();
 
-  @IsNumber()
-  // @ts-expect-error: number-bound rejects boolean
-  active!: boolean;
-}
-```
-
-The same mechanism applies to `createClassDecorator<M, Args, TInstance>` (rejects non-subclass classes), `createMethodDecorator<M, Args, TMethod>` (e.g., async-only), and `createAccessorInterceptor<M, Args, TValue>` (the accessor's declared value type).
-
-Known limitations: `any`-typed fields always pass (standard TS loophole); optional fields like `x?: number` do **not** widen the constraint, so `@IsNumber() x?: number` still compiles.
-
-### Compose
-
-Pass `compose` to transform multiple decorator arguments into metadata:
-
-```typescript
-const Route = createMethodDecorator({
-  compose: (path: string, method: "GET" | "POST") => ({ path, method }),
+const Route = decorate.method({
+  compose: (method: "GET" | "POST", path: string) => ({ method, path }),
 });
 
-class Api {
-  @Route("/users", "GET")
-  getUsers() {}
-}
-```
-
-### Reflection
-
-Factories expose `key`, `reflect(target)` (class constructor or instance),
-scalar lookups, and `applied` / `appliedOwn` where applicable. Use
-`Factory.reflect(ctorOrInstance).methods()` (and the same for `properties()`)
-for collections; `methodsSingular` / `propertiesSingular` live on
-`ScopedReflector` only.
-
-```typescript
-const Column = createPropertyDecorator<{ type: string; nullable?: boolean }>();
-
-class User {
-  @Column({ type: "varchar" })
-  name!: string;
-
-  @Column({ type: "int", nullable: true })
-  age!: number;
-}
-
-const columns = Column.reflect(User).properties();
-
-for (const col of columns) {
-  console.log(col.name, col.metadata);
-}
-```
-
-### Property injection
-
-```typescript
-import { createPropertyDecorator } from "@zendrex/annotate";
-
-const Inject = createPropertyDecorator<string>();
-
-class UserService {
-  @Inject("database")
-  db!: Database;
-
-  @Inject("logger")
-  logger!: Logger;
-}
-
-const deps = Inject.reflect(UserService).properties();
-const instance = new UserService();
-for (const dep of deps) {
-  (instance as any)[dep.name] = container.get(dep.metadata[0]);
-}
-```
-
-### Class metadata scalars
-
-Use `metadata(target)` (or `requireMetadata(target)`) for the first value, with
-inheritance along the class constructor chain. `applied` / `appliedOwn` report
-array presence; use `appliedOwn` to ignore inherited class metadata on
-subclasses.
-
-```typescript
-const Controller = createClassDecorator<string>();
-
-@Controller("users")
-class UserController {}
-
-class AdminController extends UserController {}
-
-Controller.metadata(AdminController);  // => "users" (inherited)
-Controller.applied(AdminController);   // => true
-Controller.appliedOwn(AdminController); // => false when only the parent is decorated
-```
-
-### Singular method and property lists
-
-```typescript
-const EventHandler = createMethodDecorator<EventHandlerMeta>();
-
-class Component {
-  @EventHandler({ event: "click" })
-  onClick() {}
-}
-
-for (const { name, metadata } of EventHandler.reflect(Component).methodsSingular()) {
-  bind(name, metadata);
-}
-
-EventHandler.metadata(Component, "onClick");
-EventHandler.requireMetadata(Component, "onClick");
-```
-
-### `reflect()`
-
-`reflect(ctorOrInstance)` returns an unscoped `Reflector` (pass a
-`MetadataKey` into each call). The same constructor resolution applies as for
-`factory.reflect`: you may pass a class, or an object whose
-`object.constructor` is a valid class constructor. Plain `{}`, `Object`, arrow
-functions, and other invalid targets throw `TypeError` with stable message
-prefixes (see source tests for patterns).
-
-### materialize(ctor)
-
-Instance-member metadata registers lazily — for a class with only instance decorators (no class decorator, no static-decorated members), the metadata stores are empty until the first `new Ctor()`. Most APIs on the factory auto-materialize for you (`Factory.reflect`, `Factory.applied`, `Factory.metadata`, and `reflect(ctor)` from the barrel all call `materialize(ctor)` internally). Call `materialize(ctor)` directly only if you need an explicit eager-flush — for example, before publishing the class to a DI container that introspects via `Object.getOwnPropertyNames`.
-
-```typescript
-import { materialize, createPropertyDecorator } from "@zendrex/annotate";
-
-const Field = createPropertyDecorator<string>();
-
-class User {
-  @Field("varchar")
-  name!: string;
-}
-
-materialize(User);  // instance-member metadata now committed
-```
-
-## Interceptors
-
-```typescript
-import { createMethodInterceptor } from "@zendrex/annotate";
-
-const Timed = createMethodInterceptor<string>({
-  intercept: (original, readMetadata, context) =>
-    function (this: unknown, ...args: unknown[]) {
-      const start = performance.now();
-      const result = original.apply(this, args);
-      console.log(`${String(context.name)} took ${performance.now() - start}ms — tags: ${readMetadata(this as object).join(",")}`);
-      return result;
-    } as typeof original,
-});
-```
-
-`InterceptorContext` carries `name` (member key), `static` (boolean), and `kind` (`"method" | "accessor"`).
-
-**Accessor interceptors** wrap `accessor foo: T;` (and `get`/`set` pairs) — not plain class fields. `createAccessorInterceptor` requires at least one of `onGet` / `onSet`; calling it with neither throws `TypeError`. To attach metadata to a plain field without interception, use `createPropertyDecorator`.
-
-```typescript
-import { createAccessorInterceptor } from "@zendrex/annotate";
-
-const Trace = createAccessorInterceptor<string>({
-  onGet: (original, readMetadata) =>
-    function (this: unknown) {
-      console.log("read", readMetadata(this as object));
-      return original.call(this);
-    },
+const Log = intercept.method<string>({
+  intercept: (fn, tag, ctx) => function (this: any, ...args: any[]) {
+    console.log(`→ ${tag(this)[0]}/${String(ctx.name)}`);
+    return fn.apply(this, args);
+  },
 });
 
-class Box {
-  @Trace("box")
-  accessor value: string = "v";
+@Controller("/users")
+class Users {
+  @Route("GET",  "/")     @Log("users") list()   {}
+  @Route("POST", "/")     @Log("users") create() {}
+  @Route("GET",  "/:id")  @Log("users") show()   {}
+}
+
+// Wire to any router.
+const prefix = Controller.firstOrThrow(Users);
+for (const { name, metadata } of Route.reader(Users).methodsScalar()) {
+  app.on(metadata.method, prefix + metadata.path, name);
 }
 ```
+
+## Validated, scoped fields
+
+`validate` and `requireInstanceOf` both run at decoration time. `validate` rejects bad arguments; `requireInstanceOf` rejects host classes that do not extend the required base.
+
+```typescript
+import { decorate } from "@zendrex/annotate";
+
+class Entity {}
+
+const Field = decorate.property<{ type: "string" | "int"; min?: number }>({
+  requireInstanceOf: Entity,
+  validate: ({ type, min }, { memberName }) => {
+    if (type === "int" && min !== undefined && !Number.isInteger(min)) {
+      throw new Error(`${String(memberName)}: min must be an integer`);
+    }
+  },
+});
+
+class User extends Entity {
+  @Field({ type: "string" })        name!: string;
+  @Field({ type: "int", min: 0 })   age!: number;
+}
+
+Field.reader(User).properties();
+```
+
+Applying `@Field` to a class that does not extend `Entity` throws `InvalidDecorationTargetError` at decoration time, not at runtime.
+
+## Extending a factory
+
+`.derive()` returns a child factory that writes to the *same metadata key* as the parent:
+
+| Option | Behavior on `.derive()` |
+|---|---|
+| `requireInstanceOf` | Child overrides parent. Falls back to parent's when omitted. |
+| `validate` | Chains after the parent validator. Parent runs first, then child. |
+| `name` | Relabels the child in error messages. |
+| `compose`, `unique` | Inherited from the parent. Not overridable, so the stored shape stays consistent across the chain. |
+
+Pass type generics if you need to narrow further: `.derive<TField, TThis>(...)` constrains the child's field type and `this` shape.
+
+```typescript
+const IntField = Field.derive({
+  name: "IntField",
+  validate: ({ type }, { memberName }) => {
+    if (type !== "int") {
+      throw new Error(`${String(memberName)}: IntField requires type "int"`);
+    }
+  },
+});
+
+class Account extends Entity {
+  @IntField({ type: "int", min: 0 })  balance!: number;
+}
+
+// Same key: Field.reader() sees every @IntField entry too.
+// Parent's int-min validator still runs before the child's check.
+Field.reader(Account).properties();
+```
+
+## API
+
+### Factories
+
+| Factory | For |
+|---|---|
+| `decorate.class<TMeta>` | classes |
+| `decorate.method<TMeta>` | methods |
+| `decorate.property<TMeta>` | class fields |
+| `intercept.method<TMeta>` | methods (wraps) |
+| `intercept.accessor<TMeta>` | `accessor` fields |
+
+Every factory takes optional trailing generics to constrain the target: method signature, field type, `this` shape, or `instanceof` bound. Mismatches fail at compile time.
+
+### Shared options
+
+```typescript
+{
+  compose?:           (...args) => TMeta,  // fold args into stored value
+  validate?:          (meta, ctx) => void, // throw to reject at decoration
+  requireInstanceOf?: AnyConstructor,      // enclosing class must extend this
+  unique?:            boolean,             // replace on re-apply instead of append
+  name?:              string,              // label in error messages
+}
+```
+
+### Factory surface
+
+```typescript
+Route.key                                  // MetadataKey (symbol)
+Route.reader(target).methodsScalar()       // DecoratedMethodScalar<TMeta>[]
+Route.reader(target).methods()             // DecoratedMethod<TMeta>[]
+Route.first(target, name)                  // TMeta | undefined
+Route.firstOrThrow(target, name)           // TMeta, throws on missing
+Route.all(target, name)                    // MetadataArray<TMeta>, empty if not applied
+Route.has(target, name)                    // boolean, never throws
+Route.hasOwn(target, name)                 // boolean, ignores inherited
+Route.derive({ ... })                      // new factory, same key, narrowed
+```
+
+Class factories drop `name`; interceptors and `reader()` mirror the same shape.
+
+### Unscoped reflect
+
+```typescript
+import { reflect } from "@zendrex/annotate";
+
+reflect(Users).methods(Route.key);
+```
+
+Pass keys per-call. Useful when the consumer holds many factories.
+
+### Type helpers
+
+```typescript
+import type { MetadataOf, ArgsOf, ThisOf } from "@zendrex/annotate";
+
+type M = MetadataOf<typeof Route>;  // { method: "GET" | "POST"; path: string }
+type A = ArgsOf<typeof Route>;      // ["GET" | "POST", string]
+```
+
+### prepare
+
+Instance metadata commits on first `new`. All factory helpers auto-materialize on read. Call `prepare(Ctor)` directly only when something else (a DI container scanning `Object.getOwnPropertyNames`) needs the flush first.
 
 ## Errors
 
-- **`AnnotateError`** — abstract base. Subclasses carry `code` (`"missing" | "duplicate"`), `kind` (`DecoratedKind`), `target` (always a constructor), and optional `memberName`.
-- **`DuplicateMetadataError`** — thrown when a `unique: true` decorator is applied twice.
-- **`UnregisteredClassError`** — thrown by `reflect(ctor).methods(...)` / `.properties(...)` / `.class(...)` if `ctor` was never decorated with a member/class decorator from this library. Use `Factory.applied(ctor, name)` instead — it never throws and returns `false` on the unregistered path.
-- Invalid factory options (e.g. an accessor interceptor with neither `onGet` nor `onSet`) throw `TypeError`, not `AnnotateError`.
+All domain errors extend `AnnotateError` and carry `code`, `target`, `kind?`, `memberName?`.
 
-## API summary
+| Class | `code` | When |
+|---|---|---|
+| `DuplicateMetadataError` | `"duplicate"` | `unique: true` factory applied twice |
+| `UnregisteredClassError` | `"unregistered"` | `reflect()` on a class with no annotate metadata anywhere on its chain |
+| `InvalidDecorationTargetError` | `"invalidTarget"` | `requireInstanceOf` rejects; carries `requiredBase` |
+| `ValidationError` | `"validation"` | `validate` hook threw; original on `Error.cause` |
+| `AnnotateError` | `"missing"` | `firstOrThrow` found no value |
 
-- **Class factory:** `key`, `reflect`, `metadata`, `requireMetadata`, `applied`, `appliedOwn`
-- **Method / property (and `createAccessorInterceptor`):** `key`, `reflect`, `metadata(target, name)`, `requireMetadata`, `applied`, `appliedOwn`
+Invalid factory options (e.g. accessor interceptor with neither `onGet` nor `onSet`) throw `TypeError`.
+
+## v1.0 alpha
+
+Major rewrite on Stage-3 decorators. API is unstable until 1.0.0.
 
 ## License
 
