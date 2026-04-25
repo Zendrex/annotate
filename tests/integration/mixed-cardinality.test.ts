@@ -26,7 +26,11 @@ const ListPropertyMeta = decorate.property.list<string>();
 
 // method interceptors — capture invocation call order
 const methodInterceptCalls: string[] = [];
-const listMethodInterceptCalls: string[][] = [];
+// Captures one entry per wrapper firing in invocation order; the per-wrapper tag
+// is bound at decoration time so positional assertions prove call ordering rather
+// than just full-list visibility.
+const listMethodCallOrder: string[] = [];
+const listMethodMetaSeen: string[][] = [];
 
 const UniqueMethodInterceptor = intercept.method<string>({
 	intercept: (original, readMetadata) =>
@@ -36,18 +40,29 @@ const UniqueMethodInterceptor = intercept.method<string>({
 		} as typeof original,
 });
 
+// Stage-3 application order: each wrapper closes over a unique creation index.
+// Decoration runs bottom-up, so the inner decorator builds wrapper #1 first,
+// the outer builds wrapper #2 second. At call time the outermost (last-built,
+// id=2) fires before the innermost (first-built, id=1).
+let listMethodWrapperCounter = 0;
 const ListMethodInterceptor = intercept.method.list<string>({
-	intercept: (original, readMetadata) =>
-		function (this: unknown, ...args: unknown[]) {
-			listMethodInterceptCalls.push(readMetadata(this as object));
+	intercept: (original, readMetadata) => {
+		listMethodWrapperCounter += 1;
+		const wrapperId = listMethodWrapperCounter;
+		return function (this: unknown, ...args: unknown[]) {
+			listMethodCallOrder.push(`wrapper-${wrapperId}`);
+			listMethodMetaSeen.push(readMetadata(this as object));
 			return original.call(this, ...args);
-		} as typeof original,
+		} as typeof original;
+	},
 });
 
 // accessor interceptors
 const accessorInterceptGetCalls: string[] = [];
-const listAccessorGetCalls: string[][] = [];
-const listAccessorSetCalls: string[][] = [];
+const listAccessorGetOrder: string[] = [];
+const listAccessorSetOrder: string[] = [];
+const listAccessorGetMetaSeen: string[][] = [];
+const listAccessorSetMetaSeen: string[][] = [];
 
 const UniqueAccessorInterceptor = intercept.accessor<string, [string], number>({
 	onGet: (original, readMetadata) =>
@@ -57,17 +72,29 @@ const UniqueAccessorInterceptor = intercept.accessor<string, [string], number>({
 		},
 });
 
+// Tag each wrapper with a unique id captured at decoration time (same pattern as
+// ListMethodInterceptor) so positional call-order assertions prove outermost-first.
+let listAccessorGetWrapperCounter = 0;
+let listAccessorSetWrapperCounter = 0;
 const ListAccessorInterceptor = intercept.accessor.list<string, [string], number>({
-	onGet: (original, readMetadata) =>
-		function (this: unknown) {
-			listAccessorGetCalls.push(readMetadata(this as object));
+	onGet: (original, readMetadata) => {
+		listAccessorGetWrapperCounter += 1;
+		const wrapperId = listAccessorGetWrapperCounter;
+		return function (this: unknown) {
+			listAccessorGetOrder.push(`get-wrapper-${wrapperId}`);
+			listAccessorGetMetaSeen.push(readMetadata(this as object));
 			return original.call(this);
-		},
-	onSet: (original, readMetadata) =>
-		function (this: unknown, v: number) {
-			listAccessorSetCalls.push(readMetadata(this as object));
+		};
+	},
+	onSet: (original, readMetadata) => {
+		listAccessorSetWrapperCounter += 1;
+		const wrapperId = listAccessorSetWrapperCounter;
+		return function (this: unknown, v: number) {
+			listAccessorSetOrder.push(`set-wrapper-${wrapperId}`);
+			listAccessorSetMetaSeen.push(readMetadata(this as object));
 			original.call(this, v);
-		},
+		};
+	},
 });
 
 // ── Fixture class ─────────────────────────────────────────────────────────────
@@ -300,6 +327,28 @@ describe("mixed-cardinality integration", () => {
 			expect(classEntry).toBeDefined();
 			expect(Array.isArray(classEntry?.metadata)).toBe(true);
 		});
+
+		it("unique property key all() returns one property item with scalar metadata", () => {
+			const items = r.all(UniquePropertyMeta.key);
+			// Only fieldC carries the unique property key; class / methods do not.
+			expect(items).toHaveLength(1);
+			const propertyEntry = items[0];
+			expect(propertyEntry?.kind).toBe("property");
+			expect(propertyEntry?.metadata).toBe("property-C");
+			expect(Array.isArray(propertyEntry?.metadata)).toBe(false);
+		});
+
+		it("list property key all() returns one property item with array metadata in Stage-3 order", () => {
+			const items = r.all(ListPropertyMeta.key);
+			// Only fieldD carries the list property key.
+			expect(items).toHaveLength(1);
+			const propertyEntry = items[0];
+			expect(propertyEntry?.kind).toBe("property");
+			expect(Array.isArray(propertyEntry?.metadata)).toBe(true);
+			expect(propertyEntry?.metadata).toHaveLength(2);
+			// Stage-3 inner-first application order.
+			expect(propertyEntry?.metadata).toEqual(["property-D-inner", "property-D-outer"]);
+		});
 	});
 
 	describe("interceptor runtime behaviour", () => {
@@ -310,22 +359,28 @@ describe("mixed-cardinality integration", () => {
 		});
 
 		it("list method interceptor: both wrappers run on member F invocation (outermost first)", () => {
-			listMethodInterceptCalls.length = 0;
+			listMethodCallOrder.length = 0;
+			listMethodMetaSeen.length = 0;
 			instance.memberF();
+
 			// Two wrappers ran
-			expect(listMethodInterceptCalls).toHaveLength(2);
-			// Outer wrapper fires first at call time (Stage-3 application order: inner wraps first → outermost runs first)
-			const firstBatch = listMethodInterceptCalls[0];
-			const secondBatch = listMethodInterceptCalls[1];
-			// Both wrappers share the same key; readMetadata returns the full list
-			expect(firstBatch).toEqual(["intercept-F-inner", "intercept-F-outer"]);
-			expect(secondBatch).toEqual(["intercept-F-inner", "intercept-F-outer"]);
+			expect(listMethodCallOrder).toHaveLength(2);
+
+			// Stage-3 application order: inner decorator runs first at definition time and
+			// builds wrapper #1; outer runs second and builds wrapper #2. At call time the
+			// outermost (last-built, id=2) fires first; innermost (id=1) fires last.
+			// Positional assertion fails if call order ever inverts.
+			expect(listMethodCallOrder[0]).toBe("wrapper-2");
+			expect(listMethodCallOrder[1]).toBe("wrapper-1");
 		});
 
 		it("list method interceptor: readMetadata inside each wrapper returns full list of length 2", () => {
-			listMethodInterceptCalls.length = 0;
+			listMethodCallOrder.length = 0;
+			listMethodMetaSeen.length = 0;
 			instance.memberF();
-			for (const seenMeta of listMethodInterceptCalls) {
+
+			expect(listMethodMetaSeen).toHaveLength(2);
+			for (const seenMeta of listMethodMetaSeen) {
 				expect(seenMeta).toHaveLength(2);
 				expect(seenMeta).toContain("intercept-F-inner");
 				expect(seenMeta).toContain("intercept-F-outer");
@@ -338,23 +393,36 @@ describe("mixed-cardinality integration", () => {
 			expect(accessorInterceptGetCalls).toContain("intercept-G");
 		});
 
-		it("list accessor interceptor: both getter wrappers run on accessorH get", () => {
-			listAccessorGetCalls.length = 0;
+		it("list accessor interceptor: both getter wrappers run on accessorH get (outermost first)", () => {
+			listAccessorGetOrder.length = 0;
+			listAccessorGetMetaSeen.length = 0;
 			const _read = instance.accessorH;
-			expect(listAccessorGetCalls).toHaveLength(2);
-			// Both see full list
-			for (const seenMeta of listAccessorGetCalls) {
+
+			expect(listAccessorGetOrder).toHaveLength(2);
+			// Stage-3: inner decorates first → wrapper #1; outer decorates second → wrapper #2.
+			// Outermost (id=2) fires first at call time.
+			expect(listAccessorGetOrder[0]).toBe("get-wrapper-2");
+			expect(listAccessorGetOrder[1]).toBe("get-wrapper-1");
+
+			// Each wrapper sees the full list
+			for (const seenMeta of listAccessorGetMetaSeen) {
 				expect(seenMeta).toHaveLength(2);
 				expect(seenMeta).toContain("intercept-H-inner");
 				expect(seenMeta).toContain("intercept-H-outer");
 			}
 		});
 
-		it("list accessor interceptor: both setter wrappers run on accessorH set", () => {
-			listAccessorSetCalls.length = 0;
+		it("list accessor interceptor: both setter wrappers run on accessorH set (outermost first)", () => {
+			listAccessorSetOrder.length = 0;
+			listAccessorSetMetaSeen.length = 0;
 			instance.accessorH = 99;
-			expect(listAccessorSetCalls).toHaveLength(2);
-			for (const seenMeta of listAccessorSetCalls) {
+
+			expect(listAccessorSetOrder).toHaveLength(2);
+			// Same Stage-3 ordering rule for setter wrappers.
+			expect(listAccessorSetOrder[0]).toBe("set-wrapper-2");
+			expect(listAccessorSetOrder[1]).toBe("set-wrapper-1");
+
+			for (const seenMeta of listAccessorSetMetaSeen) {
 				expect(seenMeta).toHaveLength(2);
 			}
 		});
