@@ -13,8 +13,6 @@ automatically from the key brand.
 
 - `unique` field on every `DecoratorOptions` variant (and the error path tied to
   `options.unique` mismatch).
-- `Deferred.unique`; the `unique` parameter on `appendClassMeta` /
-  `appendMemberMeta`.
 - `methodsScalar` / `propertiesScalar` on `ScopedReflector`.
 - `DecoratedMethodScalar` / `DecoratedPropertyScalar` exports.
 
@@ -58,3 +56,4 @@ automatically from the key brand.
 | `factory.reader(t).methodsScalar()` | `factory.reader(t).methods()` (returns `DecoratedMethodUnique<T>[]`) |
 | `factory.reader(t).propertiesScalar()` | `factory.reader(t).properties()` |
 | `import type { DecoratedMethodScalar }` | `import type { DecoratedMethodUnique }` |
+| `import type { DecoratedPropertyScalar }` | `import type { DecoratedPropertyUnique }` |
