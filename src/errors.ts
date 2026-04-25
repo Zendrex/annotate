@@ -4,9 +4,8 @@ import type { AnyConstructor, DecoratedKind } from "./reflector/types";
 
 /**
  * Domain codes for {@link AnnotateError#code}. Use these instead of matching
- * message strings. Several values map to a dedicated error class in this
- * module; `MISSING` and others are also used with a base `AnnotateError` from
- * factory helpers.
+ * message strings. Each value maps to a dedicated subclass of
+ * {@link AnnotateError} in this module.
  */
 export const AnnotateErrorCode = {
 	DUPLICATE: "duplicate",
@@ -92,6 +91,41 @@ export class DuplicateMetadataError extends AnnotateError {
 			target: ctor,
 			memberName,
 			message: `duplicate decoration: ${slot} already has metadata for this factory`,
+		});
+	}
+}
+
+/**
+ * Thrown by `firstOrThrow` read helpers when no metadata entry exists for the
+ * requested factory on a registered class or member. `code` is
+ * {@link AnnotateErrorCode.MISSING}.
+ */
+export class MissingMetadataError extends AnnotateError {
+	override readonly name: string = "MissingMetadataError";
+
+	/**
+	 * @param args.target - Class the read was performed on
+	 * @param args.key - Metadata key whose entry was missing
+	 * @param args.label - Decorator name shown in the message
+	 * @param args.kind - Decoration kind (class vs member)
+	 * @param args.memberName - Set for member-level reads; omit for class-level
+	 */
+	constructor(args: {
+		target: AnyConstructor;
+		key: MetadataKey;
+		label: string;
+		kind: DecoratedKind;
+		memberName?: string | symbol;
+	}) {
+		const className = targetDisplayName(args.target);
+		const slot = args.memberName === undefined ? className : `${className}.${String(args.memberName)}`;
+		super({
+			code: AnnotateErrorCode.MISSING,
+			key: args.key,
+			kind: args.kind,
+			memberName: args.memberName,
+			target: args.target,
+			message: `@${args.label} metadata missing on "${slot}"`,
 		});
 	}
 }

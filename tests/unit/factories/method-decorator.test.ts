@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { AnnotateError, decorate, UnregisteredClassError } from "../../../src";
+import { AnnotateError, decorate, MissingMetadataError, UnregisteredClassError } from "../../../src";
 
 describe("decorate.method", () => {
 	test("stores metadata on instance method after construction", () => {
@@ -69,7 +69,7 @@ describe("decorate.method", () => {
 		expect(() => Route.first(X, "anything")).toThrow(UnregisteredClassError);
 	});
 
-	test("firstOrThrow throws AnnotateError(missing) when class registered but member not decorated", () => {
+	test("firstOrThrow throws MissingMetadataError when class registered but member not decorated", () => {
 		const Route = decorate.method<string>({ name: "Route" });
 		const Other = decorate.method<string>({ name: "Other" });
 
@@ -80,6 +80,7 @@ describe("decorate.method", () => {
 		}
 
 		new X();
+		expect(() => Route.firstOrThrow(X, "absent")).toThrow(MissingMetadataError);
 		expect(() => Route.firstOrThrow(X, "absent")).toThrow(AnnotateError);
 		expect(() => Route.firstOrThrow(X, "absent")).not.toThrow(UnregisteredClassError);
 	});

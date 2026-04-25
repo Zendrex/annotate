@@ -13,6 +13,7 @@ export {
 	AnnotateErrorCode,
 	DuplicateMetadataError,
 	InvalidDecorationTargetError,
+	MissingMetadataError,
 	UnregisteredClassError,
 	ValidationError,
 } from "./errors";

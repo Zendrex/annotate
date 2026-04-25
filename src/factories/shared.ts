@@ -1,4 +1,4 @@
-import { AnnotateError, AnnotateErrorCode, UnregisteredClassError } from "../errors";
+import { MissingMetadataError, UnregisteredClassError } from "../errors";
 import {
 	collectClassMeta,
 	firstClassMetaForKey,
@@ -16,7 +16,6 @@ import {
 } from "../metadata/member-meta-store";
 import { registerCtor } from "../metadata/metadata-ctor-correlation";
 import { flushFor, queueDeferred } from "../metadata/metadata-deferred-queue";
-import { targetDisplayName } from "../reflector/class-name";
 import { resolveReflectTarget } from "../reflector/resolve-instance";
 import { createScopedReflector } from "../reflector/scoped-reflector";
 import { prepare } from "../runtime/prepare";
@@ -57,13 +56,7 @@ export function labelFor(name: string | undefined, key: MetadataKey): string {
  * Throws a structured "metadata missing" error for a class (used by `firstOrThrow` when no entry exists).
  */
 export function throwMissingClass(key: MetadataKey, ctor: AnyConstructor, label: string): never {
-	throw new AnnotateError({
-		key,
-		kind: "class",
-		code: AnnotateErrorCode.MISSING,
-		target: ctor,
-		message: `@${label} metadata missing on "${targetDisplayName(ctor)}"`,
-	});
+	throw new MissingMetadataError({ key, kind: "class", target: ctor, label });
 }
 
 /**
@@ -76,14 +69,7 @@ export function throwMissingMember(
 	member: string | symbol,
 	label: string
 ): never {
-	throw new AnnotateError({
-		key,
-		kind,
-		code: AnnotateErrorCode.MISSING,
-		target: ctor,
-		memberName: member,
-		message: `@${label} metadata missing on "${targetDisplayName(ctor)}.${String(member)}"`,
-	});
+	throw new MissingMetadataError({ key, kind, target: ctor, memberName: member, label });
 }
 
 /**

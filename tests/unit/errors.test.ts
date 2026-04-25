@@ -4,6 +4,7 @@ import {
 	AnnotateError,
 	AnnotateErrorCode,
 	InvalidDecorationTargetError,
+	MissingMetadataError,
 	UnregisteredClassError,
 	ValidationError,
 } from "../../src/errors";
@@ -25,6 +26,43 @@ describe("UnregisteredClassError", () => {
 		class X {}
 		const err = new UnregisteredClassError(X);
 		expect(err.message).toMatch(HINTS_PATTERN);
+	});
+});
+
+describe("MissingMetadataError", () => {
+	test("class-level message and inherited fields", () => {
+		class Subject {}
+		const err = new MissingMetadataError({
+			target: Subject,
+			key: KEY,
+			label: "Tag",
+			kind: "class",
+		});
+
+		expect(err).toBeInstanceOf(Error);
+		expect(err).toBeInstanceOf(AnnotateError);
+		expect(err).toBeInstanceOf(MissingMetadataError);
+		expect(err.name).toBe("MissingMetadataError");
+		expect(err.code).toBe(AnnotateErrorCode.MISSING);
+		expect(err.key).toBe(KEY);
+		expect(err.kind).toBe("class");
+		expect(err.target).toBe(Subject);
+		expect(err.memberName).toBeUndefined();
+		expect(err.message).toBe('@Tag metadata missing on "Subject"');
+	});
+
+	test("member-level message qualifies the slot with class.member", () => {
+		class Subject {}
+		const err = new MissingMetadataError({
+			target: Subject,
+			key: KEY,
+			label: "Column",
+			kind: "property",
+			memberName: "field",
+		});
+
+		expect(err.memberName).toBe("field");
+		expect(err.message).toBe('@Column metadata missing on "Subject.field"');
 	});
 });
 

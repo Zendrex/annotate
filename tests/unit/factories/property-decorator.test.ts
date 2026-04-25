@@ -1,6 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
-import { AnnotateError, DuplicateMetadataError, decorate, prepare, UnregisteredClassError } from "../../../src";
+import {
+	AnnotateError,
+	DuplicateMetadataError,
+	decorate,
+	MissingMetadataError,
+	prepare,
+	UnregisteredClassError,
+} from "../../../src";
 
 describe("decorate.property", () => {
 	test("captures metadata on a decorated field after construction", () => {
@@ -81,7 +88,7 @@ describe("decorate.property", () => {
 		expect(() => Column.first(X, "anything")).toThrow(UnregisteredClassError);
 	});
 
-	test("firstOrThrow throws AnnotateError(missing) when class registered but member not decorated", () => {
+	test("firstOrThrow throws MissingMetadataError when class registered but member not decorated", () => {
 		const Column = decorate.property<string>({ name: "Column" });
 		const Other = decorate.property<string>({ name: "Other" });
 
@@ -91,6 +98,7 @@ describe("decorate.property", () => {
 		}
 
 		new X();
+		expect(() => Column.firstOrThrow(X, "absent")).toThrow(MissingMetadataError);
 		expect(() => Column.firstOrThrow(X, "absent")).toThrow(AnnotateError);
 		expect(() => Column.firstOrThrow(X, "absent")).not.toThrow(UnregisteredClassError);
 	});

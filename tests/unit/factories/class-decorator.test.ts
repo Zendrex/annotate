@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { AnnotateError, decorate, UnregisteredClassError } from "../../../src";
+import { AnnotateError, decorate, MissingMetadataError, UnregisteredClassError } from "../../../src";
 
 describe("decorate.class", () => {
 	test("stores metadata via class decorator application", () => {
@@ -67,13 +67,14 @@ describe("decorate.class", () => {
 		expect(() => Tag.first(Bare)).toThrow(UnregisteredClassError);
 	});
 
-	test("firstOrThrow throws AnnotateError(missing) when class registered but factory not applied", () => {
+	test("firstOrThrow throws MissingMetadataError when class registered but factory not applied", () => {
 		const Tag = decorate.class<string>({ name: "Tag" });
 		const Other = decorate.class<string>({ name: "Other" });
 
 		@Other("o")
 		class X {}
 
+		expect(() => Tag.firstOrThrow(X)).toThrow(MissingMetadataError);
 		expect(() => Tag.firstOrThrow(X)).toThrow(AnnotateError);
 		expect(() => Tag.firstOrThrow(X)).not.toThrow(UnregisteredClassError);
 	});
