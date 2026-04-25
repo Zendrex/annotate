@@ -148,7 +148,7 @@ export function emitMemberDecoration<TMeta>(params: {
 		context.addInitializer(function (this: unknown) {
 			const ctor = this as Ctor;
 			// Validate, commit, then flush; flush drains sibling instance deferreds on the same bag.
-			if (validators && validators.length > 0) {
+			if (validators) {
 				runValidatorChain(validators, meta, {
 					target: ctor as AnyConstructor,
 					memberName,
@@ -172,7 +172,7 @@ export function emitMemberDecoration<TMeta>(params: {
 		static: false,
 		kind,
 	};
-	if (validators && validators.length > 0) {
+	if (validators) {
 		deferred.validators = asDeferredValidators(validators);
 	}
 	queueDeferred(correlation, deferred);
