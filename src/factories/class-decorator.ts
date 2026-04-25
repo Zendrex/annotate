@@ -1,31 +1,77 @@
-import { appendClassMeta, flushFor, registerCtor } from "../metadata/store";
-import { compose, createClassFactoryHelpers, generateKey, labelFor } from "./shared";
-import type { DecoratedClassFactory, DecoratorOptions } from "./types";
+import { appendClassMeta } from "../metadata/class-meta-store";
+import { registerCtor } from "../metadata/metadata-ctor-correlation";
+import { flushFor } from "../metadata/metadata-deferred-queue";
+import { compose, createClassFactoryHelpers, generateKey, labelFor, mergeExtendedOptions } from "./shared";
+import { buildValidatorChain, runValidatorChain } from "./validator-chain";
+import type { MetadataKey } from "../metadata/types";
+import type { AnyConstructor } from "../reflector/types";
+import type { DecoratedClassFactory, DecoratorOptions, DeriveOptions } from "./types";
 
 /**
- * Create a typed class decorator with reflection helpers pre-bound to a unique
- * metadata key. `TInstance` constrains the class the decorator may apply to —
- * narrowing it (e.g. to `Component`) rejects applications to classes whose
- * instances do not extend the bound at compile time.
+ * Returns a class decorator factory: each decorated class stores metadata under a
+ * generated key, runs optional `validate` / `requireInstanceOf` (see {@link buildClassFactory}),
+ * and wires the constructor into the reflector (`registerCtor` + `flushFor` after
+ * `appendClassMeta`). Use `options.unique` to control duplicate application on the
+ * same class.
+ *
+ * @param options - Optional `name` (affects the key), `compose`, `validate`,
+ *   `requireInstanceOf`, and `unique`.
  */
 export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta], TInstance = unknown>(
 	options?: DecoratorOptions<TMeta, TArgs>
 ): DecoratedClassFactory<TMeta, TArgs, TInstance> {
 	const key = generateKey(options?.name);
+	return buildClassFactory<TMeta, TArgs, TInstance>(key, options);
+}
+
+/**
+ * Builds a {@link createClassDecorator}-style factory for a fixed metadata key, merging
+ * `options` the same way as the public entrypoint. The returned callable composes
+ * `TMeta` from decorator arguments (identity tuple by default, or `options.compose`),
+ * runs the validator chain if configured, then appends class-level metadata. When
+ * `unique` is set, the store enforces a single value per class for this key. After
+ * metadata is written, the constructor is registered on decorator context metadata
+ * and deferred reflector work is flushed so `reader` / scoped APIs stay consistent.
+ *
+ * The object also exposes `key`, `reader`, `first`, `has`, `all`, and `derive`
+ * (child options merged via `mergeExtendedOptions` while preserving the key).
+ *
+ * @param key - Metadata key this factory reads and writes.
+ * @param options - Optional compose/validation/uniqueness and display `name` for labels.
+ */
+export function buildClassFactory<TMeta, TArgs extends unknown[], TInstance>(
+	key: MetadataKey,
+	options: DecoratorOptions<TMeta, TArgs> | undefined
+): DecoratedClassFactory<TMeta, TArgs, TInstance> {
 	const { compose: composeFn, name, unique = false } = options ?? {};
 	const label = labelFor(name, key);
+	const validators = buildValidatorChain<TMeta>(options, label, key);
 
 	const decoratorFn =
 		(...args: TArgs) =>
 		// biome-ignore lint/suspicious/noExplicitAny: structural Stage-3 generic
 		<T extends abstract new (...a: any[]) => TInstance>(value: T, context: ClassDecoratorContext<T>): void => {
-			appendClassMeta(value, key, compose(args, composeFn), { unique });
+			const meta = compose(args, composeFn);
+			if (validators) {
+				runValidatorChain(validators, meta, {
+					target: value as unknown as AnyConstructor,
+					kind: "class",
+					static: false,
+				});
+			}
+			appendClassMeta(value, key, meta, { unique });
 			registerCtor(value, context.metadata);
 			flushFor(value, context.metadata);
 		};
 
+	const derive = <TNewInstance = TInstance>(
+		childOptions?: DeriveOptions<TMeta, TArgs>
+	): DecoratedClassFactory<TMeta, TArgs, TNewInstance> =>
+		buildClassFactory<TMeta, TArgs, TNewInstance>(key, mergeExtendedOptions(options, childOptions));
+
 	return Object.assign(decoratorFn, {
 		key,
 		...createClassFactoryHelpers<TMeta>(key, label),
+		derive,
 	}) as DecoratedClassFactory<TMeta, TArgs, TInstance>;
 }

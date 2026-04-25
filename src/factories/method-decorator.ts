@@ -1,39 +1,114 @@
-import { compose, createMemberFactoryHelpers, emitMemberDecoration, generateKey, labelFor } from "./shared";
-import type { AnyFn, DecoratedMethodFactory, DecoratorOptions } from "./types";
+import {
+	compose,
+	createMemberFactoryHelpers,
+	createMemberMetadataReader,
+	emitMemberDecoration,
+	generateKey,
+	labelFor,
+	mergeExtendedOptions,
+} from "./shared";
+import { buildValidatorChain } from "./validator-chain";
+import type { MetadataKey } from "../metadata/types";
+import type { AnyFn, DecoratedMethodFactory, DecoratorOptions, DeriveOptions, InterceptorContext } from "./types";
 
 /**
- * Create a typed method decorator that records metadata without replacing the
- * method body. `TMethod` constrains the method signature the decorator may
- * apply to — narrowing it rejects applications to methods with incompatible
- * shapes at compile time.
- *
- * Applies to both instance and static methods. Instance applications register
- * lazily on first instantiation; static applications register at class-body
- * evaluation and drain the pending buffer.
+ * Optional hooks for a method factory built with {@link buildMethodFactory}. When
+ * `intercept` is supplied, the method decorator may return a replacement function;
+ * the hook receives the original method, a reader over existing metadata for that
+ * member, and an {@link InterceptorContext} (name, static flag, `kind: "method"`).
  */
-export function createMethodDecorator<TMeta, TArgs extends unknown[] = [TMeta], TMethod extends AnyFn = AnyFn>(
-	options?: DecoratorOptions<TMeta, TArgs>
-): DecoratedMethodFactory<TMeta, TArgs, TMethod> {
+export interface MethodHookRefs<TMeta, TMethod extends AnyFn> {
+	intercept: (original: TMethod, readMetadata: (instance: object) => TMeta[], context: InterceptorContext) => TMethod;
+}
+
+/**
+ * Returns a method decorator factory. Metadata is written through
+ * `emitMemberDecoration` with the same key, validation, and `unique` behavior as
+ * other member factories: composed `TMeta` is stored and optionally validated;
+ * `unique` controls duplicate application for that member. When advanced wiring
+ * is needed, {@link buildMethodFactory} accepts {@link MethodHookRefs} for
+ * intercept-based replacement and a distinct internal decoration token.
+ *
+ * @param options - Optional `name`, `compose`, `validate`, `requireInstanceOf`, `unique`.
+ */
+export function createMethodDecorator<
+	TMeta,
+	TArgs extends unknown[] = [TMeta],
+	TMethod extends AnyFn = AnyFn,
+	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
+	TThis = any,
+>(options?: DecoratorOptions<TMeta, TArgs>): DecoratedMethodFactory<TMeta, TArgs, TMethod, TThis> {
 	const key = generateKey(options?.name);
+	return buildMethodFactory<TMeta, TArgs, TMethod, TThis>(key, options);
+}
+
+/**
+ * Core implementation shared with {@link createMethodDecorator} and (with
+ * `hookRefs`) other builds. Composes `TMeta` from args, then schedules member
+ * metadata via `emitMemberDecoration` (class initialization callback path), applying
+ * validators and honoring `unique`. If `hookRefs.intercept` is set, it runs first
+ * and the return value, if any, becomes the new method; metadata emission still
+ * uses a stable token so storage stays aligned with the non-intercept path. The
+ * returned object includes `key`, reader helpers, and `derive` (reuses
+ * `hookRefs` and merges child options; see inline note on `TNewMethod` narrowing).
+ *
+ * @param key - Fixed metadata key for this family of decorators.
+ * @param options - Factory options; merged into derived factories by `derive`.
+ * @param hookRefs - When present, enables intercept-based method replacement
+ *   while metadata is still recorded for the member.
+ */
+export function buildMethodFactory<TMeta, TArgs extends unknown[], TMethod extends AnyFn, TThis>(
+	key: MetadataKey,
+	options: DecoratorOptions<TMeta, TArgs> | undefined,
+	hookRefs?: MethodHookRefs<TMeta, TMethod>
+): DecoratedMethodFactory<TMeta, TArgs, TMethod, TThis> {
 	const { compose: composeFn, name, unique = false } = options ?? {};
 	const label = labelFor(name, key);
+	const validators = buildValidatorChain<TMeta>(options, label, key);
+	const intercept = hookRefs?.intercept;
 
 	const decoratorFn =
 		(...args: TArgs) =>
-		// biome-ignore lint/suspicious/noExplicitAny: EA-3 — ClassMethodDecoratorContext's This generic must default to `any` so typed `this:` on methods type-checks
-		(_value: TMethod, context: ClassMethodDecoratorContext<any, TMethod>): void => {
+		(value: TMethod, context: ClassMethodDecoratorContext<TThis, TMethod>): TMethod | undefined => {
+			let replacement: TMethod | undefined;
+			if (intercept) {
+				const interceptorContext: InterceptorContext = {
+					name: context.name,
+					static: context.static,
+					kind: "method",
+				};
+				replacement = intercept(
+					value,
+					createMemberMetadataReader<TMeta>(key, context.name, context.static),
+					interceptorContext
+				);
+			}
+
 			emitMemberDecoration({
 				context,
 				key,
 				kind: "method",
 				meta: compose(args, composeFn),
-				token: Symbol("methodDecoration"),
+				token: Symbol(intercept ? "methodIntercept" : "methodDecoration"),
 				unique,
+				validators,
 			});
+
+			return replacement;
 		};
+
+	const derive = <TNewMethod extends AnyFn = TMethod, TNewThis = TThis>(
+		childOptions?: DeriveOptions<TMeta, TArgs>
+	): DecoratedMethodFactory<TMeta, TArgs, TNewMethod, TNewThis> =>
+		buildMethodFactory<TMeta, TArgs, TNewMethod, TNewThis>(
+			key,
+			mergeExtendedOptions(options, childOptions),
+			hookRefs as MethodHookRefs<TMeta, TNewMethod> | undefined
+		);
 
 	return Object.assign(decoratorFn, {
 		key,
 		...createMemberFactoryHelpers<TMeta>(key, "method", label),
-	}) as DecoratedMethodFactory<TMeta, TArgs, TMethod>;
+		derive,
+	}) as DecoratedMethodFactory<TMeta, TArgs, TMethod, TThis>;
 }

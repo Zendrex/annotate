@@ -1,11 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
-// Temporary: importing directly until Phase M1 consolidates all factory exports into src/index.ts.
-import { createAccessorInterceptor } from "../../../src/factories/accessor-interceptor";
+import { intercept } from "../../../src";
 
-describe("createAccessorInterceptor (Stage-3)", () => {
+describe("intercept.accessor", () => {
 	test("intercepts accessor getter and records metadata", () => {
-		const Trace = createAccessorInterceptor<string, [string], string>({
+		const Trace = intercept.accessor<string, [string], string>({
 			onGet: (original, readMetadata) =>
 				function (this: unknown) {
 					const meta = readMetadata(this as object);
@@ -20,12 +19,12 @@ describe("createAccessorInterceptor (Stage-3)", () => {
 
 		const b = new Box();
 		expect(b.value).toBe("[a]:v");
-		expect(Trace.metadata(Box, "value")).toBe("a");
+		expect(Trace.first(Box, "value")).toBe("a");
 	});
 
 	test("intercepts setter side", () => {
 		const observed: string[] = [];
-		const Watch = createAccessorInterceptor<string, [string], string>({
+		const Watch = intercept.accessor<string, [string], string>({
 			onSet: (original) =>
 				function (this: unknown, v: string) {
 					observed.push(v);
@@ -44,11 +43,11 @@ describe("createAccessorInterceptor (Stage-3)", () => {
 	});
 
 	test("throws when neither onGet nor onSet provided", () => {
-		expect(() => createAccessorInterceptor({} as never)).toThrow(TypeError);
+		expect(() => intercept.accessor({} as never)).toThrow(TypeError);
 	});
 
 	test("ancestor-merged metadata visible in onGet at call-time", () => {
-		const Layer = createAccessorInterceptor<string, [string], number>({
+		const Layer = intercept.accessor<string, [string], number>({
 			onGet: (original, readMetadata) =>
 				function (this: unknown) {
 					const meta = readMetadata(this as object);
@@ -72,7 +71,7 @@ describe("createAccessorInterceptor (Stage-3)", () => {
 	// .properties(), not .methods(), because auto-accessor get/set pairs
 	// previously fooled the descriptor-based classifier.
 	test("accessor appears in reflect().properties(), not .methods()", () => {
-		const Tag = createAccessorInterceptor<string, [string], number>({
+		const Tag = intercept.accessor<string, [string], number>({
 			onGet: (original) =>
 				function (this: unknown) {
 					return original.call(this);
@@ -85,8 +84,8 @@ describe("createAccessorInterceptor (Stage-3)", () => {
 		}
 
 		new Box();
-		const props = Tag.reflect(Box).properties();
-		const methods = Tag.reflect(Box).methods();
+		const props = Tag.reader(Box).properties();
+		const methods = Tag.reader(Box).methods();
 		expect(props).toHaveLength(1);
 		expect(methods).toHaveLength(0);
 		expect(props[0]?.name).toBe("x");

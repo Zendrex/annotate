@@ -1,5 +1,5 @@
-import { createClassDecorator, createMethodDecorator, createPropertyDecorator } from "../../src";
+import { decorate } from "../../src";
 
-export const ClassTag = createClassDecorator<string>();
-export const MethodRoute = createMethodDecorator<string>();
-export const PropertyColumn = createPropertyDecorator<string>();
+export const ClassTag = decorate.class<string>();
+export const MethodRoute = decorate.method<string>();
+export const PropertyColumn = decorate.property<string>();

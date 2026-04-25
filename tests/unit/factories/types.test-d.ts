@@ -1,20 +1,15 @@
 /** biome-ignore-all lint/suspicious/noEmptyBlockStatements: test file */
 /** biome-ignore-all lint/complexity/noVoid: discard class reference to avoid unused-variable warning in test */
 /** biome-ignore-all lint/suspicious/useAwait: async keyword is the constraint under test — no real await needed */
-import {
-	createAccessorInterceptor,
-	createClassDecorator,
-	createMethodDecorator,
-	createPropertyDecorator,
-} from "../../../src";
+import { decorate, intercept } from "../../../src";
 
 interface Meta {
 	v: string;
 }
 
-// --- createPropertyDecorator type constraints ---
+// --- decorate.property type constraints ---
 
-const NumberField = createPropertyDecorator<Meta, [Meta], number>();
+const NumberField = decorate.property<Meta, [Meta], number>();
 
 class P_AcceptNumber {
 	@NumberField({ v: "v" })
@@ -70,7 +65,7 @@ class Animal {
 class Dog extends Animal {
 	bark(): void {}
 }
-const DogField = createPropertyDecorator<Meta, [Meta], Dog>();
+const DogField = decorate.property<Meta, [Meta], Dog>();
 
 class P_RejectSupertype {
 	// @ts-expect-error: Dog-bound rejects Animal supertype
@@ -79,19 +74,19 @@ class P_RejectSupertype {
 }
 void P_RejectSupertype;
 
-const PermissiveField = createPropertyDecorator<Meta>();
+const PermissiveField = decorate.property<Meta>();
 class P_PermissiveAccepts {
 	@PermissiveField({ v: "v" })
 	whatever!: { complex: { type: () => boolean } };
 }
 void P_PermissiveAccepts;
 
-// --- createClassDecorator type constraints ---
+// --- decorate.class type constraints ---
 
 class Component {
 	render(): void {}
 }
-const Cmp = createClassDecorator<Meta, [Meta], Component>();
+const Cmp = decorate.class<Meta, [Meta], Component>();
 
 @Cmp({ v: "v" })
 class C_Ok extends Component {}
@@ -102,9 +97,9 @@ void C_Ok;
 class C_NotComponent {}
 void C_NotComponent;
 
-// --- createMethodDecorator type constraints ---
+// --- decorate.method type constraints ---
 
-const AsyncOnly = createMethodDecorator<Meta, [Meta], (...a: unknown[]) => Promise<unknown>>();
+const AsyncOnly = decorate.method<Meta, [Meta], (...a: unknown[]) => Promise<unknown>>();
 
 class M_AsyncOk {
 	@AsyncOnly({ v: "v" })
@@ -121,9 +116,9 @@ class M_RejectSync {
 }
 void M_RejectSync;
 
-// --- createAccessorInterceptor: rejects plain field application ---
+// --- intercept.accessor: rejects plain field application ---
 
-const Acc = createAccessorInterceptor<Meta, [Meta], number>({
+const Acc = intercept.accessor<Meta, [Meta], number>({
 	onGet: (original) => original,
 });
 

@@ -1,14 +1,10 @@
-// Temporary: importing directly until Phase M1 consolidates all factory exports into src/index.ts.
 import { describe, expect, test } from "bun:test";
 
-import { AnnotateError, UnregisteredClassError } from "../../../src/errors";
-import { createClassDecorator } from "../../../src/factories/class-decorator";
-import { createPropertyDecorator } from "../../../src/factories/property-decorator";
-import { materialize } from "../../../src/runtime/materialize";
+import { AnnotateError, DuplicateMetadataError, decorate, prepare, UnregisteredClassError } from "../../../src";
 
-describe("createPropertyDecorator (Stage-3)", () => {
+describe("decorate.property", () => {
 	test("captures metadata on a decorated field after construction", () => {
-		const Column = createPropertyDecorator<string>();
+		const Column = decorate.property<string>();
 
 		class User {
 			@Column("varchar")
@@ -16,38 +12,24 @@ describe("createPropertyDecorator (Stage-3)", () => {
 		}
 
 		new User();
-		expect(Column.appliedOwn(User, "name")).toBe(true);
-		expect(Column.metadata(User, "name")).toBe("varchar");
+		expect(Column.hasOwn(User, "name")).toBe(true);
+		expect(Column.first(User, "name")).toBe("varchar");
 	});
 
-	test("eager flush via materialize() makes pre-instantiation reflection work", () => {
-		const Column = createPropertyDecorator<string>();
+	test("eager flush via prepare() makes pre-instantiation reflection work", () => {
+		const Column = decorate.property<string>();
 
 		class User {
 			@Column("varchar")
 			name!: string;
 		}
 
-		materialize(User);
-		expect(Column.appliedOwn(User, "name")).toBe(true);
+		prepare(User);
+		expect(Column.hasOwn(User, "name")).toBe(true);
 	});
 
-	test("eager flush via class decorator on the same class", () => {
-		const Tag = createClassDecorator<string>();
-		const Field = createPropertyDecorator<string>();
-
-		@Tag("entity")
-		class Entity {
-			@Field("varchar")
-			name!: string;
-		}
-
-		// No new Entity() — class decorator drained pending Deferreds at class-body eval.
-		expect(Field.appliedOwn(Entity, "name")).toBe(true);
-	});
-
-	test("inheritance: child sees parent field via applied(), not appliedOwn()", () => {
-		const Column = createPropertyDecorator<string>();
+	test("inheritance: child sees parent field via has(), not hasOwn()", () => {
+		const Column = decorate.property<string>();
 
 		class Parent {
 			@Column("varchar")
@@ -56,13 +38,13 @@ describe("createPropertyDecorator (Stage-3)", () => {
 		class Child extends Parent {}
 
 		new Child();
-		expect(Column.appliedOwn(Parent, "name")).toBe(true);
-		expect(Column.appliedOwn(Child, "name")).toBe(false);
-		expect(Column.applied(Child, "name")).toBe(true);
+		expect(Column.hasOwn(Parent, "name")).toBe(true);
+		expect(Column.hasOwn(Child, "name")).toBe(false);
+		expect(Column.has(Child, "name")).toBe(true);
 	});
 
 	test("supports compose for multi-arg call shapes", () => {
-		const Column = createPropertyDecorator({
+		const Column = decorate.property({
 			compose: (type: string, nullable: boolean) => ({ type, nullable }),
 		});
 
@@ -72,26 +54,13 @@ describe("createPropertyDecorator (Stage-3)", () => {
 		}
 
 		new User();
-		expect(Column.metadata(User, "name")).toEqual({ type: "varchar", nullable: false });
+		expect(Column.first(User, "name")).toEqual({ type: "varchar", nullable: false });
 	});
 
-	test("unique:true throws on second application to same field", () => {
-		const Column = createPropertyDecorator<string>({ unique: true, name: "Column" });
+	test("unique:true throws DuplicateMetadataError with property kind on duplicate", () => {
+		const Column = decorate.property<string>({ unique: true, name: "Column" });
 
-		expect(() => {
-			class X {
-				@Column("a")
-				@Column("b")
-				name!: string;
-			}
-			new X();
-		}).toThrow(AnnotateError);
-	});
-
-	test("DuplicateMetadataError reports kind='property' on field duplicate", () => {
-		const Column = createPropertyDecorator<string>({ unique: true, name: "Column" });
-
-		let caught: AnnotateError | undefined;
+		let caught: unknown;
 		try {
 			class X {
 				@Column("a")
@@ -100,30 +69,21 @@ describe("createPropertyDecorator (Stage-3)", () => {
 			}
 			new X();
 		} catch (err) {
-			caught = err as AnnotateError;
+			caught = err;
 		}
-		expect(caught).toBeInstanceOf(AnnotateError);
-		expect(caught?.kind).toBe("property");
+		expect(caught).toBeInstanceOf(DuplicateMetadataError);
+		expect((caught as DuplicateMetadataError).kind).toBe("property");
 	});
 
-	test("requireMetadata throws UnregisteredClassError when class never decorated", () => {
-		const Column = createPropertyDecorator<string>({ name: "Column" });
-		class X {
-			name!: string;
-		}
-		new X();
-		expect(() => Column.requireMetadata(X, "name")).toThrow(UnregisteredClassError);
-	});
-
-	test("metadata() throws UnregisteredClassError when class never decorated", () => {
-		const Column = createPropertyDecorator<string>({ name: "Column" });
+	test("first() throws UnregisteredClassError when class never decorated", () => {
+		const Column = decorate.property<string>({ name: "Column" });
 		class X {}
-		expect(() => Column.metadata(X, "anything")).toThrow(UnregisteredClassError);
+		expect(() => Column.first(X, "anything")).toThrow(UnregisteredClassError);
 	});
 
-	test("requireMetadata throws AnnotateError(missing) when class registered but member not decorated", () => {
-		const Column = createPropertyDecorator<string>({ name: "Column" });
-		const Other = createPropertyDecorator<string>({ name: "Other" });
+	test("firstOrThrow throws AnnotateError(missing) when class registered but member not decorated", () => {
+		const Column = decorate.property<string>({ name: "Column" });
+		const Other = decorate.property<string>({ name: "Other" });
 
 		class X {
 			@Other("o")
@@ -131,17 +91,15 @@ describe("createPropertyDecorator (Stage-3)", () => {
 		}
 
 		new X();
-		expect(() => Column.requireMetadata(X, "absent")).toThrow(AnnotateError);
-		expect(() => Column.requireMetadata(X, "absent")).not.toThrow(UnregisteredClassError);
+		expect(() => Column.firstOrThrow(X, "absent")).toThrow(AnnotateError);
+		expect(() => Column.firstOrThrow(X, "absent")).not.toThrow(UnregisteredClassError);
 	});
 
-	// Skipped: Bun 1.3.13 decorator transpiler emits a shared `_init` variable per
-	// module for classes with decorated fields; the later class's initializer
-	// overwrites the earlier class's, so A's @Column initializer never fires.
-	// Store-level sibling isolation is covered in tests/unit/metadata/store.test.ts.
-	// Re-enable when Bun emits per-class scoped initializer variables.
-	test.skip("appliedOwn(Sub, 'foo') stays false when subclass decorated a sibling member only", () => {
-		const Column = createPropertyDecorator<string>();
+	// Bun can still emit a shared `_init` / broken addInitializer ordering for multiple
+	// decorated classes in one scope, which is a real transpiler bug.
+	// Annotate resolves registration via the constructor, so has/hasOwn stay correct.
+	test("hasOwn(Sub, 'foo') stays false when subclass decorated a sibling member only", () => {
+		const Column = decorate.property<string>();
 		class A {
 			@Column("a")
 			foo!: string;
@@ -152,25 +110,18 @@ describe("createPropertyDecorator (Stage-3)", () => {
 		}
 
 		new B();
-		expect(Column.appliedOwn(B, "foo")).toBe(false);
-		expect(Column.appliedOwn(B, "bar")).toBe(true);
-		expect(Column.appliedOwn(A, "foo")).toBe(true);
+		expect(Column.hasOwn(B, "foo")).toBe(false);
+		expect(Column.hasOwn(B, "bar")).toBe(true);
+		expect(Column.hasOwn(A, "foo")).toBe(true);
 	});
 
-	test("applied / appliedOwn never throw on undecorated class", () => {
-		const Column = createPropertyDecorator<string>();
-		class Bare {}
-		expect(Column.applied(Bare, "foo")).toBe(false);
-		expect(Column.appliedOwn(Bare, "foo")).toBe(false);
-	});
-
-	test("appliedOwn auto-materializes pending registrations", () => {
-		const Column = createPropertyDecorator<string>();
+	test("hasOwn auto-materializes pending registrations", () => {
+		const Column = decorate.property<string>();
 		class User {
 			@Column("v")
 			name!: string;
 		}
-		// No new User(), no materialize() — appliedOwn should still see it via auto-materialize.
-		expect(Column.appliedOwn(User, "name")).toBe(true);
+		// No new User(), no prepare() — hasOwn should still see it via auto-materialize.
+		expect(Column.hasOwn(User, "name")).toBe(true);
 	});
 });

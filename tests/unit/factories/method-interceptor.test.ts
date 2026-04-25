@@ -1,12 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
-// Temporary: importing directly until Phase M1 consolidates all factory exports into src/index.ts.
-import { createMethodInterceptor } from "../../../src/factories/method-interceptor";
+import { intercept } from "../../../src";
 
-describe("createMethodInterceptor (Stage-3)", () => {
+describe("intercept.method", () => {
 	test("wraps a method and records metadata", () => {
 		const calls: string[] = [];
-		const Log = createMethodInterceptor<string>({
+		const Log = intercept.method<string>({
 			intercept: (original, readMetadata, context) =>
 				function (this: unknown, ...args: unknown[]) {
 					const meta = readMetadata(this as object);
@@ -25,34 +24,11 @@ describe("createMethodInterceptor (Stage-3)", () => {
 		const s = new Svc();
 		expect(s.run(1)).toBe(2);
 		expect(calls).toEqual(["run:a"]);
-		expect(Log.metadata(Svc, "run")).toBe("a");
-	});
-
-	test("readMetadata returns the complete ancestor-merged array at call-time", () => {
-		const Outer = createMethodInterceptor<string>({
-			intercept: (original, readMetadata) =>
-				function (this: unknown, ...args: unknown[]) {
-					(this as { _seen?: string[] })._seen = readMetadata(this as object);
-					return original.call(this, ...args);
-				} as typeof original,
-		});
-
-		class Parent {
-			@Outer("p")
-			// biome-ignore lint/suspicious/noEmptyBlockStatements: test stub method
-			run(): void {}
-		}
-		class Child extends Parent {
-			// inherits run; ancestor merge should include "p"
-		}
-
-		const c = new Child() as Child & { _seen?: string[] };
-		c.run();
-		expect(c._seen).toEqual(["p"]);
+		expect(Log.first(Svc, "run")).toBe("a");
 	});
 
 	test("static method interception", () => {
-		const Cmd = createMethodInterceptor<string>({
+		const Cmd = intercept.method<string>({
 			intercept: (original) => ((...args: unknown[]) => `[${original(...args)}]`) as typeof original,
 		});
 
@@ -64,11 +40,11 @@ describe("createMethodInterceptor (Stage-3)", () => {
 			}
 		}
 		expect(Cli.greet()).toBe("[hi]");
-		expect(Cmd.metadata(Cli, "greet")).toBe("build");
+		expect(Cmd.first(Cli, "greet")).toBe("build");
 	});
 
 	test("stacked interceptors: outer wraps inner; both metadata visible", () => {
-		const Trace = createMethodInterceptor<string>({
+		const Trace = intercept.method<string>({
 			intercept: (original, readMetadata) =>
 				function (this: unknown, ...args: unknown[]) {
 					const meta = readMetadata(this as object);

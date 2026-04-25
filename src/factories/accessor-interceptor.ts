@@ -5,43 +5,82 @@ import {
 	emitMemberDecoration,
 	generateKey,
 	labelFor,
+	mergeExtendedOptions,
 } from "./shared";
-import type { AccessorInterceptorOptions, DecoratedAccessorFactory, InterceptorContext } from "./types";
+import { buildValidatorChain } from "./validator-chain";
+import type { MetadataKey } from "../metadata/types";
+import type {
+	AccessorInterceptorOptions,
+	DecoratedAccessorFactory,
+	DecoratorOptions,
+	DeriveOptions,
+	InterceptorContext,
+} from "./types";
 
 /**
- * Create an accessor (get/set) interceptor. Supply `onGet`, `onSet`, or both;
- * calling with neither throws a `TypeError`. Each hook receives a
- * `readMetadata` reader that, when called at invocation time, returns the
- * full ancestor-merged metadata array for the decorated member.
- *
- * `TValue` constrains the accessor's declared type — narrowing it (e.g.
- * `number`) rejects applications to accessors with incompatible types at
- * compile time.
- *
- * Applies to both instance and static accessors. For instance accessors the
- * metadata registers lazily on first instantiation; static applications
- * register at class-body evaluation and drain the pending buffer.
+ * Hook implementations passed into {@link buildAccessorFactory}. Separated from
+ * {@link AccessorInterceptorOptions} so the factory can be built with stable
+ * references for `derive` reuse.
  */
-export function createAccessorInterceptor<TMeta, TArgs extends unknown[] = [TMeta], TValue = unknown>(
-	options: AccessorInterceptorOptions<TMeta, TArgs, TValue>
-): DecoratedAccessorFactory<TMeta, TArgs, TValue> {
+export interface AccessorHookRefs<TMeta, TValue> {
+	onGet?: (
+		original: () => TValue,
+		readMetadata: (instance: object) => TMeta[],
+		context: InterceptorContext
+	) => () => TValue;
+	onSet?: (
+		original: (value: TValue) => void,
+		readMetadata: (instance: object) => TMeta[],
+		context: InterceptorContext
+	) => (value: TValue) => void;
+}
+
+/**
+ * Like `intercept.method`, but for Stage 3 auto-accessors. Supply at least one of
+ * `onGet` or `onSet` to wrap the generated getter and/or setter.
+ *
+ * @throws {TypeError} If neither `onGet` nor `onSet` is provided.
+ */
+export function createAccessorInterceptor<
+	TMeta,
+	TArgs extends unknown[] = [TMeta],
+	TValue = unknown,
+	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
+	TThis = any,
+>(options: AccessorInterceptorOptions<TMeta, TArgs, TValue>): DecoratedAccessorFactory<TMeta, TArgs, TValue, TThis> {
 	if (!(options.onGet || options.onSet)) {
-		throw new TypeError("createAccessorInterceptor: provide at least one of onGet or onSet");
+		throw new TypeError("intercept.accessor: provide at least one of onGet or onSet");
 	}
 
 	const key = generateKey(options.name);
-	const { compose: composeFn, onGet, onSet, name, unique = false } = options;
+	const { onGet, onSet, ...rest } = options;
+	return buildAccessorFactory<TMeta, TArgs, TValue, TThis>(key, rest as DecoratorOptions<TMeta, TArgs>, {
+		onGet,
+		onSet,
+	});
+}
+
+/**
+ * Low-level accessor interceptor factory: emits metadata through the same path
+ * as `createAccessorInterceptor` but accepts a precomputed key and optional
+ * `derive` merging. Exposed for advanced composition; prefer `createAccessorInterceptor`.
+ */
+export function buildAccessorFactory<TMeta, TArgs extends unknown[], TValue, TThis>(
+	key: MetadataKey,
+	options: DecoratorOptions<TMeta, TArgs> | undefined,
+	hookRefs: AccessorHookRefs<TMeta, TValue>
+): DecoratedAccessorFactory<TMeta, TArgs, TValue, TThis> {
+	const { compose: composeFn, name, unique = false } = options ?? {};
 	const label = labelFor(name, key);
+	const validators = buildValidatorChain<TMeta>(options, label, key);
+	const { onGet, onSet } = hookRefs;
 
 	const decoratorFn =
 		(...args: TArgs) =>
 		(
-			// biome-ignore lint/suspicious/noExplicitAny: EA-3 — This defaults to any per lib.es2023.decorators.d.ts
-			value: ClassAccessorDecoratorTarget<any, TValue>,
-			// biome-ignore lint/suspicious/noExplicitAny: EA-3 — This defaults to any per lib.es2023.decorators.d.ts
-			context: ClassAccessorDecoratorContext<any, TValue>
-			// biome-ignore lint/suspicious/noExplicitAny: EA-3 — This defaults to any per lib.es2023.decorators.d.ts
-		): ClassAccessorDecoratorResult<any, TValue> => {
+			value: ClassAccessorDecoratorTarget<TThis, TValue>,
+			context: ClassAccessorDecoratorContext<TThis, TValue>
+		): ClassAccessorDecoratorResult<TThis, TValue> => {
 			const memberName = context.name;
 			const isStatic = context.static;
 
@@ -53,8 +92,7 @@ export function createAccessorInterceptor<TMeta, TArgs extends unknown[] = [TMet
 
 			const readMetadata = createMemberMetadataReader<TMeta>(key, memberName, isStatic);
 
-			// biome-ignore lint/suspicious/noExplicitAny: EA-3 — This defaults to any per lib.es2023.decorators.d.ts
-			const result: ClassAccessorDecoratorResult<any, TValue> = {};
+			const result: ClassAccessorDecoratorResult<TThis, TValue> = {};
 			if (onGet) {
 				result.get = onGet(value.get, readMetadata, interceptorContext);
 			}
@@ -65,18 +103,28 @@ export function createAccessorInterceptor<TMeta, TArgs extends unknown[] = [TMet
 			emitMemberDecoration({
 				context,
 				key,
-				// Auto-accessors classify as fields in the store (parity with reflector).
 				kind: "property",
 				meta: compose(args, composeFn),
 				token: Symbol("accessorIntercept"),
 				unique,
+				validators,
 			});
 
 			return result;
 		};
 
+	const derive = <TNewValue = TValue, TNewThis = TThis>(
+		childOptions?: DeriveOptions<TMeta, TArgs>
+	): DecoratedAccessorFactory<TMeta, TArgs, TNewValue, TNewThis> =>
+		buildAccessorFactory<TMeta, TArgs, TNewValue, TNewThis>(
+			key,
+			mergeExtendedOptions(options, childOptions),
+			hookRefs as unknown as AccessorHookRefs<TMeta, TNewValue>
+		);
+
 	return Object.assign(decoratorFn, {
 		key,
 		...createMemberFactoryHelpers<TMeta>(key, "property", label),
-	}) as DecoratedAccessorFactory<TMeta, TArgs, TValue>;
+		derive,
+	}) as DecoratedAccessorFactory<TMeta, TArgs, TValue, TThis>;
 }

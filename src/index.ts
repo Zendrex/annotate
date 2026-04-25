@@ -1,29 +1,65 @@
-/**
- * @packageDocumentation
- *
- * A TypeScript decorator factory library with metadata storage and reflection
- * capabilities, built on TC39 Stage-3 decorators.
- */
 /** biome-ignore-all lint/performance/noBarrelFile: main index file */
 
-export { AnnotateError, AnnotateErrorCode, DuplicateMetadataError, UnregisteredClassError } from "./errors";
-export { createAccessorInterceptor } from "./factories/accessor-interceptor";
-export { createClassDecorator } from "./factories/class-decorator";
-export { createMethodDecorator } from "./factories/method-decorator";
-export { createMethodInterceptor } from "./factories/method-interceptor";
-export { createPropertyDecorator } from "./factories/property-decorator";
+/**
+ * Public API for **@zendrex/annotate**: the primary barrel for this package. It
+ * exposes two frozen registries of decorator and interceptor factories, re-exports
+ * domain errors from the metadata layer, `reflect` and `prepare` for reading and
+ * bootstrapping metadata, and the TypeScript types that shape options, validators,
+ * and the reflector API. Use the factory registries as the supported entry when
+ * building on this library; they keep the public surface small and version-stable.
+ */
+export {
+	AnnotateError,
+	AnnotateErrorCode,
+	DuplicateMetadataError,
+	InvalidDecorationTargetError,
+	UnregisteredClassError,
+	ValidationError,
+} from "./errors";
+
+import { createAccessorInterceptor } from "./factories/accessor-interceptor";
+import { createClassDecorator } from "./factories/class-decorator";
+import { createMethodDecorator } from "./factories/method-decorator";
+import { createMethodInterceptor } from "./factories/method-interceptor";
+import { createPropertyDecorator } from "./factories/property-decorator";
+
+/**
+ * Version-stable registry of decorator factories (class, method, property). Prefer
+ * this object over deep imports from `./factories/*` in consuming code.
+ */
+export const decorate = Object.freeze({
+	class: createClassDecorator,
+	method: createMethodDecorator,
+	property: createPropertyDecorator,
+} as const);
+
+/**
+ * Version-stable registry of method and accessor interceptor factories. Prefer this
+ * object over deep imports from `./factories/*` in consuming code.
+ */
+export const intercept = Object.freeze({
+	method: createMethodInterceptor,
+	accessor: createAccessorInterceptor,
+} as const);
+
 export { reflect } from "./reflector/reflector";
-export { materialize } from "./runtime/materialize";
+export { prepare } from "./runtime/prepare";
 export type {
 	AccessorInterceptorOptions,
 	AnyFn,
+	ArgsOf,
 	DecoratedAccessorFactory,
 	DecoratedClassFactory,
 	DecoratedMethodFactory,
 	DecoratedPropertyFactory,
 	DecoratorOptions,
+	DeriveOptions,
 	InterceptorContext,
+	MetadataOf,
 	MethodInterceptorOptions,
+	ThisOf,
+	ValidateContext,
+	ValidatorFn,
 } from "./factories/types";
 export type { MetadataArray, MetadataKey } from "./metadata/types";
 export type { Reflector } from "./reflector/reflector";
@@ -32,8 +68,8 @@ export type {
 	DecoratedItem,
 	DecoratedKind,
 	DecoratedMethod,
-	DecoratedMethodSingle,
+	DecoratedMethodScalar,
 	DecoratedProperty,
-	DecoratedPropertySingle,
+	DecoratedPropertyScalar,
 	ScopedReflector,
 } from "./reflector/types";

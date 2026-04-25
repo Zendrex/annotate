@@ -1,28 +1,35 @@
 import { AnnotateError, AnnotateErrorCode, UnregisteredClassError } from "../errors";
 import {
-	appendMemberMeta,
 	collectClassMeta,
-	collectMemberMeta,
-	flushFor,
+	firstClassMetaForKey,
 	hasAnyClassMeta,
-	hasAnyMemberMeta,
+	hasAnyClassMetaForKey,
 	hasOwnClassMeta,
+} from "../metadata/class-meta-store";
+import {
+	appendMemberMeta,
+	collectMemberMeta,
+	firstMemberMetaForKey,
+	hasAnyMemberMeta,
+	hasAnyMemberMetaForKey,
 	hasOwnMemberMeta,
-	queueDeferred,
-	registerCtor,
-} from "../metadata/store";
+} from "../metadata/member-meta-store";
+import { registerCtor } from "../metadata/metadata-ctor-correlation";
+import { flushFor, queueDeferred } from "../metadata/metadata-deferred-queue";
 import { targetDisplayName } from "../reflector/class-name";
 import { resolveReflectTarget } from "../reflector/resolve-instance";
 import { createScopedReflector } from "../reflector/scoped-reflector";
-import { materialize } from "../runtime/materialize";
+import { prepare } from "../runtime/prepare";
 import { walkPrototypeChain } from "../runtime/prototype-chain";
-import type { Ctor, MemberKind, MetadataKey } from "../metadata/types";
+import { asDeferredValidators, chainValidators, runValidatorChain } from "./validator-chain";
+import type { Ctor, Deferred, MemberKind, MetadataArray, MetadataKey } from "../metadata/types";
 import type { AnyConstructor, DecoratedKind, ScopedReflector } from "../reflector/types";
+import type { DecoratorOptions, DeriveOptions } from "./types";
+import type { ValidatorFn } from "./validator-types";
 
 /**
- * Fold decorator arguments into a single metadata value. Uses `options.compose`
- * when provided, otherwise treats the first positional argument as the
- * metadata payload.
+ * Produces a single metadata value from factory arguments: if `fn` is set, returns `fn(...args)`;
+ * otherwise the first element of `args` is treated as `TMeta` (the common `(...meta) =>` shape).
  */
 export function compose<TMeta, TArgs extends unknown[]>(args: TArgs, fn?: (...a: TArgs) => TMeta): TMeta {
 	return fn ? fn(...args) : (args[0] as TMeta);
@@ -31,20 +38,24 @@ export function compose<TMeta, TArgs extends unknown[]>(args: TArgs, fn?: (...a:
 let keyCounter = 0;
 
 /**
- * Mint a fresh {@link MetadataKey} per factory invocation. The monotonic
- * counter guarantees uniqueness even when callers reuse `label`.
+ * Returns a new unique {@link MetadataKey} (Symbol) for this decorator, optionally prefixed
+ * in the description for debugging.
  */
 export function generateKey(label?: string): MetadataKey {
 	keyCounter += 1;
 	return Symbol(`${label ?? "decorator"}:${keyCounter}`);
 }
 
-/** Resolve the human-readable label used by factory error messages. */
+/**
+ * Resolves a stable display name for the decorator, preferring an explicit `name` when provided.
+ */
 export function labelFor(name: string | undefined, key: MetadataKey): string {
 	return name ?? String(key.description ?? key);
 }
 
-/** @throws {AnnotateError} With code `MISSING` — class-level metadata absent for `key`. */
+/**
+ * Throws a structured "metadata missing" error for a class (used by `firstOrThrow` when no entry exists).
+ */
 export function throwMissingClass(key: MetadataKey, ctor: AnyConstructor, label: string): never {
 	throw new AnnotateError({
 		key,
@@ -55,7 +66,9 @@ export function throwMissingClass(key: MetadataKey, ctor: AnyConstructor, label:
 	});
 }
 
-/** @throws {AnnotateError} With code `MISSING` — member-level metadata absent for `key` on `member`. */
+/**
+ * Throws a structured "metadata missing" error for a method or property member.
+ */
 export function throwMissingMember(
 	key: MetadataKey,
 	kind: Extract<DecoratedKind, "method" | "property">,
@@ -74,11 +87,8 @@ export function throwMissingMember(
 }
 
 /**
- * Guard used by `metadata` / `requireMetadata` helpers to surface a clear
- * failure when a caller reflects on a class that never saw any annotate
- * decorator — mirrors the reflector's collection-method behavior.
- *
- * @throws {UnregisteredClassError} Class has no class- or member-level metadata after auto-materialize.
+ * Ensures the constructor is known to the metadata system (any class- or member-level entry); used by
+ * read helpers so unregistered types fail fast.
  */
 export function ensureClassRegistered(ctor: Ctor): void {
 	if (!(hasAnyClassMeta(ctor) || hasAnyMemberMeta(ctor))) {
@@ -86,21 +96,15 @@ export function ensureClassRegistered(ctor: Ctor): void {
 	}
 }
 
-/**
- * Resolve `target` to a constructor and materialize any pending decorations.
- * Shared entry-point for the non-throwing helpers (`applied`, `appliedOwn`).
- */
 function prepareForRead(target: object): Ctor {
 	const ctor = resolveReflectTarget(target);
-	materialize(ctor);
+	prepare(ctor);
 	return ctor;
 }
 
 /**
- * Build a lazy reader that returns the full ancestor-merged metadata array for
- * `(key, memberName)` on the class of `instance`. Shared by method/accessor
- * interceptors; `isStatic` captures whether `instance` arrives as a
- * constructor or as an instance at invocation time.
+ * Returns a per-member reader that returns all metadata entries for `memberName` on the given key,
+ * using instance vs static rules (`static` — metadata lives on the constructor; otherwise on the instance prototype chain).
  */
 export function createMemberMetadataReader<TMeta>(
 	key: MetadataKey,
@@ -113,12 +117,6 @@ export function createMemberMetadataReader<TMeta>(
 	};
 }
 
-/**
- * Minimal shape the Stage-3 decorator contexts share — enough to drive the
- * `emitMemberDecoration` helper without leaking the variant-specific
- * `ClassMethodDecoratorContext` / `ClassFieldDecoratorContext` /
- * `ClassAccessorDecoratorContext` union into callers.
- */
 interface MemberEmitContext {
 	addInitializer(initializer: (this: unknown) => void): void;
 	readonly metadata: object | null;
@@ -127,32 +125,21 @@ interface MemberEmitContext {
 }
 
 /**
- * Commit a member-decoration registration from any member-level Stage-3
- * decorator body. Static applications append eagerly and drain pending
- * deferreds in the same initializer; instance applications queue a deferred
- * and register a per-instance initializer whose body materializes the
- * constructing class so pending metadata lands on the correct bucket.
- *
- * The instance initializer body deliberately closes over **nothing** besides
- * the per-instance `this.constructor`. Bun 1.3.13's Stage-3 runtime has a bug
- * where `ctx.addInitializer` on instance field/method contexts is globally
- * shared across classes (only the last-registered initializer survives and
- * fires on every instance of every class). Capturing per-decoration `meta` or
- * `memberName` here would cross-pollute one class's bucket with another's;
- * using only `this.constructor` sidesteps that — whichever initializer Bun
- * actually invokes, it flushes the pending deferreds for the real class of
- * the instance being constructed. `materialize` / `flushFor` are idempotent,
- * so repeated or spurious invocations are safe no-ops.
+ * Emits a member decoration: for static members, validators run and metadata commits immediately; for
+ * instance members, work is {@link queueDeferred} until `prepare` drains the chain. The `token` prevents
+ * double-commit; when `unique` is true, a second append for the same member/key throws
+ * `DuplicateMetadataError` if a value is already present.
  */
-export function emitMemberDecoration(params: {
+export function emitMemberDecoration<TMeta>(params: {
 	context: MemberEmitContext;
 	key: MetadataKey;
 	kind: MemberKind;
-	meta: unknown;
+	meta: TMeta;
 	token: symbol;
 	unique: boolean;
+	validators?: readonly ValidatorFn<TMeta>[];
 }): void {
-	const { context, key, kind, meta, token, unique } = params;
+	const { context, key, kind, meta, token, unique, validators } = params;
 	const correlation = context.metadata;
 	const memberName = context.name;
 	const isStatic = context.static;
@@ -160,6 +147,15 @@ export function emitMemberDecoration(params: {
 	if (isStatic) {
 		context.addInitializer(function (this: unknown) {
 			const ctor = this as Ctor;
+			// Validate, commit, then flush; flush drains sibling instance deferreds on the same bag.
+			if (validators && validators.length > 0) {
+				runValidatorChain(validators, meta, {
+					target: ctor as AnyConstructor,
+					memberName,
+					kind,
+					static: true,
+				});
+			}
 			appendMemberMeta(ctor, key, memberName, meta, token, { unique, static: true, kind });
 			registerCtor(ctor, correlation);
 			flushFor(ctor, correlation);
@@ -167,90 +163,144 @@ export function emitMemberDecoration(params: {
 		return;
 	}
 
-	queueDeferred(correlation, { key, name: memberName, meta, token, unique, static: false, kind });
+	const deferred: Deferred = {
+		key,
+		name: memberName,
+		meta,
+		token,
+		unique,
+		static: false,
+		kind,
+	};
+	if (validators && validators.length > 0) {
+		deferred.validators = asDeferredValidators(validators);
+	}
+	queueDeferred(correlation, deferred);
 	context.addInitializer(function (this: unknown) {
-		// Walk the prototype chain so an ancestor's pending deferreds also drain
-		// on construction of the most-derived class — `materialize` short-circuits
-		// at the first class with own `[Symbol.metadata]` by design.
+		// `prepare` each link so ancestor pending deferreds run on instance construction.
 		walkPrototypeChain((this as { constructor: Ctor }).constructor, (ctor) => {
-			materialize(ctor);
+			prepare(ctor);
 		});
 	});
 }
 
 /**
- * Build the reflector helpers shared by class-decorator factories:
- * `reflect`, `metadata`, `requireMetadata`, `applied`, `appliedOwn`.
+ * Merges a base factory’s {@link DecoratorOptions} with a `derive` child’s {@link DeriveOptions}.
+ * `validate` runs as a chained pipeline via `chainValidators` (parent first, then child). `name` and
+ * `requireInstanceOf` are overridden when the child supplies them. `compose` and `unique` are taken
+ * only from the parent (they are not part of `DeriveOptions`).
+ */
+export function mergeExtendedOptions<TMeta, TArgs extends unknown[]>(
+	parent: DecoratorOptions<TMeta, TArgs> | undefined,
+	child: DeriveOptions<TMeta, TArgs> | undefined
+): DecoratorOptions<TMeta, TArgs> {
+	const validate = chainValidators<TMeta>(parent?.validate, child?.validate);
+	const merged: DecoratorOptions<TMeta, TArgs> = {};
+	if (parent?.compose) {
+		merged.compose = parent.compose;
+	}
+	if (parent?.unique !== undefined) {
+		merged.unique = parent.unique;
+	}
+	const requireInstanceOf = child?.requireInstanceOf ?? parent?.requireInstanceOf;
+	if (requireInstanceOf) {
+		merged.requireInstanceOf = requireInstanceOf;
+	}
+	if (validate) {
+		merged.validate = validate;
+	}
+	const name = child?.name ?? parent?.name;
+	if (name !== undefined) {
+		merged.name = name;
+	}
+	return merged;
+}
+
+/**
+ * Read helpers for a class-level metadata key, sharing one `key` and error `label` with the public factory.
+ *
+ * - **reader** — {@link createScopedReflector} for this `key` (navigate decorated classes, methods, properties).
+ * - **first** — first class-scoped value for the key, or `undefined` after {@link ensureClassRegistered}.
+ * - **firstOrThrow** — like `first`, but throws if missing.
+ * - **has** / **hasOwn** — whether an entry exists anywhere in the class metadata chain / on the constructor only.
+ * - **all** — a frozen list of all class-level entries in declaration order.
  */
 export function createClassFactoryHelpers<TMeta>(key: MetadataKey, label: string) {
-	const firstClassMeta = (ctor: Ctor): TMeta | undefined => {
-		const list = collectClassMeta<TMeta>(ctor, key);
-		return list.length > 0 ? list[0] : undefined;
-	};
+	const firstClassMeta = (ctor: Ctor): TMeta | undefined => firstClassMetaForKey<TMeta>(ctor, key);
 
 	return {
-		reflect: (target: object): ScopedReflector<TMeta> =>
+		reader: (target: object): ScopedReflector<TMeta> =>
 			createScopedReflector<TMeta>(resolveReflectTarget(target), key),
-		metadata: (target: object): TMeta | undefined => {
+		first: (target: object): TMeta | undefined => {
 			const ctor = prepareForRead(target);
 			ensureClassRegistered(ctor);
 			return firstClassMeta(ctor);
 		},
-		requireMetadata: (target: object): TMeta => {
+		firstOrThrow: (target: object): TMeta => {
 			const ctor = prepareForRead(target);
 			ensureClassRegistered(ctor);
-			const first = firstClassMeta(ctor);
-			return first === undefined ? throwMissingClass(key, ctor, label) : first;
+			const entry = firstClassMeta(ctor);
+			return entry === undefined ? throwMissingClass(key, ctor, label) : entry;
 		},
-		applied: (target: object): boolean => {
+		has: (target: object): boolean => {
 			const ctor = prepareForRead(target);
-			return collectClassMeta<TMeta>(ctor, key).length > 0;
+			return hasAnyClassMetaForKey(ctor, key);
 		},
-		appliedOwn: (target: object): boolean => {
+		hasOwn: (target: object): boolean => {
 			const ctor = prepareForRead(target);
 			return hasOwnClassMeta(ctor, key);
+		},
+		all: (target: object): MetadataArray<TMeta> => {
+			const ctor = prepareForRead(target);
+			ensureClassRegistered(ctor);
+			return Object.freeze(collectClassMeta<TMeta>(ctor, key)) as MetadataArray<TMeta>;
 		},
 	};
 }
 
 /**
- * Build the reflector helpers shared by member decorator + interceptor
- * factories: `reflect`, `metadata`, `requireMetadata`, `applied`,
- * `appliedOwn`. `kind` is the {@link DecoratedKind} reported by
- * `throwMissingMember` — accessor interceptors report `"property"` because
- * the store classifies auto-accessors as fields.
+ * Read helpers for a member-level (method/property) metadata `key`, sharing one `key` and error `label`.
+ *
+ * - **reader** — {@link createScopedReflector} for this `key` (same as class factory `reader`).
+ * - **first** — first value for the given `member` on the resolved constructor, or `undefined`.
+ * - **firstOrThrow** — like `first`, but throws if missing.
+ * - **has** / **hasOwn** — any vs own entry for that member+key.
+ * - **all** — frozen list of all entries for the member+key in declaration order.
  */
 export function createMemberFactoryHelpers<TMeta>(
 	key: MetadataKey,
 	kind: Extract<DecoratedKind, "method" | "property">,
 	label: string
 ) {
-	const firstMemberMeta = (ctor: Ctor, member: string | symbol): TMeta | undefined => {
-		const list = collectMemberMeta<TMeta>(ctor, key, member);
-		return list.length > 0 ? list[0] : undefined;
-	};
+	const firstMemberMeta = (ctor: Ctor, member: string | symbol): TMeta | undefined =>
+		firstMemberMetaForKey<TMeta>(ctor, key, member);
 
 	return {
-		reflect: (target: object): ScopedReflector<TMeta> =>
+		reader: (target: object): ScopedReflector<TMeta> =>
 			createScopedReflector<TMeta>(resolveReflectTarget(target), key),
-		metadata: (target: object, member: string | symbol): TMeta | undefined => {
+		first: (target: object, member: string | symbol): TMeta | undefined => {
 			const ctor = prepareForRead(target);
 			ensureClassRegistered(ctor);
 			return firstMemberMeta(ctor, member);
 		},
-		requireMetadata: (target: object, member: string | symbol): TMeta => {
+		firstOrThrow: (target: object, member: string | symbol): TMeta => {
 			const ctor = prepareForRead(target);
 			ensureClassRegistered(ctor);
-			const first = firstMemberMeta(ctor, member);
-			return first === undefined ? throwMissingMember(key, kind, ctor, member, label) : first;
+			const entry = firstMemberMeta(ctor, member);
+			return entry === undefined ? throwMissingMember(key, kind, ctor, member, label) : entry;
 		},
-		applied: (target: object, member: string | symbol): boolean => {
+		has: (target: object, member: string | symbol): boolean => {
 			const ctor = prepareForRead(target);
-			return collectMemberMeta<TMeta>(ctor, key, member).length > 0;
+			return hasAnyMemberMetaForKey(ctor, key, member);
 		},
-		appliedOwn: (target: object, member: string | symbol): boolean => {
+		hasOwn: (target: object, member: string | symbol): boolean => {
 			const ctor = prepareForRead(target);
 			return hasOwnMemberMeta(ctor, key, member);
+		},
+		all: (target: object, member: string | symbol): MetadataArray<TMeta> => {
+			const ctor = prepareForRead(target);
+			ensureClassRegistered(ctor);
+			return Object.freeze(collectMemberMeta<TMeta>(ctor, key, member)) as MetadataArray<TMeta>;
 		},
 	};
 }

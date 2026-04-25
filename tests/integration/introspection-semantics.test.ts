@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { createPropertyDecorator, materialize } from "../../src";
+import { decorate, prepare } from "../../src";
 
 describe("introspection semantics post-ensureProperty removal", () => {
-	const Field = createPropertyDecorator<string>();
+	const Field = decorate.property<string>();
 
 	class User {
 		@Field("varchar")
@@ -17,18 +17,10 @@ describe("introspection semantics post-ensureProperty removal", () => {
 		}
 	}
 
-	test("'name' in User.prototype === false (no proto descriptor side effect)", () => {
+	test("decorated fields are not on prototype; methods are", () => {
 		expect("name" in User.prototype).toBe(false);
 		expect("age" in User.prototype).toBe(false);
 		expect("method" in User.prototype).toBe(true);
-	});
-
-	test("Object.hasOwn(User.prototype, 'name') === false", () => {
-		expect(Object.hasOwn(User.prototype, "name")).toBe(false);
-		expect(Object.hasOwn(User.prototype, "age")).toBe(false);
-	});
-
-	test("Object.getOwnPropertyNames(User.prototype) excludes decorated fields, includes methods", () => {
 		const names = Object.getOwnPropertyNames(User.prototype);
 		expect(names).toContain("method");
 		expect(names).toContain("constructor");
@@ -53,10 +45,10 @@ describe("introspection semantics post-ensureProperty removal", () => {
 		expect(JSON.parse(JSON.stringify(u))).toEqual({});
 	});
 
-	test("Field.applied(User, 'name') === true regardless of instantiation (with materialize)", () => {
-		materialize(User);
-		expect(Field.applied(User, "name")).toBe(true);
-		expect(Field.applied(User, "age")).toBe(true);
-		expect(Field.applied(User, "method")).toBe(false);
+	test("Field.has(User, 'name') === true regardless of instantiation (with prepare)", () => {
+		prepare(User);
+		expect(Field.has(User, "name")).toBe(true);
+		expect(Field.has(User, "age")).toBe(true);
+		expect(Field.has(User, "method")).toBe(false);
 	});
 });

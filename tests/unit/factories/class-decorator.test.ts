@@ -1,57 +1,55 @@
 import { describe, expect, test } from "bun:test";
 
-// Temporary: importing directly until Phase M1 consolidates all factory exports into src/index.ts.
-import { AnnotateError, UnregisteredClassError } from "../../../src/errors";
-import { createClassDecorator } from "../../../src/factories/class-decorator";
+import { AnnotateError, decorate, UnregisteredClassError } from "../../../src";
 
-describe("createClassDecorator (Stage-3)", () => {
+describe("decorate.class", () => {
 	test("stores metadata via class decorator application", () => {
-		const Tag = createClassDecorator<string>();
+		const Tag = decorate.class<string>();
 
 		@Tag("svc")
 		class Service {}
 
-		expect(Tag.metadata(Service)).toBe("svc");
-		expect(Tag.applied(Service)).toBe(true);
-		expect(Tag.appliedOwn(Service)).toBe(true);
+		expect(Tag.first(Service)).toBe("svc");
+		expect(Tag.has(Service)).toBe(true);
+		expect(Tag.hasOwn(Service)).toBe(true);
 	});
 
 	test("supports compose for multi-arg call shapes", () => {
-		const Component = createClassDecorator({
+		const Component = decorate.class({
 			compose: (selector: string, scoped: boolean) => ({ selector, scoped }),
 		});
 
 		@Component("app-root", true)
 		class Root {}
 
-		expect(Component.metadata(Root)).toEqual({ selector: "app-root", scoped: true });
+		expect(Component.first(Root)).toEqual({ selector: "app-root", scoped: true });
 	});
 
 	test("appends per application; first wins on metadata()", () => {
-		const Tag = createClassDecorator<string>();
+		const Tag = decorate.class<string>();
 
 		@Tag("outer")
 		@Tag("inner")
 		class X {}
 
-		expect(Tag.reflect(X).class()?.metadata).toEqual(["inner", "outer"]);
-		expect(Tag.metadata(X)).toBe("inner");
+		expect(Tag.reader(X).class()?.metadata).toEqual(["inner", "outer"]);
+		expect(Tag.first(X)).toBe("inner");
 	});
 
-	test("inheritance: child sees parent's class metadata via applied(); appliedOwn() does not", () => {
-		const Tag = createClassDecorator<string>();
+	test("inheritance: child sees parent's class metadata via has(); hasOwn() does not", () => {
+		const Tag = decorate.class<string>();
 
 		@Tag("base")
 		class Base {}
 		class Child extends Base {}
 
-		expect(Tag.applied(Child)).toBe(true);
-		expect(Tag.appliedOwn(Child)).toBe(false);
-		expect(Tag.metadata(Child)).toBe("base");
+		expect(Tag.has(Child)).toBe(true);
+		expect(Tag.hasOwn(Child)).toBe(false);
+		expect(Tag.first(Child)).toBe("base");
 	});
 
 	test("unique:true throws on second application to same class", () => {
-		const Tag = createClassDecorator<string>({ unique: true, name: "Tag" });
+		const Tag = decorate.class<string>({ unique: true, name: "Tag" });
 
 		expect(() => {
 			@Tag("a")
@@ -62,28 +60,21 @@ describe("createClassDecorator (Stage-3)", () => {
 		}).toThrow(AnnotateError);
 	});
 
-	test("requireMetadata throws UnregisteredClassError when class never decorated", () => {
-		const Tag = createClassDecorator<string>({ name: "Tag" });
+	test("first() throws UnregisteredClassError when class never decorated", () => {
+		const Tag = decorate.class<string>({ name: "Tag" });
 
 		class Bare {}
-		expect(() => Tag.requireMetadata(Bare)).toThrow(UnregisteredClassError);
+		expect(() => Tag.first(Bare)).toThrow(UnregisteredClassError);
 	});
 
-	test("metadata() throws UnregisteredClassError when class never decorated", () => {
-		const Tag = createClassDecorator<string>({ name: "Tag" });
-
-		class Bare {}
-		expect(() => Tag.metadata(Bare)).toThrow(UnregisteredClassError);
-	});
-
-	test("requireMetadata throws AnnotateError(missing) when class registered but factory not applied", () => {
-		const Tag = createClassDecorator<string>({ name: "Tag" });
-		const Other = createClassDecorator<string>({ name: "Other" });
+	test("firstOrThrow throws AnnotateError(missing) when class registered but factory not applied", () => {
+		const Tag = decorate.class<string>({ name: "Tag" });
+		const Other = decorate.class<string>({ name: "Other" });
 
 		@Other("o")
 		class X {}
 
-		expect(() => Tag.requireMetadata(X)).toThrow(AnnotateError);
-		expect(() => Tag.requireMetadata(X)).not.toThrow(UnregisteredClassError);
+		expect(() => Tag.firstOrThrow(X)).toThrow(AnnotateError);
+		expect(() => Tag.firstOrThrow(X)).not.toThrow(UnregisteredClassError);
 	});
 });

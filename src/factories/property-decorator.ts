@@ -1,27 +1,58 @@
-import { compose, createMemberFactoryHelpers, emitMemberDecoration, generateKey, labelFor } from "./shared";
-import type { DecoratedPropertyFactory, DecoratorOptions } from "./types";
+import {
+	compose,
+	createMemberFactoryHelpers,
+	emitMemberDecoration,
+	generateKey,
+	labelFor,
+	mergeExtendedOptions,
+} from "./shared";
+import { buildValidatorChain } from "./validator-chain";
+import type { MetadataKey } from "../metadata/types";
+import type { DecoratedPropertyFactory, DecoratorOptions, DeriveOptions } from "./types";
 
 /**
- * Create a typed field decorator. `TField` constrains the declared type of the
- * decorated field — `createPropertyDecorator<M, [M], number>()` rejects
- * `@Dec() flag!: boolean;` at compile time via the structural assignability of
- * `ClassFieldDecoratorContext<This, Value>`.
+ * Returns a class field (property) decorator factory. The Stage-3 field form passes
+ * `undefined` for the value; all work happens in `emitMemberDecoration`, which
+ * composes `TMeta`, runs validators, applies `unique` to prevent duplicate values for
+ * the same key on that field, and records metadata when the class is initialized
+ * (same member-decoration pipeline as methods, without an intercept/replacement
+ * hook). The result includes `key`, `reader` / `first` / `has` / `all` scoped to
+ * property names, and `derive` for merged child options.
  *
- * Field decorators register lazily on first instantiation. For pre-instantiation
- * reflection on instance-member-only classes, call `materialize(ctor)` first or
- * apply a class decorator (which drains the pending buffer at class-body eval).
+ * @param options - Optional `name`, `compose`, `validate`, `requireInstanceOf`, `unique`.
  */
-export function createPropertyDecorator<TMeta, TArgs extends unknown[] = [TMeta], TField = unknown>(
-	options?: DecoratorOptions<TMeta, TArgs>
-): DecoratedPropertyFactory<TMeta, TArgs, TField> {
+export function createPropertyDecorator<
+	TMeta,
+	TArgs extends unknown[] = [TMeta],
+	TField = unknown,
+	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
+	TThis = any,
+>(options?: DecoratorOptions<TMeta, TArgs>): DecoratedPropertyFactory<TMeta, TArgs, TField, TThis> {
 	const key = generateKey(options?.name);
+	return buildPropertyFactory<TMeta, TArgs, TField, TThis>(key, options);
+}
+
+/**
+ * Builds a {@link createPropertyDecorator}-style factory for a fixed key. Behavior
+ * matches the public entrypoint: `emitMemberDecoration` with `kind: "property"`,
+ * composed metadata, optional validator chain, and `unique` for duplicate
+ * detection on the same field. `derive` reuses the key and merges options via
+ * `mergeExtendedOptions`.
+ *
+ * @param key - Metadata key this factory reads and writes.
+ * @param options - Optional compose/validation/uniqueness and display `name` for labels.
+ */
+export function buildPropertyFactory<TMeta, TArgs extends unknown[], TField, TThis>(
+	key: MetadataKey,
+	options: DecoratorOptions<TMeta, TArgs> | undefined
+): DecoratedPropertyFactory<TMeta, TArgs, TField, TThis> {
 	const { compose: composeFn, name, unique = false } = options ?? {};
 	const label = labelFor(name, key);
+	const validators = buildValidatorChain<TMeta>(options, label, key);
 
 	const decoratorFn =
 		(...args: TArgs) =>
-		// biome-ignore lint/suspicious/noExplicitAny: EA-3 — ClassFieldDecoratorContext's This generic must default to `any` so typed `this:` on fields type-checks
-		(_value: undefined, context: ClassFieldDecoratorContext<any, TField>): void => {
+		(_value: undefined, context: ClassFieldDecoratorContext<TThis, TField>): void => {
 			emitMemberDecoration({
 				context,
 				key,
@@ -29,11 +60,18 @@ export function createPropertyDecorator<TMeta, TArgs extends unknown[] = [TMeta]
 				meta: compose(args, composeFn),
 				token: Symbol("propertyDecoration"),
 				unique,
+				validators,
 			});
 		};
+
+	const derive = <TNewField = TField, TNewThis = TThis>(
+		childOptions?: DeriveOptions<TMeta, TArgs>
+	): DecoratedPropertyFactory<TMeta, TArgs, TNewField, TNewThis> =>
+		buildPropertyFactory<TMeta, TArgs, TNewField, TNewThis>(key, mergeExtendedOptions(options, childOptions));
 
 	return Object.assign(decoratorFn, {
 		key,
 		...createMemberFactoryHelpers<TMeta>(key, "property", label),
-	}) as DecoratedPropertyFactory<TMeta, TArgs, TField>;
+		derive,
+	}) as DecoratedPropertyFactory<TMeta, TArgs, TField, TThis>;
 }
