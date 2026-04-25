@@ -31,7 +31,8 @@ describe("decorate.class", () => {
 		@Tag("value")
 		class X {}
 
-		expect(Tag.reader(X).class()?.metadata).toEqual(["value"]);
+		// Unique-cardinality key: reader metadata is a scalar string, not an array.
+		expect(Tag.reader(X).class()?.metadata).toBe("value");
 		expect(Tag.first(X)).toBe("value");
 	});
 

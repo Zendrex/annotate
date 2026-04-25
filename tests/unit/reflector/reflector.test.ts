@@ -46,7 +46,8 @@ describe("Reflector", () => {
 		new A();
 		const methods = reflect(B).methods<string>(Route.key);
 		const run = methods.find((m) => m.name === "run");
-		expect(run?.metadata).toEqual(["/b", "/a"]);
+		// Unique key: most-derived-first metadata is "/b" (only the first/own value per site).
+		expect(run?.metadata).toBe("/b");
 	});
 
 	test("throws UnregisteredClassError when class never decorated", () => {

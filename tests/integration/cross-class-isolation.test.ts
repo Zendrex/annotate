@@ -35,8 +35,9 @@ describe("cross-class member isolation", () => {
 
 		expect(alphaProps.map((p) => p.name)).toEqual(["a"]);
 		expect(betaProps.map((p) => p.name)).toEqual(["b"]);
-		expect(alphaProps[0]?.metadata).toEqual([{ tag: "alpha" }]);
-		expect(betaProps[0]?.metadata).toEqual([{ tag: "beta" }]);
+		// Unique-cardinality key: metadata is a scalar Tagged value, not an array.
+		expect(alphaProps[0]?.metadata).toEqual({ tag: "alpha" });
+		expect(betaProps[0]?.metadata).toEqual({ tag: "beta" });
 	});
 
 	test("bare-member-decorator class: metadata readable after reflect via materialize", () => {
@@ -50,6 +51,7 @@ describe("cross-class member isolation", () => {
 		// materialize so pending deferreds surface.
 		const props = Prop.reader(Bare).properties();
 		expect(props.map((p) => p.name)).toEqual(["x"]);
-		expect(props[0]?.metadata).toEqual([{ tag: "only" }]);
+		// Unique-cardinality key: metadata is a scalar Tagged value, not an array.
+		expect(props[0]?.metadata).toEqual({ tag: "only" });
 	});
 });

@@ -5,15 +5,17 @@ import { describe, expect, test } from "bun:test";
 import { decorate, intercept, UnregisteredClassError } from "../../../src";
 
 describe("shared reader helpers: all()", () => {
-	test("class: parity, empty, frozen, unregistered", () => {
+	test("class: unique factory all() returns one-element frozen array; reader metadata is scalar", () => {
 		const Tag = decorate.class<string>();
 		const Other = decorate.class<string>();
 
 		@Tag("a")
 		class T1 {}
-		// all() on a single-application unique factory returns a one-element frozen array.
-		expect(Tag.all(T1)).toEqual(Tag.reader(T1).class()?.metadata ?? []);
+		// factory.all() still returns MetadataArray (readonly string[]) — length 1 for unique.
+		expect(Tag.all(T1)).toEqual(["a"]);
 		expect(Object.isFrozen(Tag.all(T1))).toBe(true);
+		// reader.class().metadata is now a scalar (T4: unique-key metadata is unwrapped).
+		expect(Tag.reader(T1).class()?.metadata).toBe("a");
 
 		@Other("x")
 		class T2 {}
@@ -23,7 +25,7 @@ describe("shared reader helpers: all()", () => {
 		expect(() => Tag.all(Bare)).toThrow(UnregisteredClassError);
 	});
 
-	test("method: parity and empty (errors/frozen follow class case)", () => {
+	test("method: unique factory all() returns one-element array; reader metadata is scalar", () => {
 		const Route = decorate.method<string>();
 		const Other = decorate.method<string>();
 
@@ -38,14 +40,17 @@ describe("shared reader helpers: all()", () => {
 		}
 
 		new Api();
+		// factory.all() returns the full MetadataArray (readonly string[]).
+		expect(Route.all(Api, "ping")).toEqual(["/a"]);
+		// reader.methods().metadata is now a scalar string for unique keys.
 		const entry = Route.reader(Api)
 			.methods()
 			.find((m) => m.name === "ping");
-		expect(Route.all(Api, "ping")).toEqual(entry?.metadata ?? []);
+		expect(entry?.metadata).toBe("/a");
 		expect(Route.all(Api, "absent")).toEqual([]);
 	});
 
-	test("property: parity and empty", () => {
+	test("property: unique factory all() returns one-element array; reader metadata is scalar", () => {
 		const Column = decorate.property<string>();
 		const Other = decorate.property<string>();
 
@@ -60,14 +65,17 @@ describe("shared reader helpers: all()", () => {
 		}
 
 		new User();
+		// factory.all() returns the full MetadataArray (readonly string[]).
+		expect(Column.all(User, "name")).toEqual(["a"]);
+		// reader.properties().metadata is now a scalar string for unique keys.
 		const entry = Column.reader(User)
 			.properties()
 			.find((p) => p.name === "name");
-		expect(Column.all(User, "name")).toEqual(entry?.metadata ?? []);
+		expect(entry?.metadata).toBe("a");
 		expect(Column.all(User, "absent")).toEqual([]);
 	});
 
-	test("method interceptor: parity", () => {
+	test("method interceptor: unique factory all() returns one-element array; reader metadata is scalar", () => {
 		const Trace = intercept.method<string>({
 			intercept: (original) => original,
 		});
@@ -78,13 +86,16 @@ describe("shared reader helpers: all()", () => {
 		}
 
 		new Svc();
+		// factory.all() returns the full MetadataArray.
+		expect(Trace.all(Svc, "run")).toEqual(["a"]);
+		// reader.methods().metadata is scalar for unique keys.
 		const entry = Trace.reader(Svc)
 			.methods()
 			.find((m) => m.name === "run");
-		expect(Trace.all(Svc, "run")).toEqual(entry?.metadata ?? []);
+		expect(entry?.metadata).toBe("a");
 	});
 
-	test("accessor interceptor: parity", () => {
+	test("accessor interceptor: unique factory all() returns one-element array; reader metadata is scalar", () => {
 		const Tag = intercept.accessor<string, [string], number>({
 			onGet: (original) =>
 				function (this: unknown) {
@@ -98,9 +109,12 @@ describe("shared reader helpers: all()", () => {
 		}
 
 		new Box();
+		// factory.all() returns the full MetadataArray.
+		expect(Tag.all(Box, "x")).toEqual(["v"]);
+		// reader.properties().metadata is scalar for unique keys.
 		const entry = Tag.reader(Box)
 			.properties()
 			.find((p) => p.name === "x");
-		expect(Tag.all(Box, "x")).toEqual(entry?.metadata ?? []);
+		expect(entry?.metadata).toBe("v");
 	});
 });

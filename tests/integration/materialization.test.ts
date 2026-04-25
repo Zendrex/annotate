@@ -38,7 +38,8 @@ describe("subclass-of-parent-only-decorated regression", () => {
 			}
 		}
 		const list = Field.reader(A).properties();
-		expect(list[0]?.metadata).toEqual(["a"]);
+		// Unique-cardinality key: metadata is a scalar string value.
+		expect(list[0]?.metadata).toBe("a");
 		expect(Field.hasOwn(B, "foo")).toBe(false);
 	});
 });
