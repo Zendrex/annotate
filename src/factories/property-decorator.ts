@@ -1,25 +1,18 @@
-import {
-	compose,
-	createMemberFactoryHelpers,
-	emitMemberDecoration,
-	generateKey,
-	labelFor,
-	mergeExtendedOptions,
-} from "./shared";
+import { mintUniqueKey } from "../metadata/cardinality-registry";
+import { compose, createMemberFactoryHelpers, emitMemberDecoration, labelFor, mergeExtendedOptions } from "./shared";
 import { buildValidatorChain } from "./validator-chain";
-import type { MetadataKey } from "../metadata/types";
+import type { UniqueMetadataKey } from "../metadata/types";
 import type { DecoratedPropertyFactory, DecoratorOptions, DeriveOptions } from "./types";
 
 /**
  * Returns a class field (property) decorator factory. The Stage-3 field form passes
  * `undefined` for the value; all work happens in `emitMemberDecoration`, which
- * composes `TMeta`, runs validators, applies `unique` to prevent duplicate values for
- * the same key on that field, and records metadata when the class is initialized
- * (same member-decoration pipeline as methods, without an intercept/replacement
- * hook). The result includes `key`, `reader` / `first` / `has` / `all` scoped to
- * property names, and `derive` for merged child options.
+ * composes `TMeta`, runs validators, and records metadata when the class is initialized
+ * (same member-decoration pipeline as methods, without an intercept/replacement hook).
+ * The result includes `key`, `reader` / `first` / `has` / `all` scoped to property names,
+ * and `derive` for merged child options.
  *
- * @param options - Optional `name`, `compose`, `validate`, `requireInstanceOf`, `unique`.
+ * @param options - Optional `name`, `compose`, `validate`, `requireInstanceOf`.
  */
 export function createPropertyDecorator<
 	TMeta,
@@ -28,25 +21,24 @@ export function createPropertyDecorator<
 	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
 	TThis = any,
 >(options?: DecoratorOptions<TMeta, TArgs>): DecoratedPropertyFactory<TMeta, TArgs, TField, TThis> {
-	const key = generateKey(options?.name);
+	const key = mintUniqueKey<TMeta>(options?.name);
 	return buildPropertyFactory<TMeta, TArgs, TField, TThis>(key, options);
 }
 
 /**
  * Builds a {@link createPropertyDecorator}-style factory for a fixed key. Behavior
  * matches the public entrypoint: `emitMemberDecoration` with `kind: "property"`,
- * composed metadata, optional validator chain, and `unique` for duplicate
- * detection on the same field. `derive` reuses the key and merges options via
- * `mergeExtendedOptions`.
+ * composed metadata, and optional validator chain. `derive` reuses the key and merges
+ * options via `mergeExtendedOptions`.
  *
  * @param key - Metadata key this factory reads and writes.
- * @param options - Optional compose/validation/uniqueness and display `name` for labels.
+ * @param options - Optional compose/validation and display `name` for labels.
  */
 export function buildPropertyFactory<TMeta, TArgs extends unknown[], TField, TThis>(
-	key: MetadataKey,
+	key: UniqueMetadataKey<TMeta>,
 	options: DecoratorOptions<TMeta, TArgs> | undefined
 ): DecoratedPropertyFactory<TMeta, TArgs, TField, TThis> {
-	const { compose: composeFn, name, unique = false } = options ?? {};
+	const { compose: composeFn, name } = options ?? {};
 	const label = labelFor(name, key);
 	const validators = buildValidatorChain<TMeta>(options, label, key);
 
@@ -59,7 +51,6 @@ export function buildPropertyFactory<TMeta, TArgs extends unknown[], TField, TTh
 				kind: "property",
 				meta: compose(args, composeFn),
 				token: Symbol("propertyDecoration"),
-				unique,
 				validators,
 			});
 		};

@@ -1,14 +1,14 @@
+import { mintUniqueKey } from "../metadata/cardinality-registry";
 import {
 	compose,
 	createMemberFactoryHelpers,
 	createMemberMetadataReader,
 	emitMemberDecoration,
-	generateKey,
 	labelFor,
 	mergeExtendedOptions,
 } from "./shared";
 import { buildValidatorChain } from "./validator-chain";
-import type { MetadataKey } from "../metadata/types";
+import type { UniqueMetadataKey } from "../metadata/types";
 import type {
 	AccessorInterceptorOptions,
 	DecoratedAccessorFactory,
@@ -52,7 +52,7 @@ export function createAccessorInterceptor<
 		throw new TypeError("intercept.accessor: provide at least one of onGet or onSet");
 	}
 
-	const key = generateKey(options.name);
+	const key = mintUniqueKey<TMeta>(options.name);
 	const { onGet, onSet, ...rest } = options;
 	return buildAccessorFactory<TMeta, TArgs, TValue, TThis>(key, rest as DecoratorOptions<TMeta, TArgs>, {
 		onGet,
@@ -66,11 +66,11 @@ export function createAccessorInterceptor<
  * `derive` merging. Exposed for advanced composition; prefer `createAccessorInterceptor`.
  */
 export function buildAccessorFactory<TMeta, TArgs extends unknown[], TValue, TThis>(
-	key: MetadataKey,
+	key: UniqueMetadataKey<TMeta>,
 	options: DecoratorOptions<TMeta, TArgs> | undefined,
 	hookRefs: AccessorHookRefs<TMeta, TValue>
 ): DecoratedAccessorFactory<TMeta, TArgs, TValue, TThis> {
-	const { compose: composeFn, name, unique = false } = options ?? {};
+	const { compose: composeFn, name } = options ?? {};
 	const label = labelFor(name, key);
 	const validators = buildValidatorChain<TMeta>(options, label, key);
 	const { onGet, onSet } = hookRefs;
@@ -106,7 +106,6 @@ export function buildAccessorFactory<TMeta, TArgs extends unknown[], TValue, TTh
 				kind: "property",
 				meta: compose(args, composeFn),
 				token: Symbol("accessorIntercept"),
-				unique,
 				validators,
 			});
 

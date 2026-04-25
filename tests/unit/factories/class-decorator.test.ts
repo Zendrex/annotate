@@ -25,15 +25,27 @@ describe("decorate.class", () => {
 		expect(Component.first(Root)).toEqual({ selector: "app-root", scoped: true });
 	});
 
-	test("appends per application; first wins on metadata()", () => {
+	test("single application; first returns the stored value", () => {
 		const Tag = decorate.class<string>();
 
-		@Tag("outer")
-		@Tag("inner")
+		@Tag("value")
 		class X {}
 
-		expect(Tag.reader(X).class()?.metadata).toEqual(["inner", "outer"]);
-		expect(Tag.first(X)).toBe("inner");
+		expect(Tag.reader(X).class()?.metadata).toEqual(["value"]);
+		expect(Tag.first(X)).toBe("value");
+	});
+
+	test("inheritance: subclass and base each hold one value; all() collects both", () => {
+		const Tag = decorate.class<string>();
+
+		@Tag("base")
+		class Base {}
+
+		@Tag("child")
+		class Child extends Base {}
+
+		expect(Tag.all(Child)).toEqual(["child", "base"]);
+		expect(Tag.first(Child)).toBe("child");
 	});
 
 	test("inheritance: child sees parent's class metadata via has(); hasOwn() does not", () => {
@@ -48,8 +60,8 @@ describe("decorate.class", () => {
 		expect(Tag.first(Child)).toBe("base");
 	});
 
-	test("unique:true throws on second application to same class", () => {
-		const Tag = decorate.class<string>({ unique: true, name: "Tag" });
+	test("throws DuplicateMetadataError on second application to same class (all factory keys are unique)", () => {
+		const Tag = decorate.class<string>({ name: "Tag" });
 
 		expect(() => {
 			@Tag("a")

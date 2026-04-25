@@ -1,14 +1,14 @@
+import { mintUniqueKey } from "../metadata/cardinality-registry";
 import {
 	compose,
 	createMemberFactoryHelpers,
 	createMemberMetadataReader,
 	emitMemberDecoration,
-	generateKey,
 	labelFor,
 	mergeExtendedOptions,
 } from "./shared";
 import { buildValidatorChain } from "./validator-chain";
-import type { MetadataKey } from "../metadata/types";
+import type { UniqueMetadataKey } from "../metadata/types";
 import type { AnyFn, DecoratedMethodFactory, DecoratorOptions, DeriveOptions, InterceptorContext } from "./types";
 
 /**
@@ -23,13 +23,12 @@ export interface MethodHookRefs<TMeta, TMethod extends AnyFn> {
 
 /**
  * Returns a method decorator factory. Metadata is written through
- * `emitMemberDecoration` with the same key, validation, and `unique` behavior as
- * other member factories: composed `TMeta` is stored and optionally validated;
- * `unique` controls duplicate application for that member. When advanced wiring
- * is needed, {@link buildMethodFactory} accepts {@link MethodHookRefs} for
- * intercept-based replacement and a distinct internal decoration token.
+ * `emitMemberDecoration` with the same key and validation as other member factories:
+ * composed `TMeta` is stored and optionally validated. When advanced wiring is needed,
+ * {@link buildMethodFactory} accepts {@link MethodHookRefs} for intercept-based replacement
+ * and a distinct internal decoration token.
  *
- * @param options - Optional `name`, `compose`, `validate`, `requireInstanceOf`, `unique`.
+ * @param options - Optional `name`, `compose`, `validate`, `requireInstanceOf`.
  */
 export function createMethodDecorator<
 	TMeta,
@@ -38,7 +37,7 @@ export function createMethodDecorator<
 	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
 	TThis = any,
 >(options?: DecoratorOptions<TMeta, TArgs>): DecoratedMethodFactory<TMeta, TArgs, TMethod, TThis> {
-	const key = generateKey(options?.name);
+	const key = mintUniqueKey<TMeta>(options?.name);
 	return buildMethodFactory<TMeta, TArgs, TMethod, TThis>(key, options);
 }
 
@@ -46,11 +45,11 @@ export function createMethodDecorator<
  * Core implementation shared with {@link createMethodDecorator} and (with
  * `hookRefs`) other builds. Composes `TMeta` from args, then schedules member
  * metadata via `emitMemberDecoration` (class initialization callback path), applying
- * validators and honoring `unique`. If `hookRefs.intercept` is set, it runs first
- * and the return value, if any, becomes the new method; metadata emission still
- * uses a stable token so storage stays aligned with the non-intercept path. The
- * returned object includes `key`, reader helpers, and `derive` (reuses
- * `hookRefs` and merges child options; see inline note on `TNewMethod` narrowing).
+ * validators. If `hookRefs.intercept` is set, it runs first and the return value,
+ * if any, becomes the new method; metadata emission still uses a stable token so
+ * storage stays aligned with the non-intercept path. The returned object includes
+ * `key`, reader helpers, and `derive` (reuses `hookRefs` and merges child options;
+ * see inline note on `TNewMethod` narrowing).
  *
  * @param key - Fixed metadata key for this family of decorators.
  * @param options - Factory options; merged into derived factories by `derive`.
@@ -58,11 +57,11 @@ export function createMethodDecorator<
  *   while metadata is still recorded for the member.
  */
 export function buildMethodFactory<TMeta, TArgs extends unknown[], TMethod extends AnyFn, TThis>(
-	key: MetadataKey,
+	key: UniqueMetadataKey<TMeta>,
 	options: DecoratorOptions<TMeta, TArgs> | undefined,
 	hookRefs?: MethodHookRefs<TMeta, TMethod>
 ): DecoratedMethodFactory<TMeta, TArgs, TMethod, TThis> {
-	const { compose: composeFn, name, unique = false } = options ?? {};
+	const { compose: composeFn, name } = options ?? {};
 	const label = labelFor(name, key);
 	const validators = buildValidatorChain<TMeta>(options, label, key);
 	const intercept = hookRefs?.intercept;
@@ -90,7 +89,6 @@ export function buildMethodFactory<TMeta, TArgs extends unknown[], TMethod exten
 				kind: "method",
 				meta: compose(args, composeFn),
 				token: Symbol(intercept ? "methodIntercept" : "methodDecoration"),
-				unique,
 				validators,
 			});
 

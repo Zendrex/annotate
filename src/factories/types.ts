@@ -1,4 +1,4 @@
-import type { MetadataArray, MetadataKey } from "../metadata/types";
+import type { MetadataArray, UniqueMetadataKey } from "../metadata/types";
 import type { AnyConstructor, ScopedReflector } from "../reflector/types";
 import type { ValidatorFn } from "./validator-types";
 
@@ -20,8 +20,7 @@ export interface InterceptorContext {
 }
 
 /**
- * Common options for class/method/property/ accessor factories and interceptors.
- * - `unique`: when true, duplicate metadata for the same slot throws on flush.
+ * Common options for class/method/property/accessor factories and interceptors.
  * - `requireInstanceOf` / `validate`: composed into a validator chain (see `buildValidatorChain`).
  * - `compose`: maps decorator arguments to the stored metadata value.
  */
@@ -29,7 +28,6 @@ export interface DecoratorOptions<TMeta, TArgs extends unknown[] = [TMeta]> {
 	compose?: (...args: TArgs) => TMeta;
 	name?: string;
 	requireInstanceOf?: AnyConstructor;
-	unique?: boolean;
 	validate?: ValidatorFn<TMeta>;
 }
 
@@ -97,7 +95,7 @@ export type DecoratedClassFactory<TMeta, TArgs extends unknown[] = [TMeta], TIns
 	TInstance,
 	TArgs
 > & {
-	key: MetadataKey;
+	key: UniqueMetadataKey<TMeta>;
 	reader(target: object): ScopedReflector<TMeta>;
 	first(target: object): TMeta | undefined;
 	firstOrThrow(target: object): TMeta;
@@ -120,7 +118,7 @@ export type DecoratedMethodFactory<
 	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
 	TThis = any,
 > = MethodDecoratorFn<TThis, TMethod, TArgs> & {
-	key: MetadataKey;
+	key: UniqueMetadataKey<TMeta>;
 	reader(target: object): ScopedReflector<TMeta>;
 	first(target: object, name: string | symbol): TMeta | undefined;
 	firstOrThrow(target: object, name: string | symbol): TMeta;
@@ -140,7 +138,7 @@ export type DecoratedPropertyFactory<
 	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
 	TThis = any,
 > = FieldDecoratorFn<TThis, TField, TArgs> & {
-	key: MetadataKey;
+	key: UniqueMetadataKey<TMeta>;
 	reader(target: object): ScopedReflector<TMeta>;
 	first(target: object, name: string | symbol): TMeta | undefined;
 	firstOrThrow(target: object, name: string | symbol): TMeta;
@@ -163,7 +161,7 @@ export type DecoratedAccessorFactory<
 	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
 	TThis = any,
 > = AccessorDecoratorFn<TThis, TValue, TArgs> & {
-	key: MetadataKey;
+	key: UniqueMetadataKey<TMeta>;
 	reader(target: object): ScopedReflector<TMeta>;
 	first(target: object, name: string | symbol): TMeta | undefined;
 	firstOrThrow(target: object, name: string | symbol): TMeta;

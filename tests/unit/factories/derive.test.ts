@@ -128,8 +128,8 @@ describe("Factory.derive() — requireInstanceOf propagation", () => {
 });
 
 describe("Factory.derive() — unique across shared key", () => {
-	test("class factory with unique: true + extend child on same class throws DuplicateMetadataError", () => {
-		const Parent = decorate.class<string>({ name: "Parent", unique: true });
+	test("class factory child on same class throws DuplicateMetadataError (all keys are unique)", () => {
+		const Parent = decorate.class<string>({ name: "Parent" });
 		const Child = Parent.derive();
 
 		let caught: unknown;
@@ -144,8 +144,8 @@ describe("Factory.derive() — unique across shared key", () => {
 		expect(caught).toBeInstanceOf(DuplicateMetadataError);
 	});
 
-	test("static method with unique: true + extend child on same member throws at decoration time", () => {
-		const Parent = decorate.method<string>({ name: "Parent", unique: true });
+	test("static method child on same member throws at decoration time (all keys are unique)", () => {
+		const Parent = decorate.method<string>({ name: "Parent" });
 		const Child = Parent.derive();
 
 		let caught: unknown;
@@ -165,13 +165,10 @@ describe("Factory.derive() — unique across shared key", () => {
 });
 
 describe("Factory.derive() — compile-time locks (compile-only)", () => {
-	test("Pick rejects compose and unique", () => {
+	test("Pick rejects compose", () => {
 		const Parent = decorate.class<string>({ name: "Parent" });
 
 		// @ts-expect-error — compose is omitted from the derive() Pick signature.
 		Parent.derive({ compose: (x: string) => x });
-
-		// @ts-expect-error — unique is omitted from the derive() Pick signature.
-		Parent.derive({ unique: true });
 	});
 });

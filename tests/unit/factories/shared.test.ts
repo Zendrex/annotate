@@ -10,8 +10,8 @@ describe("shared reader helpers: all()", () => {
 		const Other = decorate.class<string>();
 
 		@Tag("a")
-		@Tag("b")
 		class T1 {}
+		// all() on a single-application unique factory returns a one-element frozen array.
 		expect(Tag.all(T1)).toEqual(Tag.reader(T1).class()?.metadata ?? []);
 		expect(Object.isFrozen(Tag.all(T1))).toBe(true);
 
@@ -29,7 +29,6 @@ describe("shared reader helpers: all()", () => {
 
 		class Api {
 			@Route("/a")
-			@Route("/b")
 			ping(): void {}
 
 			@Other("/o")
@@ -52,7 +51,6 @@ describe("shared reader helpers: all()", () => {
 
 		class User {
 			@Column("a")
-			@Column("b")
 			name!: string;
 
 			@Other("o")

@@ -47,8 +47,8 @@ describe("decorate.method", () => {
 		expect(Route.hasOwn(Base, "handle")).toBe(true);
 	});
 
-	test("unique:true throws on second application", () => {
-		const Cmd = decorate.method<string>({ unique: true, name: "Cmd" });
+	test("throws DuplicateMetadataError on second application (all factory keys are unique)", () => {
+		const Cmd = decorate.method<string>({ name: "Cmd" });
 
 		expect(() => {
 			// biome-ignore lint/complexity/noStaticOnlyClass: test fixture requires a class with a single static method

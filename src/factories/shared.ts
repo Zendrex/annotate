@@ -34,19 +34,6 @@ export function compose<TMeta, TArgs extends unknown[]>(args: TArgs, fn?: (...a:
 	return fn ? fn(...args) : (args[0] as TMeta);
 }
 
-let keyCounter = 0;
-
-/**
- * Returns a new unique {@link MetadataKey} (Symbol) for this decorator, optionally prefixed
- * in the description for debugging.
- */
-export function generateKey(label?: string): MetadataKey {
-	keyCounter += 1;
-	// Cast is safe: every symbol produced here is a valid metadata key. The
-	// brand is phantom-only — no runtime field is added.
-	return Symbol(`${label ?? "decorator"}:${keyCounter}`) as MetadataKey;
-}
-
 /**
  * Resolves a stable display name for the decorator, preferring an explicit `name` when provided.
  */
@@ -115,8 +102,7 @@ interface MemberEmitContext {
 /**
  * Emits a member decoration: for static members, validators run and metadata commits immediately; for
  * instance members, work is {@link queueDeferred} until `prepare` drains the chain. The `token` prevents
- * double-commit; when `unique` is true, a second append for the same member/key throws
- * `DuplicateMetadataError` if a value is already present.
+ * double-commit; cardinality (unique vs list) is resolved from the registry inside `appendMemberMeta`.
  */
 export function emitMemberDecoration<TMeta>(params: {
 	context: MemberEmitContext;
@@ -124,10 +110,9 @@ export function emitMemberDecoration<TMeta>(params: {
 	kind: MemberKind;
 	meta: TMeta;
 	token: symbol;
-	unique: boolean;
 	validators?: readonly ValidatorFn<TMeta>[];
 }): void {
-	const { context, key, kind, meta, token, unique, validators } = params;
+	const { context, key, kind, meta, token, validators } = params;
 	const correlation = context.metadata;
 	const memberName = context.name;
 	const isStatic = context.static;
@@ -144,7 +129,7 @@ export function emitMemberDecoration<TMeta>(params: {
 					static: true,
 				});
 			}
-			appendMemberMeta(ctor, key, memberName, meta, token, { unique, static: true, kind });
+			appendMemberMeta(ctor, key, memberName, meta, token, { static: true, kind });
 			registerCtor(ctor, correlation);
 			flushFor(ctor, correlation);
 		});
@@ -156,7 +141,6 @@ export function emitMemberDecoration<TMeta>(params: {
 		name: memberName,
 		meta,
 		token,
-		unique,
 		static: false,
 		kind,
 	};
@@ -175,8 +159,8 @@ export function emitMemberDecoration<TMeta>(params: {
 /**
  * Merges a base factory’s {@link DecoratorOptions} with a `derive` child’s {@link DeriveOptions}.
  * `validate` runs as a chained pipeline via `chainValidators` (parent first, then child). `name` and
- * `requireInstanceOf` are overridden when the child supplies them. `compose` and `unique` are taken
- * only from the parent (they are not part of `DeriveOptions`).
+ * `requireInstanceOf` are overridden when the child supplies them. `compose` is taken only from the
+ * parent (it is not part of `DeriveOptions`).
  */
 export function mergeExtendedOptions<TMeta, TArgs extends unknown[]>(
 	parent: DecoratorOptions<TMeta, TArgs> | undefined,
@@ -186,9 +170,6 @@ export function mergeExtendedOptions<TMeta, TArgs extends unknown[]>(
 	const merged: DecoratorOptions<TMeta, TArgs> = {};
 	if (parent?.compose) {
 		merged.compose = parent.compose;
-	}
-	if (parent?.unique !== undefined) {
-		merged.unique = parent.unique;
 	}
 	const requireInstanceOf = child?.requireInstanceOf ?? parent?.requireInstanceOf;
 	if (requireInstanceOf) {

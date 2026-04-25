@@ -1,9 +1,10 @@
+import { mintUniqueKey } from "../metadata/cardinality-registry";
 import { appendClassMeta } from "../metadata/class-meta-store";
 import { registerCtor } from "../metadata/metadata-ctor-correlation";
 import { flushFor } from "../metadata/metadata-deferred-queue";
-import { compose, createClassFactoryHelpers, generateKey, labelFor, mergeExtendedOptions } from "./shared";
+import { compose, createClassFactoryHelpers, labelFor, mergeExtendedOptions } from "./shared";
 import { buildValidatorChain, runValidatorChain } from "./validator-chain";
-import type { MetadataKey } from "../metadata/types";
+import type { UniqueMetadataKey } from "../metadata/types";
 import type { AnyConstructor } from "../reflector/types";
 import type { DecoratedClassFactory, DecoratorOptions, DeriveOptions } from "./types";
 
@@ -11,16 +12,14 @@ import type { DecoratedClassFactory, DecoratorOptions, DeriveOptions } from "./t
  * Returns a class decorator factory: each decorated class stores metadata under a
  * generated key, runs optional `validate` / `requireInstanceOf` (see {@link buildClassFactory}),
  * and wires the constructor into the reflector (`registerCtor` + `flushFor` after
- * `appendClassMeta`). Use `options.unique` to control duplicate application on the
- * same class.
+ * `appendClassMeta`).
  *
- * @param options - Optional `name` (affects the key), `compose`, `validate`,
- *   `requireInstanceOf`, and `unique`.
+ * @param options - Optional `name` (affects the key), `compose`, `validate`, and `requireInstanceOf`.
  */
 export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta], TInstance = unknown>(
 	options?: DecoratorOptions<TMeta, TArgs>
 ): DecoratedClassFactory<TMeta, TArgs, TInstance> {
-	const key = generateKey(options?.name);
+	const key = mintUniqueKey<TMeta>(options?.name);
 	return buildClassFactory<TMeta, TArgs, TInstance>(key, options);
 }
 
@@ -28,8 +27,7 @@ export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta], T
  * Builds a {@link createClassDecorator}-style factory for a fixed metadata key, merging
  * `options` the same way as the public entrypoint. The returned callable composes
  * `TMeta` from decorator arguments (identity tuple by default, or `options.compose`),
- * runs the validator chain if configured, then appends class-level metadata. When
- * `unique` is set, the store enforces a single value per class for this key. After
+ * runs the validator chain if configured, then appends class-level metadata. After
  * metadata is written, the constructor is registered on decorator context metadata
  * and deferred reflector work is flushed so `reader` / scoped APIs stay consistent.
  *
@@ -37,13 +35,13 @@ export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta], T
  * (child options merged via `mergeExtendedOptions` while preserving the key).
  *
  * @param key - Metadata key this factory reads and writes.
- * @param options - Optional compose/validation/uniqueness and display `name` for labels.
+ * @param options - Optional compose/validation and display `name` for labels.
  */
 export function buildClassFactory<TMeta, TArgs extends unknown[], TInstance>(
-	key: MetadataKey,
+	key: UniqueMetadataKey<TMeta>,
 	options: DecoratorOptions<TMeta, TArgs> | undefined
 ): DecoratedClassFactory<TMeta, TArgs, TInstance> {
-	const { compose: composeFn, name, unique = false } = options ?? {};
+	const { compose: composeFn, name } = options ?? {};
 	const label = labelFor(name, key);
 	const validators = buildValidatorChain<TMeta>(options, label, key);
 
@@ -59,7 +57,7 @@ export function buildClassFactory<TMeta, TArgs extends unknown[], TInstance>(
 					static: false,
 				});
 			}
-			appendClassMeta(value, key, meta, { unique });
+			appendClassMeta(value, key, meta);
 			registerCtor(value, context.metadata);
 			flushFor(value, context.metadata);
 		};

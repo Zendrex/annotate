@@ -64,8 +64,8 @@ describe("decorate.property", () => {
 		expect(Column.first(User, "name")).toEqual({ type: "varchar", nullable: false });
 	});
 
-	test("unique:true throws DuplicateMetadataError with property kind on duplicate", () => {
-		const Column = decorate.property<string>({ unique: true, name: "Column" });
+	test("throws DuplicateMetadataError with property kind on duplicate (all factory keys are unique)", () => {
+		const Column = decorate.property<string>({ name: "Column" });
 
 		let caught: unknown;
 		try {

@@ -43,7 +43,7 @@ describe("intercept.method", () => {
 		expect(Cmd.first(Cli, "greet")).toBe("build");
 	});
 
-	test("stacked interceptors: outer wraps inner; both metadata visible", () => {
+	test("stacked interceptors via derive(): outer wraps inner; both entries visible via parent reader", () => {
 		const Trace = intercept.method<string>({
 			intercept: (original, readMetadata) =>
 				function (this: unknown, ...args: unknown[]) {
@@ -52,12 +52,18 @@ describe("intercept.method", () => {
 					return original.call(this, ...args);
 				} as typeof original,
 		});
+		// derive() shares the same key so both entries are visible via the Trace reader.
+		const TraceInner = Trace.derive();
 
-		class X {
+		class Base {
 			@Trace("outer")
-			@Trace("inner")
 			// biome-ignore lint/suspicious/noEmptyBlockStatements: test stub method
 			run(): void {}
+		}
+		class X extends Base {
+			@TraceInner("inner")
+			// biome-ignore lint/suspicious/noEmptyBlockStatements: test stub method
+			override run(): void {}
 		}
 
 		const x = new X() as X & { _all?: string[] };
