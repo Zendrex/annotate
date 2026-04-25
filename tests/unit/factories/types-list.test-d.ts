@@ -24,6 +24,16 @@ void _mlKey;
 const _mlKeyUnique: UniqueMetadataKey<string> = MethodList.key;
 void _mlKeyUnique;
 
+// derive() preserves ListMetadataKey brand
+const _mlDerived = MethodList.derive();
+const _mlDerivedKey: ListMetadataKey<string> = _mlDerived.key;
+void _mlDerivedKey;
+
+// derive() does NOT widen to UniqueMetadataKey
+// @ts-expect-error: derive() result .key is ListMetadataKey, not UniqueMetadataKey
+const _mlDerivedKeyUnique: UniqueMetadataKey<string> = _mlDerived.key;
+void _mlDerivedKeyUnique;
+
 // ── decorate.class.list ───────────────────────────────────────────────────────
 
 const ClassList = decorate.class.list<number>();
@@ -35,6 +45,15 @@ void _clKey;
 const _clKeyUnique: UniqueMetadataKey<number> = ClassList.key;
 void _clKeyUnique;
 
+// derive() preserves ListMetadataKey brand
+const _clDerived = ClassList.derive();
+const _clDerivedKey: ListMetadataKey<number> = _clDerived.key;
+void _clDerivedKey;
+
+// @ts-expect-error: derive() result .key is ListMetadataKey, not UniqueMetadataKey
+const _clDerivedKeyUnique: UniqueMetadataKey<number> = _clDerived.key;
+void _clDerivedKeyUnique;
+
 // ── decorate.property.list ────────────────────────────────────────────────────
 
 const PropertyList = decorate.property.list<boolean>();
@@ -45,6 +64,15 @@ void _plKey;
 // @ts-expect-error: ListMetadataKey<boolean> is not assignable to UniqueMetadataKey<boolean>
 const _plKeyUnique: UniqueMetadataKey<boolean> = PropertyList.key;
 void _plKeyUnique;
+
+// derive() preserves ListMetadataKey brand
+const _plDerived = PropertyList.derive();
+const _plDerivedKey: ListMetadataKey<boolean> = _plDerived.key;
+void _plDerivedKey;
+
+// @ts-expect-error: derive() result .key is ListMetadataKey, not UniqueMetadataKey
+const _plDerivedKeyUnique: UniqueMetadataKey<boolean> = _plDerived.key;
+void _plDerivedKeyUnique;
 
 // ── intercept.method.list ─────────────────────────────────────────────────────
 
@@ -59,6 +87,15 @@ void _milKey;
 const _milKeyUnique: UniqueMetadataKey<string> = MethodIntList.key;
 void _milKeyUnique;
 
+// derive() preserves ListMetadataKey brand
+const _milDerived = MethodIntList.derive();
+const _milDerivedKey: ListMetadataKey<string> = _milDerived.key;
+void _milDerivedKey;
+
+// @ts-expect-error: derive() result .key is ListMetadataKey, not UniqueMetadataKey
+const _milDerivedKeyUnique: UniqueMetadataKey<string> = _milDerived.key;
+void _milDerivedKeyUnique;
+
 // ── intercept.accessor.list ───────────────────────────────────────────────────
 
 const AccList = intercept.accessor.list<string, [string], number>({
@@ -71,6 +108,15 @@ void _alKey;
 // @ts-expect-error: ListMetadataKey<string> is not assignable to UniqueMetadataKey<string>
 const _alKeyUnique: UniqueMetadataKey<string> = AccList.key;
 void _alKeyUnique;
+
+// derive() preserves ListMetadataKey brand
+const _alDerived = AccList.derive();
+const _alDerivedKey: ListMetadataKey<string> = _alDerived.key;
+void _alDerivedKey;
+
+// @ts-expect-error: derive() result .key is ListMetadataKey, not UniqueMetadataKey
+const _alDerivedKeyUnique: UniqueMetadataKey<string> = _alDerived.key;
+void _alDerivedKeyUnique;
 
 // ── unique factories keep their UniqueMetadataKey brand ───────────────────────
 

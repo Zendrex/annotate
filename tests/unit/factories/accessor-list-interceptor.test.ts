@@ -117,10 +117,9 @@ describe("intercept.accessor.list", () => {
 		new Box().x;
 
 		expect(metaSeen).toHaveLength(2);
+		// Stage-3 bottom-up: inner decorates first → stored first; outer stored second.
 		for (const seen of metaSeen) {
-			expect(seen).toHaveLength(2);
-			expect(seen).toContain("inner");
-			expect(seen).toContain("outer");
+			expect(seen).toEqual(["inner", "outer"]);
 		}
 	});
 

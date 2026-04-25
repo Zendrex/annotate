@@ -137,11 +137,10 @@ describe("intercept.method.list", () => {
 
 		// Two wrappers ran, each reading the full list
 		expect(metaSeen).toHaveLength(2);
-		// Both wrappers see both entries (inner stored first, outer second — inner decorates first)
+		// Stage-3 bottom-up apply order: inner decorates first → stored first; outer stored second.
+		// Both wrappers see the full list in the same deterministic order.
 		for (const seen of metaSeen) {
-			expect(seen).toHaveLength(2);
-			expect(seen).toContain("inner");
-			expect(seen).toContain("outer");
+			expect(seen).toEqual(["inner", "outer"]);
 		}
 	});
 
@@ -193,11 +192,9 @@ describe("intercept.method.list", () => {
 
 		// Two wrappers ran
 		expect(metaPerWrapper).toHaveLength(2);
-		// Each wrapper sees the full list
+		// Stage-3 bottom-up: inner decorates first → stored first; outer stored second.
 		for (const seen of metaPerWrapper) {
-			expect(seen).toHaveLength(2);
-			expect(seen).toContain("outer");
-			expect(seen).toContain("inner");
+			expect(seen).toEqual(["inner", "outer"]);
 		}
 	});
 });
