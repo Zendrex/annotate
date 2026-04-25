@@ -1,4 +1,4 @@
-import type { MetadataArray, UniqueMetadataKey } from "../metadata/types";
+import type { MetadataArray, MetadataKey } from "../metadata/types";
 import type { AnyConstructor, ScopedReflector } from "../reflector/types";
 import type { ValidatorFn } from "./validator-types";
 
@@ -90,12 +90,18 @@ export type AccessorDecoratorFn<TThis, TValue, TArgs extends unknown[]> = (
 /**
  * A class decorator factory plus `key`, `reader` / `first` / `all`, and
  * `derive` for the same key with stricter instance typing.
+ *
+ * `TCard` carries the cardinality brand (`"unique"` or `"list"`), exposed via
+ * `.key`. T4 will specialize reader return types on `TCard`.
  */
-export type DecoratedClassFactory<TMeta, TArgs extends unknown[] = [TMeta], TInstance = unknown> = ClassDecoratorFn<
-	TInstance,
-	TArgs
-> & {
-	key: UniqueMetadataKey<TMeta>;
+export type DecoratedClassFactory<
+	TMeta,
+	TArgs extends unknown[] = [TMeta],
+	TInstance = unknown,
+	// T4: specialize reader return types on TCard
+	TCard extends "unique" | "list" = "unique",
+> = ClassDecoratorFn<TInstance, TArgs> & {
+	key: MetadataKey<TMeta, TCard>;
 	reader(target: object): ScopedReflector<TMeta>;
 	first(target: object): TMeta | undefined;
 	firstOrThrow(target: object): TMeta;
@@ -104,12 +110,14 @@ export type DecoratedClassFactory<TMeta, TArgs extends unknown[] = [TMeta], TIns
 	all(target: object): MetadataArray<TMeta>;
 	derive<TNewInstance = TInstance>(
 		options?: DeriveOptions<TMeta, TArgs>
-	): DecoratedClassFactory<TMeta, TArgs, TNewInstance>;
+	): DecoratedClassFactory<TMeta, TArgs, TNewInstance, TCard>;
 };
 
 /**
  * Method decorator plus metadata readers scoped to `(target, name)` and `derive`
  * for alternate method/this types with the same storage key.
+ *
+ * `TCard` carries the cardinality brand; T4 will specialize reader return types.
  */
 export type DecoratedMethodFactory<
 	TMeta,
@@ -117,8 +125,10 @@ export type DecoratedMethodFactory<
 	TMethod extends AnyFn = AnyFn,
 	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
 	TThis = any,
+	// T4: specialize reader return types on TCard
+	TCard extends "unique" | "list" = "unique",
 > = MethodDecoratorFn<TThis, TMethod, TArgs> & {
-	key: UniqueMetadataKey<TMeta>;
+	key: MetadataKey<TMeta, TCard>;
 	reader(target: object): ScopedReflector<TMeta>;
 	first(target: object, name: string | symbol): TMeta | undefined;
 	firstOrThrow(target: object, name: string | symbol): TMeta;
@@ -127,18 +137,24 @@ export type DecoratedMethodFactory<
 	all(target: object, name: string | symbol): MetadataArray<TMeta>;
 	derive<TNewMethod extends AnyFn = TMethod, TNewThis = TThis>(
 		options?: DeriveOptions<TMeta, TArgs>
-	): DecoratedMethodFactory<TMeta, TArgs, TNewMethod, TNewThis>;
+	): DecoratedMethodFactory<TMeta, TArgs, TNewMethod, TNewThis, TCard>;
 };
 
-/** Field (Stage 3) decorator with the same reader/derive pattern as method factories. */
+/**
+ * Field (Stage 3) decorator with the same reader/derive pattern as method factories.
+ *
+ * `TCard` carries the cardinality brand; T4 will specialize reader return types.
+ */
 export type DecoratedPropertyFactory<
 	TMeta,
 	TArgs extends unknown[] = [TMeta],
 	TField = unknown,
 	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
 	TThis = any,
+	// T4: specialize reader return types on TCard
+	TCard extends "unique" | "list" = "unique",
 > = FieldDecoratorFn<TThis, TField, TArgs> & {
-	key: UniqueMetadataKey<TMeta>;
+	key: MetadataKey<TMeta, TCard>;
 	reader(target: object): ScopedReflector<TMeta>;
 	first(target: object, name: string | symbol): TMeta | undefined;
 	firstOrThrow(target: object, name: string | symbol): TMeta;
@@ -147,12 +163,14 @@ export type DecoratedPropertyFactory<
 	all(target: object, name: string | symbol): MetadataArray<TMeta>;
 	derive<TNewField = TField, TNewThis = TThis>(
 		options?: DeriveOptions<TMeta, TArgs>
-	): DecoratedPropertyFactory<TMeta, TArgs, TNewField, TNewThis>;
+	): DecoratedPropertyFactory<TMeta, TArgs, TNewField, TNewThis, TCard>;
 };
 
 /**
  * Class accessor decorator (auto-accessor) with reader APIs; metadata is stored
  * as property-scoped for reflection parity.
+ *
+ * `TCard` carries the cardinality brand; T4 will specialize reader return types.
  */
 export type DecoratedAccessorFactory<
 	TMeta,
@@ -160,8 +178,10 @@ export type DecoratedAccessorFactory<
 	TValue = unknown,
 	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
 	TThis = any,
+	// T4: specialize reader return types on TCard
+	TCard extends "unique" | "list" = "unique",
 > = AccessorDecoratorFn<TThis, TValue, TArgs> & {
-	key: UniqueMetadataKey<TMeta>;
+	key: MetadataKey<TMeta, TCard>;
 	reader(target: object): ScopedReflector<TMeta>;
 	first(target: object, name: string | symbol): TMeta | undefined;
 	firstOrThrow(target: object, name: string | symbol): TMeta;
@@ -170,7 +190,7 @@ export type DecoratedAccessorFactory<
 	all(target: object, name: string | symbol): MetadataArray<TMeta>;
 	derive<TNewValue = TValue, TNewThis = TThis>(
 		options?: DeriveOptions<TMeta, TArgs>
-	): DecoratedAccessorFactory<TMeta, TArgs, TNewValue, TNewThis>;
+	): DecoratedAccessorFactory<TMeta, TArgs, TNewValue, TNewThis, TCard>;
 };
 
 type FactoryGenerics<F> =

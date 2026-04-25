@@ -1,4 +1,4 @@
-import { mintUniqueKey } from "../metadata/cardinality-registry";
+import { mintListKey, mintUniqueKey } from "../metadata/cardinality-registry";
 import {
 	compose,
 	createMemberFactoryHelpers,
@@ -8,7 +8,7 @@ import {
 	mergeExtendedOptions,
 } from "./shared";
 import { buildValidatorChain } from "./validator-chain";
-import type { UniqueMetadataKey } from "../metadata/types";
+import type { MetadataKey } from "../metadata/types";
 import type {
 	AccessorInterceptorOptions,
 	DecoratedAccessorFactory,
@@ -64,12 +64,21 @@ export function createAccessorInterceptor<
  * Low-level accessor interceptor factory: emits metadata through the same path
  * as `createAccessorInterceptor` but accepts a precomputed key and optional
  * `derive` merging. Exposed for advanced composition; prefer `createAccessorInterceptor`.
+ *
+ * Accepts both `UniqueMetadataKey` and `ListMetadataKey` via the wider `MetadataKey` bound.
+ * Cardinality enforcement is delegated to the store layer.
  */
-export function buildAccessorFactory<TMeta, TArgs extends unknown[], TValue, TThis>(
-	key: UniqueMetadataKey<TMeta>,
+export function buildAccessorFactory<
+	TMeta,
+	TArgs extends unknown[],
+	TValue,
+	TThis,
+	TCard extends "unique" | "list" = "unique",
+>(
+	key: MetadataKey<TMeta, TCard>,
 	options: DecoratorOptions<TMeta, TArgs> | undefined,
 	hookRefs: AccessorHookRefs<TMeta, TValue>
-): DecoratedAccessorFactory<TMeta, TArgs, TValue, TThis> {
+): DecoratedAccessorFactory<TMeta, TArgs, TValue, TThis, TCard> {
 	const { compose: composeFn, name } = options ?? {};
 	const label = labelFor(name, key);
 	const validators = buildValidatorChain<TMeta>(options, label, key);
@@ -114,8 +123,8 @@ export function buildAccessorFactory<TMeta, TArgs extends unknown[], TValue, TTh
 
 	const derive = <TNewValue = TValue, TNewThis = TThis>(
 		childOptions?: DeriveOptions<TMeta, TArgs>
-	): DecoratedAccessorFactory<TMeta, TArgs, TNewValue, TNewThis> =>
-		buildAccessorFactory<TMeta, TArgs, TNewValue, TNewThis>(
+	): DecoratedAccessorFactory<TMeta, TArgs, TNewValue, TNewThis, TCard> =>
+		buildAccessorFactory<TMeta, TArgs, TNewValue, TNewThis, TCard>(
 			key,
 			mergeExtendedOptions(options, childOptions),
 			hookRefs as unknown as AccessorHookRefs<TMeta, TNewValue>
@@ -125,5 +134,33 @@ export function buildAccessorFactory<TMeta, TArgs extends unknown[], TValue, TTh
 		key,
 		...createMemberFactoryHelpers<TMeta>(key, "property", label),
 		derive,
-	}) as DecoratedAccessorFactory<TMeta, TArgs, TValue, TThis>;
+	}) as DecoratedAccessorFactory<TMeta, TArgs, TValue, TThis, TCard>;
+}
+
+/**
+ * Like `intercept.accessor`, but for list-cardinality metadata. Multiple decorations
+ * of the same accessor with the same factory each append one entry (no `DuplicateMetadataError`).
+ * Exposes `.key` typed as `ListMetadataKey<TMeta>`.
+ *
+ * @throws {TypeError} If neither `onGet` nor `onSet` is provided.
+ */
+export function createAccessorListInterceptor<
+	TMeta,
+	TArgs extends unknown[] = [TMeta],
+	TValue = unknown,
+	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
+	TThis = any,
+>(
+	options: AccessorInterceptorOptions<TMeta, TArgs, TValue>
+): DecoratedAccessorFactory<TMeta, TArgs, TValue, TThis, "list"> {
+	if (!(options.onGet || options.onSet)) {
+		throw new TypeError("intercept.accessor.list: provide at least one of onGet or onSet");
+	}
+
+	const key = mintListKey<TMeta>(options.name);
+	const { onGet, onSet, ...rest } = options;
+	return buildAccessorFactory<TMeta, TArgs, TValue, TThis, "list">(key, rest as DecoratorOptions<TMeta, TArgs>, {
+		onGet,
+		onSet,
+	});
 }

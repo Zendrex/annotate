@@ -1,4 +1,4 @@
-import { mintUniqueKey } from "../metadata/cardinality-registry";
+import { mintListKey, mintUniqueKey } from "../metadata/cardinality-registry";
 import {
 	compose,
 	createMemberFactoryHelpers,
@@ -8,7 +8,7 @@ import {
 	mergeExtendedOptions,
 } from "./shared";
 import { buildValidatorChain } from "./validator-chain";
-import type { UniqueMetadataKey } from "../metadata/types";
+import type { MetadataKey } from "../metadata/types";
 import type { AnyFn, DecoratedMethodFactory, DecoratorOptions, DeriveOptions, InterceptorContext } from "./types";
 
 /**
@@ -51,16 +51,25 @@ export function createMethodDecorator<
  * `key`, reader helpers, and `derive` (reuses `hookRefs` and merges child options;
  * see inline note on `TNewMethod` narrowing).
  *
+ * Accepts both `UniqueMetadataKey` and `ListMetadataKey` via the wider `MetadataKey` bound.
+ * Cardinality enforcement is delegated to the store layer.
+ *
  * @param key - Fixed metadata key for this family of decorators.
  * @param options - Factory options; merged into derived factories by `derive`.
  * @param hookRefs - When present, enables intercept-based method replacement
  *   while metadata is still recorded for the member.
  */
-export function buildMethodFactory<TMeta, TArgs extends unknown[], TMethod extends AnyFn, TThis>(
-	key: UniqueMetadataKey<TMeta>,
+export function buildMethodFactory<
+	TMeta,
+	TArgs extends unknown[],
+	TMethod extends AnyFn,
+	TThis,
+	TCard extends "unique" | "list" = "unique",
+>(
+	key: MetadataKey<TMeta, TCard>,
 	options: DecoratorOptions<TMeta, TArgs> | undefined,
 	hookRefs?: MethodHookRefs<TMeta, TMethod>
-): DecoratedMethodFactory<TMeta, TArgs, TMethod, TThis> {
+): DecoratedMethodFactory<TMeta, TArgs, TMethod, TThis, TCard> {
 	const { compose: composeFn, name } = options ?? {};
 	const label = labelFor(name, key);
 	const validators = buildValidatorChain<TMeta>(options, label, key);
@@ -97,8 +106,8 @@ export function buildMethodFactory<TMeta, TArgs extends unknown[], TMethod exten
 
 	const derive = <TNewMethod extends AnyFn = TMethod, TNewThis = TThis>(
 		childOptions?: DeriveOptions<TMeta, TArgs>
-	): DecoratedMethodFactory<TMeta, TArgs, TNewMethod, TNewThis> =>
-		buildMethodFactory<TMeta, TArgs, TNewMethod, TNewThis>(
+	): DecoratedMethodFactory<TMeta, TArgs, TNewMethod, TNewThis, TCard> =>
+		buildMethodFactory<TMeta, TArgs, TNewMethod, TNewThis, TCard>(
 			key,
 			mergeExtendedOptions(options, childOptions),
 			hookRefs as MethodHookRefs<TMeta, TNewMethod> | undefined
@@ -108,5 +117,23 @@ export function buildMethodFactory<TMeta, TArgs extends unknown[], TMethod exten
 		key,
 		...createMemberFactoryHelpers<TMeta>(key, "method", label),
 		derive,
-	}) as DecoratedMethodFactory<TMeta, TArgs, TMethod, TThis>;
+	}) as DecoratedMethodFactory<TMeta, TArgs, TMethod, TThis, TCard>;
+}
+
+/**
+ * Returns a method decorator factory that accumulates metadata (list cardinality).
+ * Multiple decorations of the same method with the same factory each append one entry.
+ * Exposes `.key` typed as `ListMetadataKey<TMeta>`.
+ *
+ * @param options - Optional `name`, `compose`, `validate`, `requireInstanceOf`.
+ */
+export function createMethodListDecorator<
+	TMeta,
+	TArgs extends unknown[] = [TMeta],
+	TMethod extends AnyFn = AnyFn,
+	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
+	TThis = any,
+>(options?: DecoratorOptions<TMeta, TArgs>): DecoratedMethodFactory<TMeta, TArgs, TMethod, TThis, "list"> {
+	const key = mintListKey<TMeta>(options?.name);
+	return buildMethodFactory<TMeta, TArgs, TMethod, TThis, "list">(key, options);
 }
