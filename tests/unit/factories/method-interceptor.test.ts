@@ -43,6 +43,26 @@ describe("intercept.method", () => {
 		expect(Cmd.first(Cli, "greet")).toBe("build");
 	});
 
+	/**
+	 * Coverage note — stacked-interceptor wrapper composition:
+	 *
+	 * Applying two unique-cardinality interceptors (e.g. @Trace twice) to the
+	 * same prototype slot now correctly throws `DuplicateMetadataError`.
+	 *
+	 * True stacked-wrapper composition — two wrappers running in sequence on one
+	 * member — belongs to `intercept.method.list` (list-cardinality keys allow
+	 * multiple entries per slot). That behaviour is covered in T3 per spec
+	 * §Testing: "Unit — list interceptors: stacking two `intercept.method.list`
+	 * decorators on one method wraps twice (Stage 3 order) and appends two
+	 * entries".
+	 *
+	 * This test exercises *metadata visibility across an inheritance chain*
+	 * only: `TraceInner` is applied to the overriding `X.run` slot while
+	 * `Trace` is applied to the base `Base.run` slot. In Stage 3 semantics an
+	 * override replaces the prototype slot, so both decorators target distinct
+	 * slots, and the `Trace` reader on `x` correctly surfaces both entries via
+	 * the shared key that `derive()` preserves.
+	 */
 	test("stacked interceptors via derive(): outer wraps inner; both entries visible via parent reader", () => {
 		const Trace = intercept.method<string>({
 			intercept: (original, readMetadata) =>

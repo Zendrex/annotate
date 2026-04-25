@@ -1,3 +1,4 @@
+import { getKeyCardinality } from "./metadata/cardinality-registry";
 import { targetDisplayName } from "./reflector/class-name";
 import type { MetadataKey } from "./metadata/types";
 import type { AnyConstructor, DecoratedKind } from "./reflector/types";
@@ -86,13 +87,18 @@ export class DuplicateMetadataError extends AnnotateError {
 			? `"${String(memberName)}" on "${targetDisplayName(ctor)}"`
 			: `"${targetDisplayName(ctor)}"`;
 		const keyLabel = key.description ?? String(key);
+		// Look up cardinality at construction time so the message stays accurate
+		// if this error is ever thrown for a non-unique key in the future.
+		// Falls back to "unique" as a safe default — the registry check at the
+		// throw site guarantees the key was registered before we reach this point.
+		const cardinality = getKeyCardinality(key) ?? "unique";
 		super({
 			code: AnnotateErrorCode.DUPLICATE,
 			key,
 			kind,
 			target: ctor,
 			memberName,
-			message: `duplicate decoration [unique key "${keyLabel}"]: ${slot} already has metadata for this factory`,
+			message: `duplicate decoration [${cardinality} key "${keyLabel}"]: ${slot} already has metadata for this factory`,
 		});
 	}
 }
