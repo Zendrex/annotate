@@ -18,8 +18,22 @@
 				"types": "./dist/index.d.cts",
 				"default": "./dist/index.cjs"
 			}
+		},
+		"./shim": {
+			"import": {
+				"types": "./dist/shim.d.mts",
+				"default": "./dist/shim.mjs"
+			},
+			"require": {
+				"types": "./dist/shim.d.cts",
+				"default": "./dist/shim.cjs"
+			}
 		}
 	},
+	"sideEffects": [
+		"./dist/shim.mjs",
+		"./dist/shim.cjs"
+	],
 	"files": [
 		"dist",
 		"README.md",
