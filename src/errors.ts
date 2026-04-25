@@ -85,13 +85,14 @@ export class DuplicateMetadataError extends AnnotateError {
 		const slot = memberName
 			? `"${String(memberName)}" on "${targetDisplayName(ctor)}"`
 			: `"${targetDisplayName(ctor)}"`;
+		const keyLabel = key.description ?? String(key);
 		super({
 			code: AnnotateErrorCode.DUPLICATE,
 			key,
 			kind,
 			target: ctor,
 			memberName,
-			message: `duplicate decoration: ${slot} already has metadata for this factory`,
+			message: `duplicate decoration [unique key "${keyLabel}"]: ${slot} already has metadata for this factory`,
 		});
 	}
 }
