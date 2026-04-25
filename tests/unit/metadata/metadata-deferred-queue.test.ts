@@ -1,12 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
+import { mintUniqueKey } from "../../../src/metadata/cardinality-registry";
 import { getMemberMeta } from "../../../src/metadata/member-meta-store";
 import { flushFor, hasPendingFor, queueDeferred } from "../../../src/metadata/metadata-deferred-queue";
 
 describe("metadata deferred queue", () => {
 	test("queueDeferred + flushFor commits pending entries", () => {
 		const correlation = {};
-		const key = Symbol("k");
+		const key = mintUniqueKey("k");
 		const token = Symbol("t");
 		class A {}
 		queueDeferred(correlation, {
@@ -14,7 +15,6 @@ describe("metadata deferred queue", () => {
 			name: "foo",
 			meta: "v",
 			token,
-			unique: false,
 			static: false,
 			kind: "method",
 		});
@@ -26,7 +26,7 @@ describe("metadata deferred queue", () => {
 
 	test("flushFor is idempotent (no double-write)", () => {
 		const correlation = {};
-		const key = Symbol("k");
+		const key = mintUniqueKey("k");
 		const token = Symbol("t");
 		class A {}
 		queueDeferred(correlation, {
@@ -34,7 +34,6 @@ describe("metadata deferred queue", () => {
 			name: "foo",
 			meta: "v",
 			token,
-			unique: false,
 			static: false,
 			kind: "method",
 		});
@@ -49,13 +48,13 @@ describe("metadata deferred queue", () => {
 	});
 
 	test("queueDeferred with nullish correlation is a no-op", () => {
+		const key = mintUniqueKey("k");
 		expect(() =>
 			queueDeferred(null, {
-				key: Symbol("k"),
+				key,
 				name: "x",
 				meta: 1,
 				token: Symbol("t"),
-				unique: false,
 				static: false,
 				kind: "method",
 			})

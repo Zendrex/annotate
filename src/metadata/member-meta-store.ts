@@ -1,5 +1,6 @@
-import { DuplicateMetadataError } from "../errors";
+import { DuplicateMetadataError, UnregisteredMetadataKeyError } from "../errors";
 import { walkPrototypeChain } from "../runtime/prototype-chain";
+import { getKeyCardinality } from "./cardinality-registry";
 import type { AnyConstructor } from "../reflector/types";
 import type { Ctor, MemberBucket, MemberKind, MetadataKey } from "./types";
 
@@ -26,8 +27,11 @@ export function hasOwnMemberMeta(ctor: Ctor, key: symbol, name: string | symbol)
 
 /**
  * Appends member metadata. Skips if `token` was already committed for this `ctor` (idempotent re-entry after a partial flush).
+ * Cardinality is read from the registry: unregistered keys throw `UnregisteredMetadataKeyError`; unique-registered keys
+ * that already have a value for this member throw `DuplicateMetadataError`; list-registered keys accumulate freely.
  *
- * @throws {DuplicateMetadataError} If `options.unique` is true and a value already exists for this member+key on `ctor`
+ * @throws {UnregisteredMetadataKeyError} If `key` was not minted via `mintUniqueKey` or `mintListKey`
+ * @throws {DuplicateMetadataError} If the key is `"unique"` and a value already exists for this member+key on `ctor`
  */
 export function appendMemberMeta<T>(
 	ctor: Ctor,
@@ -35,7 +39,7 @@ export function appendMemberMeta<T>(
 	name: string | symbol,
 	meta: T,
 	token: symbol,
-	options: { unique: boolean; static: boolean; kind: MemberKind }
+	options: { static: boolean; kind: MemberKind }
 ): void {
 	let tokens = committedTokens.get(ctor);
 	if (!tokens) {
@@ -44,6 +48,11 @@ export function appendMemberMeta<T>(
 	}
 	if (tokens.has(token)) {
 		return;
+	}
+
+	const cardinality = getKeyCardinality(key);
+	if (cardinality === undefined) {
+		throw new UnregisteredMetadataKeyError(ctor as AnyConstructor, key as MetadataKey);
 	}
 
 	let outer = memberMetaStore.get(ctor);
@@ -61,7 +70,7 @@ export function appendMemberMeta<T>(
 		list = [];
 		inner.set(name, list);
 	}
-	if (options.unique && list.length > 0) {
+	if (cardinality === "unique" && list.length > 0) {
 		// key is plain symbol here; cast to MetadataKey for the structured error (brand is phantom-only).
 		throw new DuplicateMetadataError(ctor as AnyConstructor, key as MetadataKey, options.kind, name);
 	}

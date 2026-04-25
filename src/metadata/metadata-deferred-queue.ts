@@ -63,7 +63,6 @@ export function flushFor(ctor: Ctor, correlation: object | null): void {
 				}
 			}
 			appendMemberMeta(ctor, d.key, d.name, d.meta, d.token, {
-				unique: d.unique,
 				static: d.static,
 				kind: d.kind,
 			});

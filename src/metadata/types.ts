@@ -59,8 +59,6 @@ export interface Deferred {
 	 * deferred item after a failed partial flush.
 	 */
 	token: symbol;
-	/** When true, only one value is allowed for this member+key; enforced on flush. */
-	unique: boolean;
 	/** Optional checks run on flush before the value is stored. */
 	validators?: readonly DeferredValidatorFn[];
 }

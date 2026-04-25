@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { UnregisteredClassError } from "../../../src/errors";
+import { mintUniqueKey } from "../../../src/metadata/cardinality-registry";
 import { getMemberMeta } from "../../../src/metadata/member-meta-store";
 import { getCorrelationFor, registerCtor } from "../../../src/metadata/metadata-ctor-correlation";
 import { hasPendingFor, queueDeferred } from "../../../src/metadata/metadata-deferred-queue";
@@ -19,7 +20,7 @@ describe("prepare(ctor)", () => {
 	});
 
 	test("flushes pending Deferreds via cached correlation", () => {
-		const key = Symbol("k");
+		const key = mintUniqueKey("k");
 		const correlation = {};
 		class A {}
 		queueDeferred(correlation, {
@@ -27,7 +28,6 @@ describe("prepare(ctor)", () => {
 			name: "foo",
 			meta: "v",
 			token: Symbol("token"),
-			unique: false,
 			static: false,
 			kind: "method",
 		});
@@ -38,7 +38,7 @@ describe("prepare(ctor)", () => {
 	});
 
 	test("flushes pending Deferreds via own [Symbol.metadata]", () => {
-		const key = Symbol("k");
+		const key = mintUniqueKey("k");
 		const correlation = {};
 		class A {}
 		brand(A, correlation);
@@ -47,7 +47,6 @@ describe("prepare(ctor)", () => {
 			name: "foo",
 			meta: "v",
 			token: Symbol("token"),
-			unique: false,
 			static: false,
 			kind: "method",
 		});
@@ -57,7 +56,7 @@ describe("prepare(ctor)", () => {
 	});
 
 	test("flushes ancestor pending via prototype chain walk", () => {
-		const key = Symbol("k");
+		const key = mintUniqueKey("k");
 		const correlation = {};
 		class A {}
 		class B extends A {}
@@ -67,7 +66,6 @@ describe("prepare(ctor)", () => {
 			name: "foo",
 			meta: "v",
 			token: Symbol("token"),
-			unique: false,
 			static: false,
 			kind: "method",
 		});

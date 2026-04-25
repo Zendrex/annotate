@@ -1,5 +1,6 @@
-import { DuplicateMetadataError } from "../errors";
+import { DuplicateMetadataError, UnregisteredMetadataKeyError } from "../errors";
 import { walkPrototypeChain } from "../runtime/prototype-chain";
+import { getKeyCardinality } from "./cardinality-registry";
 import type { AnyConstructor } from "../reflector/types";
 import type { ClassBucket, Ctor, MetadataKey } from "./types";
 
@@ -21,11 +22,19 @@ export function hasOwnClassMeta(ctor: Ctor, key: symbol): boolean {
 }
 
 /**
- * Appends a class-level value for `key` on `ctor`.
+ * Appends a class-level value for `key` on `ctor`. Cardinality is read from the registry:
+ * unregistered keys throw `UnregisteredMetadataKeyError`; unique-registered keys that already
+ * have a value throw `DuplicateMetadataError`; list-registered keys accumulate freely.
  *
- * @throws {DuplicateMetadataError} If `options.unique` is true and a value already exists for this ctor+key
+ * @throws {UnregisteredMetadataKeyError} If `key` was not minted via `mintUniqueKey` or `mintListKey`
+ * @throws {DuplicateMetadataError} If the key is `"unique"` and a value already exists for this ctor+key
  */
-export function appendClassMeta<T>(ctor: Ctor, key: symbol, value: T, options: { unique: boolean }): void {
+export function appendClassMeta<T>(ctor: Ctor, key: symbol, value: T): void {
+	const cardinality = getKeyCardinality(key);
+	if (cardinality === undefined) {
+		throw new UnregisteredMetadataKeyError(ctor as AnyConstructor, key as MetadataKey);
+	}
+
 	let bucket = classMetaStore.get(ctor);
 	if (!bucket) {
 		bucket = new Map();
@@ -36,7 +45,7 @@ export function appendClassMeta<T>(ctor: Ctor, key: symbol, value: T, options: {
 		list = [];
 		bucket.set(key, list);
 	}
-	if (options.unique && list.length > 0) {
+	if (cardinality === "unique" && list.length > 0) {
 		// key is plain symbol here; cast to MetadataKey for the structured error (brand is phantom-only).
 		throw new DuplicateMetadataError(ctor as AnyConstructor, key as MetadataKey, "class");
 	}
