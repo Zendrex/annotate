@@ -115,7 +115,7 @@ export function buildMethodFactory<
 
 	return Object.assign(decoratorFn, {
 		key,
-		...createMemberFactoryHelpers<TMeta>(key, "method", label),
+		...createMemberFactoryHelpers<TMeta, TCard>(key, "method", label),
 		derive,
 	}) as DecoratedMethodFactory<TMeta, TArgs, TMethod, TThis, TCard>;
 }

@@ -92,17 +92,17 @@ export type AccessorDecoratorFn<TThis, TValue, TArgs extends unknown[]> = (
  * `derive` for the same key with stricter instance typing.
  *
  * `TCard` carries the cardinality brand (`"unique"` or `"list"`), exposed via
- * `.key`. T4 will specialize reader return types on `TCard`.
+ * `.key`. The `reader` return type narrows on `TCard` so callers get
+ * scalar `metadata` for unique keys and array `metadata` for list keys.
  */
 export type DecoratedClassFactory<
 	TMeta,
 	TArgs extends unknown[] = [TMeta],
 	TInstance = unknown,
-	// T4: specialize reader return types on TCard
 	TCard extends "unique" | "list" = "unique",
 > = ClassDecoratorFn<TInstance, TArgs> & {
 	key: MetadataKey<TMeta, TCard>;
-	reader(target: object): ScopedReflector<TMeta>;
+	reader(target: object): ScopedReflector<TMeta, TCard>;
 	first(target: object): TMeta | undefined;
 	firstOrThrow(target: object): TMeta;
 	has(target: object): boolean;
@@ -117,7 +117,8 @@ export type DecoratedClassFactory<
  * Method decorator plus metadata readers scoped to `(target, name)` and `derive`
  * for alternate method/this types with the same storage key.
  *
- * `TCard` carries the cardinality brand; T4 will specialize reader return types.
+ * `TCard` carries the cardinality brand; the `reader` return type narrows on `TCard`
+ * so callers get scalar `metadata` for unique keys and array `metadata` for list keys.
  */
 export type DecoratedMethodFactory<
 	TMeta,
@@ -125,11 +126,10 @@ export type DecoratedMethodFactory<
 	TMethod extends AnyFn = AnyFn,
 	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
 	TThis = any,
-	// T4: specialize reader return types on TCard
 	TCard extends "unique" | "list" = "unique",
 > = MethodDecoratorFn<TThis, TMethod, TArgs> & {
 	key: MetadataKey<TMeta, TCard>;
-	reader(target: object): ScopedReflector<TMeta>;
+	reader(target: object): ScopedReflector<TMeta, TCard>;
 	first(target: object, name: string | symbol): TMeta | undefined;
 	firstOrThrow(target: object, name: string | symbol): TMeta;
 	has(target: object, name: string | symbol): boolean;
@@ -143,7 +143,8 @@ export type DecoratedMethodFactory<
 /**
  * Field (Stage 3) decorator with the same reader/derive pattern as method factories.
  *
- * `TCard` carries the cardinality brand; T4 will specialize reader return types.
+ * `TCard` carries the cardinality brand; the `reader` return type narrows on `TCard`
+ * so callers get scalar `metadata` for unique keys and array `metadata` for list keys.
  */
 export type DecoratedPropertyFactory<
 	TMeta,
@@ -151,11 +152,10 @@ export type DecoratedPropertyFactory<
 	TField = unknown,
 	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
 	TThis = any,
-	// T4: specialize reader return types on TCard
 	TCard extends "unique" | "list" = "unique",
 > = FieldDecoratorFn<TThis, TField, TArgs> & {
 	key: MetadataKey<TMeta, TCard>;
-	reader(target: object): ScopedReflector<TMeta>;
+	reader(target: object): ScopedReflector<TMeta, TCard>;
 	first(target: object, name: string | symbol): TMeta | undefined;
 	firstOrThrow(target: object, name: string | symbol): TMeta;
 	has(target: object, name: string | symbol): boolean;
@@ -170,7 +170,8 @@ export type DecoratedPropertyFactory<
  * Class accessor decorator (auto-accessor) with reader APIs; metadata is stored
  * as property-scoped for reflection parity.
  *
- * `TCard` carries the cardinality brand; T4 will specialize reader return types.
+ * `TCard` carries the cardinality brand; the `reader` return type narrows on `TCard`
+ * so callers get scalar `metadata` for unique keys and array `metadata` for list keys.
  */
 export type DecoratedAccessorFactory<
 	TMeta,
@@ -178,11 +179,10 @@ export type DecoratedAccessorFactory<
 	TValue = unknown,
 	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
 	TThis = any,
-	// T4: specialize reader return types on TCard
 	TCard extends "unique" | "list" = "unique",
 > = AccessorDecoratorFn<TThis, TValue, TArgs> & {
 	key: MetadataKey<TMeta, TCard>;
-	reader(target: object): ScopedReflector<TMeta>;
+	reader(target: object): ScopedReflector<TMeta, TCard>;
 	first(target: object, name: string | symbol): TMeta | undefined;
 	firstOrThrow(target: object, name: string | symbol): TMeta;
 	has(target: object, name: string | symbol): boolean;

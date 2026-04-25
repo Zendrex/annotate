@@ -76,11 +76,15 @@ export type { ListMetadataKey, MetadataArray, MetadataKey, UniqueMetadataKey } f
 export type { Reflector } from "./reflector/reflector";
 export type {
 	DecoratedClass,
+	DecoratedClassList,
+	DecoratedClassUnique,
 	DecoratedItem,
 	DecoratedKind,
 	DecoratedMethod,
-	DecoratedMethodScalar,
+	DecoratedMethodList,
+	DecoratedMethodUnique,
 	DecoratedProperty,
-	DecoratedPropertyScalar,
+	DecoratedPropertyList,
+	DecoratedPropertyUnique,
 	ScopedReflector,
 } from "./reflector/types";

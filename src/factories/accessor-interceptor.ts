@@ -132,7 +132,7 @@ export function buildAccessorFactory<
 
 	return Object.assign(decoratorFn, {
 		key,
-		...createMemberFactoryHelpers<TMeta>(key, "property", label),
+		...createMemberFactoryHelpers<TMeta, TCard>(key, "property", label),
 		derive,
 	}) as DecoratedAccessorFactory<TMeta, TArgs, TValue, TThis, TCard>;
 }

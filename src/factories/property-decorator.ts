@@ -74,7 +74,7 @@ export function buildPropertyFactory<
 
 	return Object.assign(decoratorFn, {
 		key,
-		...createMemberFactoryHelpers<TMeta>(key, "property", label),
+		...createMemberFactoryHelpers<TMeta, TCard>(key, "property", label),
 		derive,
 	}) as DecoratedPropertyFactory<TMeta, TArgs, TField, TThis, TCard>;
 }

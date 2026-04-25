@@ -77,7 +77,7 @@ export function buildClassFactory<
 
 	return Object.assign(decoratorFn, {
 		key,
-		...createClassFactoryHelpers<TMeta>(key, label),
+		...createClassFactoryHelpers<TMeta, TCard>(key, label),
 		derive,
 	}) as DecoratedClassFactory<TMeta, TArgs, TInstance, TCard>;
 }

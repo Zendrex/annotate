@@ -194,12 +194,15 @@ export function mergeExtendedOptions<TMeta, TArgs extends unknown[]>(
  * - **has** / **hasOwn** — whether an entry exists anywhere in the class metadata chain / on the constructor only.
  * - **all** — a frozen list of all class-level entries in declaration order.
  */
-export function createClassFactoryHelpers<TMeta>(key: MetadataKey, label: string) {
+export function createClassFactoryHelpers<TMeta, TCard extends "unique" | "list" = "unique">(
+	key: MetadataKey<TMeta, TCard>,
+	label: string
+) {
 	const firstClassMeta = (ctor: Ctor): TMeta | undefined => firstClassMetaForKey<TMeta>(ctor, key);
 
 	return {
-		reader: (target: object): ScopedReflector<TMeta> =>
-			createScopedReflector<TMeta>(resolveReflectTarget(target), key),
+		reader: (target: object): ScopedReflector<TMeta, TCard> =>
+			createScopedReflector<TMeta, TCard>(resolveReflectTarget(target), key),
 		first: (target: object): TMeta | undefined => {
 			const ctor = prepareForRead(target);
 			ensureClassRegistered(ctor);
@@ -236,8 +239,8 @@ export function createClassFactoryHelpers<TMeta>(key: MetadataKey, label: string
  * - **has** / **hasOwn** — any vs own entry for that member+key.
  * - **all** — frozen list of all entries for the member+key in declaration order.
  */
-export function createMemberFactoryHelpers<TMeta>(
-	key: MetadataKey,
+export function createMemberFactoryHelpers<TMeta, TCard extends "unique" | "list" = "unique">(
+	key: MetadataKey<TMeta, TCard>,
 	kind: Extract<DecoratedKind, "method" | "property">,
 	label: string
 ) {
@@ -245,8 +248,8 @@ export function createMemberFactoryHelpers<TMeta>(
 		firstMemberMetaForKey<TMeta>(ctor, key, member);
 
 	return {
-		reader: (target: object): ScopedReflector<TMeta> =>
-			createScopedReflector<TMeta>(resolveReflectTarget(target), key),
+		reader: (target: object): ScopedReflector<TMeta, TCard> =>
+			createScopedReflector<TMeta, TCard>(resolveReflectTarget(target), key),
 		first: (target: object, member: string | symbol): TMeta | undefined => {
 			const ctor = prepareForRead(target);
 			ensureClassRegistered(ctor);
