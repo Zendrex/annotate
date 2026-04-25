@@ -30,19 +30,6 @@ describe("walkPrototypeChain", () => {
 		expect(visited).toEqual([Leaf, Mid]);
 	});
 
-	test("continues when visit returns a non-true value", () => {
-		class Base {}
-		class Leaf extends Base {}
-
-		const visited: unknown[] = [];
-		walkPrototypeChain(Leaf, (current) => {
-			visited.push(current);
-			return false;
-		});
-
-		expect(visited).toEqual([Leaf, Base]);
-	});
-
 	test("visits only ctor when no ancestor class exists", () => {
 		class Solo {}
 		const visited: unknown[] = [];

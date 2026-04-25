@@ -6,11 +6,6 @@ describe("METADATA_SYMBOL", () => {
 	test("is a symbol", () => {
 		expect(typeof METADATA_SYMBOL).toBe("symbol");
 	});
-
-	test("is stable across calls (same identity)", () => {
-		// Imported once; identity of the module-level binding is trivially stable.
-		expect(METADATA_SYMBOL).toBe(METADATA_SYMBOL);
-	});
 });
 
 describe("readOwnMetadata", () => {

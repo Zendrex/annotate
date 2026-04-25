@@ -1,11 +1,13 @@
 import type { Ctor } from "../metadata/types";
 
 /**
- * Walk `ctor`'s prototype chain, invoking `visit` for each ancestor (including
- * `ctor` itself). Returning `true` from `visit` stops the walk. The walk stops
- * at `Function.prototype` so reflection never reads from the base callable.
+ * Walks the constructor prototype chain for metadata discovery: visits `ctor`,
+ * then each `Object.getPrototypeOf` link, until the chain ends or reaches
+ * `Function.prototype` (that node is not visited). Stops early when `visit`
+ * returns strictly `true`.
  *
- * @internal
+ * **Contract:** Used so metadata lookup can consider inherited constructors
+ * without walking past the built-in function prototype.
  */
 export function walkPrototypeChain(ctor: Ctor, visit: (current: Ctor) => unknown): void {
 	let current: Ctor | null = ctor;
