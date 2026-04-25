@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/complexity/noVoid: discard class references to avoid unused-variable warnings in tests */
 import { describe, expect, test } from "bun:test";
 
-import { AnnotateError, decorate, reflect } from "../../../src";
+import { AnnotateError, decorate, MissingMetadataError, reflect } from "../../../src";
 import type { ListMetadataKey } from "../../../src";
 
 describe("decorate.class.list", () => {
@@ -135,6 +135,7 @@ describe("decorate.class.list", () => {
 		@Other("o")
 		class X {}
 
+		expect(() => Tag.firstOrThrow(X)).toThrow(MissingMetadataError);
 		expect(() => Tag.firstOrThrow(X)).toThrow(AnnotateError);
 	});
 });

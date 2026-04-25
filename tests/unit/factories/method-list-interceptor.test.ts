@@ -2,7 +2,7 @@
 /** biome-ignore-all lint/complexity/noVoid: type-only variable bindings discarded to prevent unused-variable errors */
 import { describe, expect, test } from "bun:test";
 
-import { AnnotateError, intercept } from "../../../src";
+import { AnnotateError, intercept, MissingMetadataError } from "../../../src";
 import type { ListMetadataKey } from "../../../src";
 
 describe("intercept.method.list", () => {
@@ -195,6 +195,7 @@ describe("intercept.method.list", () => {
 		}
 
 		new Svc();
+		expect(() => Log.firstOrThrow(Svc, "run")).toThrow(MissingMetadataError);
 		expect(() => Log.firstOrThrow(Svc, "run")).toThrow(AnnotateError);
 	});
 

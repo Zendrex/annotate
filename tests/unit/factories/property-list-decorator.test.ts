@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/complexity/noVoid: discard class references to avoid unused-variable warnings */
 import { describe, expect, test } from "bun:test";
 
-import { AnnotateError, decorate } from "../../../src";
+import { AnnotateError, decorate, MissingMetadataError } from "../../../src";
 import type { ListMetadataKey } from "../../../src";
 
 describe("decorate.property.list", () => {
@@ -145,6 +145,7 @@ describe("decorate.property.list", () => {
 		}
 
 		new X();
+		expect(() => Column.firstOrThrow(X, "value")).toThrow(MissingMetadataError);
 		expect(() => Column.firstOrThrow(X, "value")).toThrow(AnnotateError);
 	});
 });

@@ -2,7 +2,7 @@
 /** biome-ignore-all lint/complexity/noVoid: discard class references to avoid unused-variable warnings */
 import { describe, expect, test } from "bun:test";
 
-import { AnnotateError, decorate } from "../../../src";
+import { AnnotateError, decorate, MissingMetadataError } from "../../../src";
 import type { ListMetadataKey } from "../../../src";
 
 describe("decorate.method.list", () => {
@@ -161,6 +161,7 @@ describe("decorate.method.list", () => {
 		}
 
 		new Api();
+		expect(() => Route.firstOrThrow(Api, "handle")).toThrow(MissingMetadataError);
 		expect(() => Route.firstOrThrow(Api, "handle")).toThrow(AnnotateError);
 	});
 });

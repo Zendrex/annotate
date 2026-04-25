@@ -2,7 +2,7 @@
 /** biome-ignore-all lint/suspicious/noUnusedExpressions: accessor reads are the side effect under test */
 import { describe, expect, test } from "bun:test";
 
-import { AnnotateError, intercept } from "../../../src";
+import { AnnotateError, intercept, MissingMetadataError } from "../../../src";
 import type { ListMetadataKey } from "../../../src";
 
 describe("intercept.accessor.list", () => {
@@ -187,6 +187,7 @@ describe("intercept.accessor.list", () => {
 		}
 
 		new Box();
+		expect(() => Trace.firstOrThrow(Box, "x")).toThrow(MissingMetadataError);
 		expect(() => Trace.firstOrThrow(Box, "x")).toThrow(AnnotateError);
 	});
 
