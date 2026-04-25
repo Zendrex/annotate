@@ -1,25 +1,21 @@
 import { UnregisteredClassError } from "../errors";
+import { collectClassMeta, hasAnyClassMeta } from "../metadata/class-meta-store";
 import {
-	collectClassMeta,
 	collectMemberMeta,
 	collectMemberNames,
 	getMemberStatic,
-	hasAnyClassMeta,
 	hasAnyMemberMeta,
-} from "../metadata/store";
-import { materialize } from "../runtime/materialize";
+} from "../metadata/member-meta-store";
+import { prepare } from "../runtime/prepare";
 import { targetDisplayName } from "./class-name";
 import { resolveReflectTarget } from "./resolve-instance";
 import type { Ctor, MetadataKey } from "../metadata/types";
 import type { AnyConstructor, DecoratedClass, DecoratedItem, DecoratedMethod, DecoratedProperty } from "./types";
 
 /**
- * Reflection over decorator metadata attached to a class. Each query takes a
- * {@link MetadataKey} so a single reflector can answer for multiple factories.
- *
- * Exposed as a type only — construct instances via {@link reflect}. For
- * single-factory usage prefer `factory.reflect(target)`, which returns a
- * scoped reflector pre-bound to that factory's key.
+ * Read view over all decoration for a class constructor. Queries are lazy:
+ * the first call runs {@link prepare} and fails with {@link UnregisteredClassError}
+ * if no metadata is registered for the class.
  */
 export interface Reflector {
 	all<T>(key: MetadataKey): DecoratedItem<T>[];
@@ -28,11 +24,6 @@ export interface Reflector {
 	properties<T>(key: MetadataKey): DecoratedProperty<T>[];
 }
 
-// Classify strictly by descriptor value: only plain function descriptors count
-// as methods. Auto-accessors expose get/set on the prototype and are therefore
-// reported as properties by design. `isStatic` is sourced from the store (set
-// from `context.static` at decoration time) so built-in ctor properties like
-// `name` / `length` never misclassify an instance field.
 function isMethodLike(ctor: Ctor, name: string | symbol, isStatic: boolean): boolean {
 	const target = isStatic ? (ctor as object) : (ctor.prototype as object);
 	const desc = Object.getOwnPropertyDescriptor(target, name);
@@ -42,7 +33,6 @@ function isMethodLike(ctor: Ctor, name: string | symbol, isStatic: boolean): boo
 	return typeof desc.value === "function";
 }
 
-/** @internal */
 export class ReflectorImpl implements Reflector {
 	private readonly ctor: AnyConstructor;
 	private registered = false;
@@ -124,7 +114,7 @@ export class ReflectorImpl implements Reflector {
 		if (this.registered) {
 			return;
 		}
-		materialize(this.ctor);
+		prepare(this.ctor);
 		if (!(hasAnyClassMeta(this.ctor) || hasAnyMemberMeta(this.ctor))) {
 			throw new UnregisteredClassError(this.ctor);
 		}
@@ -133,15 +123,9 @@ export class ReflectorImpl implements Reflector {
 }
 
 /**
- * Create a {@link Reflector} for a class or instance. Auto-materializes pending
- * registrations on read; throws {@link UnregisteredClassError} when the class
- * has no annotate metadata anywhere on its prototype chain.
- *
- * Use `factory.applied(...)` / `factory.appliedOwn(...)` for defensive checks
- * over arbitrary classes — those never throw.
- *
- * @throws {TypeError} When `target` cannot be resolved to a concrete class constructor
- * @throws {UnregisteredClassError} When `target` has no registered metadata
+ * Returns a reflector for the class of `target` (instances resolve to their
+ * constructor). Call {@link prepare} on the class earlier if the decoration
+ * might not yet be registered (e.g. instance-only classes without a class decorator).
  */
 export function reflect(target: object): Reflector {
 	return new ReflectorImpl(resolveReflectTarget(target));

@@ -11,8 +11,14 @@ describe("reflect() target resolution", () => {
 		const arrow = (): void => {
 			return;
 		};
-		expect(() => reflect(arrow as unknown as object)).toThrow(TypeError);
-		expect(() => reflect(arrow as unknown as object)).toThrow(REFLECT_PROTOTYPE_PATTERN);
+		let err: unknown;
+		try {
+			reflect(arrow as unknown as object);
+		} catch (caught) {
+			err = caught;
+		}
+		expect(err).toBeInstanceOf(TypeError);
+		expect(String((err as Error).message)).toMatch(REFLECT_PROTOTYPE_PATTERN);
 	});
 
 	test("rejects Object constructor", () => {

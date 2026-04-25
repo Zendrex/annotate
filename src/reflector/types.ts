@@ -1,23 +1,20 @@
 import type { MetadataArray } from "../metadata/types";
 
 /**
- * Permissive constructor shape accepted by reflection entry points.
- *
- * Typed as `Function & { prototype: object }` to also admit abstract classes
- * and classes with non-public constructors. Runtime validation in
- * `resolveReflectTarget` rejects plain functions that lack an object prototype.
+ * Any class constructor this library treats as a decoration **target**: a `function` with a
+ * non-null object `prototype` (ordinary constructor shape).
  */
 // biome-ignore lint/complexity/noBannedTypes: needed for constructor type
 export type AnyConstructor = Function & { prototype: object };
 
-/** Discriminator for the kind of decorated item in {@link DecoratedItem}. */
+/**
+ * Which syntactic construct carried the metadata: the class itself, a method, or a property/field.
+ */
 export type DecoratedKind = "class" | "method" | "property";
 
 /**
- * Common shape shared by class / method / property reflection results.
- *
- * `metadata` preserves declaration order (bottom-up, matching TypeScript's
- * decorator evaluation).
+ * Shared fields for every reflected decoration: kind, member or class **name**, and all
+ * metadata values stored for that site (array form).
  */
 export interface DecoratedBase<TMeta> {
 	kind: DecoratedKind;
@@ -26,9 +23,8 @@ export interface DecoratedBase<TMeta> {
 }
 
 /**
- * Reflection result for a decorated class. `name` is derived from the
- * constructor, with a stable fallback when anonymous. `target` is always a
- * resolved constructor.
+ * Class-level decoration: metadata attached to the constructor, with **name** as the class
+ * display name and **target** as the constructor itself.
  */
 export type DecoratedClass<TMeta> = DecoratedBase<TMeta> & {
 	kind: "class";
@@ -37,8 +33,8 @@ export type DecoratedClass<TMeta> = DecoratedBase<TMeta> & {
 };
 
 /**
- * Reflection result for a decorated method. `static` is `true` when the
- * method is declared on the constructor rather than the prototype.
+ * Method-level decoration (instance or static). **static** distinguishes own properties on the
+ * constructor vs the prototype.
  */
 export type DecoratedMethod<TMeta> = DecoratedBase<TMeta> & {
 	kind: "method";
@@ -46,41 +42,47 @@ export type DecoratedMethod<TMeta> = DecoratedBase<TMeta> & {
 };
 
 /**
- * Flattened {@link DecoratedMethod} exposing the first metadata entry as a
- * scalar. Suitable for factories whose `unique` option guarantees at most one
- * application; with non-unique decorators only the first value is surfaced.
+ * Like {@link DecoratedMethod}, but **metadata** is a single value (the first entry) for call
+ * sites that store at most one value per method.
  */
-export type DecoratedMethodSingle<TMeta> = Omit<DecoratedMethod<TMeta>, "metadata"> & {
+export type DecoratedMethodScalar<TMeta> = Omit<DecoratedMethod<TMeta>, "metadata"> & {
 	metadata: TMeta;
 };
 
-/** Reflection result for a decorated property. `static` mirrors {@link DecoratedMethod}. */
+/**
+ * Property- or field-level decoration. **static** has the same meaning as for
+ * {@link DecoratedMethod}.
+ */
 export type DecoratedProperty<TMeta> = DecoratedBase<TMeta> & {
 	kind: "property";
 	static: boolean;
 };
 
-/** Flattened {@link DecoratedProperty}; see {@link DecoratedMethodSingle} for semantics. */
-export type DecoratedPropertySingle<TMeta> = Omit<DecoratedProperty<TMeta>, "metadata"> & {
+/**
+ * Like {@link DecoratedProperty}, but **metadata** is a single value (the first entry) for
+ * scalar use cases.
+ */
+export type DecoratedPropertyScalar<TMeta> = Omit<DecoratedProperty<TMeta>, "metadata"> & {
 	metadata: TMeta;
 };
 
-/** Union of every reflection result shape. Narrow by the `kind` discriminator. */
+/**
+ * Any single reflected item: class, method, or property, with full **metadata** arrays.
+ */
 export type DecoratedItem<TMeta> = DecoratedClass<TMeta> | DecoratedMethod<TMeta> | DecoratedProperty<TMeta>;
 
 /**
- * Reflector pre-bound to a specific metadata key and target class. Returned by
- * `factory.reflect(target)` and the underlying factory helpers.
+ * Read API for one **metadata key** on a fixed class: same queries as the `Reflector` interface, but the
+ * key is bound so callers do not pass it on every call. **Scalar** helpers return the first
+ * metadata value per site when you only ever store one value.
  *
- * `methodsSingular` / `propertiesSingular` return the first metadata value per
- * member and are intended for `unique: true` factories; use `methods` /
- * `properties` when multiple applications are expected.
+ * @typeParam TMeta - Metadata type associated with the bound key
  */
 export interface ScopedReflector<TMeta> {
 	all(): DecoratedItem<TMeta>[];
 	class(): DecoratedClass<TMeta> | undefined;
 	methods(): DecoratedMethod<TMeta>[];
-	methodsSingular(): DecoratedMethodSingle<TMeta>[];
+	methodsScalar(): DecoratedMethodScalar<TMeta>[];
 	properties(): DecoratedProperty<TMeta>[];
-	propertiesSingular(): DecoratedPropertySingle<TMeta>[];
+	propertiesScalar(): DecoratedPropertyScalar<TMeta>[];
 }

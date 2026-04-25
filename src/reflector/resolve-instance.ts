@@ -1,12 +1,15 @@
 import type { AnyConstructor } from "./types";
 
 /**
- * Resolve an instance (or prototype) to its concrete constructor, rejecting
- * anything that would degrade reflection (`Object`, missing prototype, etc.).
- * Used when normalizing `AnnotateError.target` and as a helper for
- * {@link resolveReflectTarget}.
+ * Obtains the class constructor from an **instance** by reading `instance.constructor`.
  *
- * @throws {TypeError} With a `reflect(target):` message prefix when the argument cannot be resolved.
+ * Rejects plain `Object` results and values that are not ordinary constructors with an object
+ * prototype, so reflection stays tied to real class-shaped targets.
+ *
+ * @param instance - Object instance whose prototype chain should yield a usable constructor
+ * @returns The instance’s class constructor
+ * @throws {TypeError} If the value is not a non-null object, has no usable `constructor`, the
+ *   constructor is `Object`, or the constructor lacks a non-null object `prototype`
  */
 export function resolveConstructorFromInstance(instance: object): AnyConstructor {
 	if (instance === null || typeof instance !== "object") {
@@ -30,10 +33,16 @@ export function resolveConstructorFromInstance(instance: object): AnyConstructor
 }
 
 /**
- * Resolve any reflection entry-point argument — a class, prototype, or
- * instance — to the constructor used for metadata lookups.
+ * Normalizes a **reflect** target to a {@link AnyConstructor}.
  *
- * @throws {TypeError} With a stable `reflect(target):` message prefix when the argument is unusable.
+ * Pass a class constructor directly, or an instance (resolved via
+ * {@link resolveConstructorFromInstance}). This is the shared resolution path for the
+ * `reflect()` function in `./reflector.ts`.
+ *
+ * @param target - A class constructor or an instance object
+ * @returns The constructor to use for metadata lookup
+ * @throws {TypeError} If `target` is not a constructor or instance that satisfies the same
+ *   constraints as {@link resolveConstructorFromInstance}, or if the constructor is `Object`
  */
 export function resolveReflectTarget(target: unknown): AnyConstructor {
 	if (typeof target === "function") {

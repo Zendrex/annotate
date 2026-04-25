@@ -1,19 +1,13 @@
 /** biome-ignore-all lint/suspicious/noEmptyBlockStatements: test file */
 import { describe, expect, test } from "bun:test";
 
-// Temporary: importing directly until Phase M1 consolidates all factory exports into src/index.ts.
-import { UnregisteredClassError } from "../../../src/errors";
-import { createClassDecorator } from "../../../src/factories/class-decorator";
-import { createMethodDecorator } from "../../../src/factories/method-decorator";
-import { createPropertyDecorator } from "../../../src/factories/property-decorator";
-import { reflect } from "../../../src/reflector/reflector";
 // biome-ignore lint/correctness/noUnusedImports: kept per plan L2 test spec; referenced by auto-materialize test behavior transitively.
-import { materialize } from "../../../src/runtime/materialize";
+import { decorate, prepare, reflect, UnregisteredClassError } from "../../../src";
 
-describe("Reflector (Stage-3)", () => {
+describe("Reflector", () => {
 	test("class() returns undefined when factory not applied (but class has other metadata)", () => {
-		const Tag = createClassDecorator<string>();
-		const Other = createClassDecorator<string>();
+		const Tag = decorate.class<string>();
+		const Other = decorate.class<string>();
 
 		@Other("o")
 		class X {}
@@ -22,7 +16,7 @@ describe("Reflector (Stage-3)", () => {
 	});
 
 	test("methods() collects own + ancestor entries, most-derived-first", () => {
-		const Route = createMethodDecorator<string>();
+		const Route = decorate.method<string>();
 
 		// Classes are function-scoped to work around a Bun 1.3.13 transpiler bug that
 		// emits a shared `var _init` per module scope: when two decorated classes live
@@ -61,7 +55,7 @@ describe("Reflector (Stage-3)", () => {
 	});
 
 	test("auto-materialize: properties() of an instance-member-only class works pre-instantiation", () => {
-		const Field = createPropertyDecorator<string>();
+		const Field = decorate.property<string>();
 
 		class User {
 			@Field("varchar")
@@ -74,7 +68,7 @@ describe("Reflector (Stage-3)", () => {
 	});
 
 	test("static and instance methods coexist; static carries the static flag", () => {
-		const Cmd = createMethodDecorator<string>();
+		const Cmd = decorate.method<string>();
 
 		class Cli {
 			@Cmd("inst")
@@ -93,7 +87,7 @@ describe("Reflector (Stage-3)", () => {
 	// constructor own-properties like `length`/`prototype`) was misclassified
 	// as static because the old classifier used `Object.hasOwn(ctor, name)`.
 	test("instance field named 'name' is classified as instance, not static", () => {
-		const Field = createPropertyDecorator<string>();
+		const Field = decorate.property<string>();
 
 		class User {
 			@Field("v")

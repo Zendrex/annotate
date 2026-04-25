@@ -6,22 +6,29 @@ import type {
 	DecoratedClass,
 	DecoratedItem,
 	DecoratedMethod,
-	DecoratedMethodSingle,
+	DecoratedMethodScalar,
 	DecoratedProperty,
-	DecoratedPropertySingle,
+	DecoratedPropertyScalar,
 	ScopedReflector,
 } from "./types";
 
 /**
- * Build a {@link ScopedReflector} pre-bound to `(ctor, key)`. Invoked from
- * factory helpers so callers never construct the implementation directly.
+ * Factory for a {@link ScopedReflector}: binds a `MetadataKey` to a class so metadata reads
+ * do not repeat the key on every call. Delegates to {@link ReflectorImpl} under the hood.
  *
- * @internal
+ * @typeParam TMeta - Metadata type for the key
+ * @param ctor - Class whose decorations are read
+ * @param key - Metadata key to query (class, method, and property sites that used this key)
+ * @returns A scoped reflector for that class and key
  */
 export function createScopedReflector<TMeta>(ctor: AnyConstructor, key: MetadataKey): ScopedReflector<TMeta> {
 	return new ScopedReflectorImpl<TMeta>(ctor, key);
 }
 
+/**
+ * Binds one metadata key to a {@link ReflectorImpl}; *Scalar methods surface only the first stored
+ * value per site.
+ */
 class ScopedReflectorImpl<TMeta> implements ScopedReflector<TMeta> {
 	private readonly reflector: Reflector;
 	private readonly key: MetadataKey;
@@ -43,19 +50,25 @@ class ScopedReflectorImpl<TMeta> implements ScopedReflector<TMeta> {
 		return this.reflector.methods<TMeta>(this.key);
 	}
 
-	methodsSingular(): DecoratedMethodSingle<TMeta>[] {
-		return this.reflector
-			.methods<TMeta>(this.key)
-			.map((entry) => ({ ...entry, metadata: entry.metadata[0] as TMeta }));
+	methodsScalar(): DecoratedMethodScalar<TMeta>[] {
+		return this.reflector.methods<TMeta>(this.key).map((entry) => ({
+			kind: entry.kind,
+			name: entry.name,
+			static: entry.static,
+			metadata: entry.metadata[0] as TMeta,
+		}));
 	}
 
 	properties(): DecoratedProperty<TMeta>[] {
 		return this.reflector.properties<TMeta>(this.key);
 	}
 
-	propertiesSingular(): DecoratedPropertySingle<TMeta>[] {
-		return this.reflector
-			.properties<TMeta>(this.key)
-			.map((entry) => ({ ...entry, metadata: entry.metadata[0] as TMeta }));
+	propertiesScalar(): DecoratedPropertyScalar<TMeta>[] {
+		return this.reflector.properties<TMeta>(this.key).map((entry) => ({
+			kind: entry.kind,
+			name: entry.name,
+			static: entry.static,
+			metadata: entry.metadata[0] as TMeta,
+		}));
 	}
 }
