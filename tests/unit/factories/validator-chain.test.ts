@@ -143,6 +143,187 @@ describe("validator chain — validate option", () => {
 			expect((caught as ValidationError).cause).toBe(payload);
 			expect((caught as ValidationError).code).toBe(AnnotateErrorCode.VALIDATION);
 		});
+
+		test("string throw is extracted as reason", () => {
+			const Tag = decorate.class<string>({
+				name: "Tag",
+				validate: () => {
+					throw "invalid value";
+				},
+			});
+
+			let caught: unknown;
+			try {
+				@Tag("x")
+				class _X {}
+				void _X;
+			} catch (error) {
+				caught = error;
+			}
+			expect(caught).toBeInstanceOf(ValidationError);
+			const err = caught as ValidationError;
+			expect(err.message).toContain("invalid value");
+			expect(err.cause).toBe("invalid value");
+		});
+
+		test("object with message property extracts message as reason", () => {
+			const payload = { message: "bad value", code: 42 };
+			const Tag = decorate.class<string>({
+				name: "Tag",
+				validate: () => {
+					throw payload;
+				},
+			});
+
+			let caught: unknown;
+			try {
+				@Tag("x")
+				class _X {}
+				void _X;
+			} catch (error) {
+				caught = error;
+			}
+			expect(caught).toBeInstanceOf(ValidationError);
+			const err = caught as ValidationError;
+			expect(err.message).toContain("bad value");
+			expect(err.cause).toBe(payload);
+		});
+
+		test("plain object without message uses JSON.stringify as reason", () => {
+			const payload = { x: 1, y: 2 };
+			const Tag = decorate.class<string>({
+				name: "Tag",
+				validate: () => {
+					throw payload;
+				},
+			});
+
+			let caught: unknown;
+			try {
+				@Tag("x")
+				class _X {}
+				void _X;
+			} catch (error) {
+				caught = error;
+			}
+			expect(caught).toBeInstanceOf(ValidationError);
+			const err = caught as ValidationError;
+			expect(err.message).toContain('{"x":1,"y":2}');
+			expect(err.cause).toBe(payload);
+		});
+
+		test("null throw is stringified as reason", () => {
+			const Tag = decorate.class<string>({
+				name: "Tag",
+				validate: () => {
+					throw null;
+				},
+			});
+
+			let caught: unknown;
+			try {
+				@Tag("x")
+				class _X {}
+				void _X;
+			} catch (error) {
+				caught = error;
+			}
+			expect(caught).toBeInstanceOf(ValidationError);
+			const err = caught as ValidationError;
+			expect(err.message).toContain("null");
+			expect(err.cause).toBe(null);
+		});
+
+		test("undefined throw is stringified as reason", () => {
+			const Tag = decorate.class<string>({
+				name: "Tag",
+				validate: () => {
+					throw undefined;
+				},
+			});
+
+			let caught: unknown;
+			try {
+				@Tag("x")
+				class _X {}
+				void _X;
+			} catch (error) {
+				caught = error;
+			}
+			expect(caught).toBeInstanceOf(ValidationError);
+			const err = caught as ValidationError;
+			expect(err.message).toContain("undefined");
+			expect(err.cause).toBeUndefined();
+		});
+
+		test("object with empty message string falls back to JSON.stringify", () => {
+			const payload = { message: "", value: 123 };
+			const Tag = decorate.class<string>({
+				name: "Tag",
+				validate: () => {
+					throw payload;
+				},
+			});
+
+			let caught: unknown;
+			try {
+				@Tag("x")
+				class _X {}
+				void _X;
+			} catch (error) {
+				caught = error;
+			}
+			expect(caught).toBeInstanceOf(ValidationError);
+			const err = caught as ValidationError;
+			expect(err.message).toContain('{"message":"","value":123}');
+			expect(err.cause).toBe(payload);
+		});
+
+		test("circular object reference falls back to [object Object]", () => {
+			const payload: Record<string, unknown> = { x: 1 };
+			payload.self = payload;
+			const Tag = decorate.class<string>({
+				name: "Tag",
+				validate: () => {
+					throw payload;
+				},
+			});
+
+			let caught: unknown;
+			try {
+				@Tag("x")
+				class _X {}
+				void _X;
+			} catch (error) {
+				caught = error;
+			}
+			expect(caught).toBeInstanceOf(ValidationError);
+			const err = caught as ValidationError;
+			expect(err.message).toContain("[object Object]");
+			expect(err.cause).toBe(payload);
+		});
+
+		test("number throw is stringified as reason", () => {
+			const Tag = decorate.class<string>({
+				name: "Tag",
+				validate: () => {
+					throw 42;
+				},
+			});
+
+			let caught: unknown;
+			try {
+				@Tag("x")
+				class _X {}
+				void _X;
+			} catch (error) {
+				caught = error;
+			}
+			expect(caught).toBeInstanceOf(ValidationError);
+			const err = caught as ValidationError;
+			expect(err.message).toContain("42");
+			expect(err.cause).toBe(42);
+		});
 	});
 
 	describe("ordering and state", () => {

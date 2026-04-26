@@ -3,6 +3,34 @@ import type { DeferredValidatorFn, MetadataKey } from "../metadata/types";
 import type { AnyConstructor } from "../reflector/types";
 import type { ValidateContext, ValidatorFn } from "./validator-types";
 
+/**
+ * Extracts a human-readable reason from an unknown thrown value.
+ * Handles null/undefined, strings, Error instances, and plain objects.
+ */
+function extractReason(error: unknown): string {
+	if (error === null || error === undefined) {
+		return String(error);
+	}
+	if (typeof error === "string") {
+		return error;
+	}
+	if (error instanceof Error) {
+		return error.message;
+	}
+	if (typeof error === "object") {
+		const obj = error as Record<string, unknown>;
+		if (typeof obj.message === "string" && obj.message.length > 0) {
+			return obj.message;
+		}
+		try {
+			return JSON.stringify(obj);
+		} catch {
+			return "[object Object]";
+		}
+	}
+	return String(error);
+}
+
 function wrapUserValidate<TMeta>(fn: ValidatorFn<TMeta>, label: string, key: MetadataKey): ValidatorFn<TMeta> {
 	return (meta, context) => {
 		try {
@@ -14,7 +42,7 @@ function wrapUserValidate<TMeta>(fn: ValidatorFn<TMeta>, label: string, key: Met
 			throw new ValidationError({
 				label,
 				target: context.target,
-				reason: String(error),
+				reason: extractReason(error),
 				kind: context.kind,
 				memberName: context.memberName,
 				key,
