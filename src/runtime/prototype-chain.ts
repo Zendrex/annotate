@@ -9,7 +9,7 @@ import type { Ctor } from "../metadata/types";
  * **Contract:** Used so metadata lookup can consider inherited constructors
  * without walking past the built-in function prototype.
  */
-export function walkPrototypeChain(ctor: Ctor, visit: (current: Ctor) => unknown): void {
+export function walkPrototypeChain(ctor: Ctor, visit: (current: Ctor) => boolean | undefined): void {
 	let current: Ctor | null = ctor;
 	while (current && current !== Function.prototype) {
 		if (visit(current) === true) {
