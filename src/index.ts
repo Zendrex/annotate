@@ -1,53 +1,82 @@
-/**
- * @packageDocumentation
- *
- * A TypeScript decorator factory library with metadata storage and reflection capabilities.
- */
 /** biome-ignore-all lint/performance/noBarrelFile: main index file */
-import "reflect-metadata";
 
-export { AnnotateError, AnnotateErrorCode } from "./errors";
-export { createClassDecorator } from "./factories/class-decorator";
-export { createMethodDecorator } from "./factories/method-decorator";
-export { createMethodInterceptor } from "./factories/method-interceptor";
-export { createParameterDecorator } from "./factories/parameter-decorator";
-export { createPropertyDecorator } from "./factories/property-decorator";
-export { createPropertyInterceptor } from "./factories/property-interceptor";
+/**
+ * Public API barrel for `@zendrex/annotate`: errors, `reflect`, `prepare`, key
+ * helpers, and shared types. Prefer the frozen `decorate` and `intercept`
+ * registries over deep imports — same factories, version-stable surface.
+ */
 export {
-	appendMetadata,
-	defineMetadata,
-	getMetadata,
-	getMetadataArray,
-	getOwnMetadata,
-	getParameterMap,
-	setParameterMap,
-} from "./metadata/store";
+	AnnotateError,
+	AnnotateErrorCode,
+	DuplicateMetadataError,
+	InvalidDecorationTargetError,
+	MissingMetadataError,
+	UnregisteredClassError,
+	UnregisteredMetadataKeyError,
+	ValidationError,
+} from "./errors";
+
+import { createAccessorInterceptor, createAccessorListInterceptor } from "./factories/accessor-interceptor";
+import { createClassDecorator, createClassListDecorator } from "./factories/class-decorator";
+import { createMethodDecorator, createMethodListDecorator } from "./factories/method-decorator";
+import { createMethodInterceptor, createMethodListInterceptor } from "./factories/method-interceptor";
+import { createPropertyDecorator, createPropertyListDecorator } from "./factories/property-decorator";
+
+const withList = <U extends object, L>(unique: U, list: L): U & { list: L } => Object.assign(unique, { list });
+
+/**
+ * Frozen registry of decorator factories. Each `class`, `method`, and
+ * `property` entry exposes the unique-cardinality factory directly and a
+ * `.list` sibling for list-cardinality metadata. Prefer this over deep
+ * imports.
+ */
+export const decorate = Object.freeze({
+	class: withList(createClassDecorator, createClassListDecorator),
+	method: withList(createMethodDecorator, createMethodListDecorator),
+	property: withList(createPropertyDecorator, createPropertyListDecorator),
+} as const);
+
+/**
+ * Frozen registry of interceptor factories. `method` and `accessor` expose
+ * the unique-cardinality factory and a `.list` sibling for list-cardinality
+ * metadata. Prefer this over deep imports.
+ */
+export const intercept = Object.freeze({
+	method: withList(createMethodInterceptor, createMethodListInterceptor),
+	accessor: withList(createAccessorInterceptor, createAccessorListInterceptor),
+} as const);
+
+export { mintListKey, mintUniqueKey } from "./metadata/cardinality-registry";
 export { reflect } from "./reflector/reflector";
+export { prepare } from "./runtime/prepare";
 export type {
+	AccessorInterceptorOptions,
+	AnyFn,
+	ArgsOf,
+	CardinalityOf,
+	DecoratedAccessorFactory,
 	DecoratedClassFactory,
 	DecoratedMethodFactory,
-	DecoratedParameterFactory,
 	DecoratedPropertyFactory,
 	DecoratorOptions,
+	DeriveOptions,
 	InterceptorContext,
+	MetadataOf,
 	MethodInterceptorOptions,
-	ParameterDecoratorOptions,
-	PropertyGetter,
-	PropertyInterceptorOptions,
-	PropertySetter,
+	ThisOf,
+	ValidateContext,
+	ValidatorFn,
 } from "./factories/types";
-export type { MetadataArray, MetadataKey, ParameterMetadataMap } from "./metadata/types";
+export type { ListMetadataKey, MetadataArray, MetadataKey, UniqueMetadataKey } from "./metadata/types";
 export type { Reflector } from "./reflector/reflector";
 export type {
-	DecoratedClass,
-	DecoratedConstructorParameter,
+	DecoratedClassList,
+	DecoratedClassUnique,
 	DecoratedItem,
 	DecoratedKind,
-	DecoratedMethod,
-	DecoratedMethodParameter,
-	DecoratedMethodSingle,
-	DecoratedParameter,
-	DecoratedProperty,
-	DecoratedPropertySingle,
+	DecoratedMethodList,
+	DecoratedMethodUnique,
+	DecoratedPropertyList,
+	DecoratedPropertyUnique,
 	ScopedReflector,
 } from "./reflector/types";
