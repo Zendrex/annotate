@@ -14,6 +14,24 @@ describe("decorate.class", () => {
 		expect(Tag.hasOwn(Service)).toBe(true);
 	});
 
+	test("all() is one-element and frozen; reader returns scalar; wrong factory yields []; bare throws", () => {
+		const Tag = decorate.class<string>();
+		const Other = decorate.class<string>();
+
+		@Tag("a")
+		class T1 {}
+		expect(Tag.all(T1)).toEqual(["a"]);
+		expect(Object.isFrozen(Tag.all(T1))).toBe(true);
+		expect(Tag.reader(T1).class()?.metadata).toBe("a");
+
+		@Other("x")
+		class T2 {}
+		expect(Tag.all(T2)).toEqual([]);
+
+		class Bare {}
+		expect(() => Tag.all(Bare)).toThrow(UnregisteredClassError);
+	});
+
 	test("supports compose for multi-arg call shapes", () => {
 		const Component = decorate.class({
 			compose: (selector: string, scoped: boolean) => ({ selector, scoped }),

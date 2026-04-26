@@ -3,7 +3,6 @@
 import { describe, expect, it } from "bun:test";
 
 import { decorate, intercept, reflect } from "../../src";
-import { createScopedReflector } from "../../src/reflector/scoped-reflector";
 
 // ── Factories ─────────────────────────────────────────────────────────────────
 
@@ -237,59 +236,6 @@ describe("mixed-cardinality integration", () => {
 		});
 	});
 
-	describe("r.all() — brand-driven shape contract", () => {
-		it("unique method key all() returns items with scalar metadata", () => {
-			const items = r.all(UniqueMethodMeta.key);
-			for (const item of items) {
-				expect(typeof item.metadata).toBe("string");
-				expect(Array.isArray(item.metadata)).toBe(false);
-			}
-		});
-
-		it("list method key all() returns items with array metadata", () => {
-			const items = r.all(ListMethodMeta.key);
-			for (const item of items) {
-				expect(Array.isArray(item.metadata)).toBe(true);
-			}
-		});
-
-		it("unique class key all() includes class entry with scalar metadata", () => {
-			const items = r.all(UniqueClassMeta.key);
-			const classEntry = items.find((i) => i.kind === "class");
-			expect(classEntry).toBeDefined();
-			expect(classEntry?.metadata).toBe("unique-class");
-		});
-
-		it("list class key all() includes class entry with array metadata", () => {
-			const items = r.all(ListClassMeta.key);
-			const classEntry = items.find((i) => i.kind === "class");
-			expect(classEntry).toBeDefined();
-			expect(Array.isArray(classEntry?.metadata)).toBe(true);
-		});
-
-		it("unique property key all() returns one property item with scalar metadata", () => {
-			const items = r.all(UniquePropertyMeta.key);
-			// Only fieldC carries the unique property key; class / methods do not.
-			expect(items).toHaveLength(1);
-			const propertyEntry = items[0];
-			expect(propertyEntry?.kind).toBe("property");
-			expect(propertyEntry?.metadata).toBe("property-C");
-			expect(Array.isArray(propertyEntry?.metadata)).toBe(false);
-		});
-
-		it("list property key all() returns one property item with array metadata in Stage-3 order", () => {
-			const items = r.all(ListPropertyMeta.key);
-			// Only fieldD carries the list property key.
-			expect(items).toHaveLength(1);
-			const propertyEntry = items[0];
-			expect(propertyEntry?.kind).toBe("property");
-			expect(Array.isArray(propertyEntry?.metadata)).toBe(true);
-			expect(propertyEntry?.metadata).toHaveLength(2);
-			// Stage-3 inner-first application order.
-			expect(propertyEntry?.metadata).toEqual(["property-D-inner", "property-D-outer"]);
-		});
-	});
-
 	describe("interceptor runtime behaviour", () => {
 		it("unique method interceptor runs on member E invocation", () => {
 			methodInterceptCalls.length = 0;
@@ -347,41 +293,6 @@ describe("mixed-cardinality integration", () => {
 			for (const seenMeta of listAccessorSetMetaSeen) {
 				expect(seenMeta).toHaveLength(2);
 			}
-		});
-	});
-
-	describe("createScopedReflector — runtime shape contracts", () => {
-		// biome-ignore lint/complexity/noBannedTypes: needed for constructor type
-		const ctor = MixedTarget as Function & { prototype: object };
-
-		it("unique method key scoped reflector methods() returns scalar entries", () => {
-			const scoped = createScopedReflector(ctor, UniqueMethodMeta.key);
-			const methods = scoped.methods();
-			for (const m of methods) {
-				expect(Array.isArray(m.metadata)).toBe(false);
-			}
-		});
-
-		it("list method key scoped reflector methods() returns array entries", () => {
-			const scoped = createScopedReflector(ctor, ListMethodMeta.key);
-			const methods = scoped.methods();
-			for (const m of methods) {
-				expect(Array.isArray(m.metadata)).toBe(true);
-			}
-		});
-
-		it("unique class key scoped reflector class() returns scalar class entry", () => {
-			const scoped = createScopedReflector(ctor, UniqueClassMeta.key);
-			const entry = scoped.class();
-			expect(entry).toBeDefined();
-			expect(entry?.metadata).toBe("unique-class");
-		});
-
-		it("list class key scoped reflector class() returns array class entry", () => {
-			const scoped = createScopedReflector(ctor, ListClassMeta.key);
-			const entry = scoped.class();
-			expect(entry).toBeDefined();
-			expect(Array.isArray(entry?.metadata)).toBe(true);
 		});
 	});
 });

@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { registerCtor } from "../../../src/metadata/metadata-ctor-correlation";
-import { invalidatePreparedFor, isFullyPrepared, markFullyPrepared } from "../../../src/metadata/prepared-sentinel";
+import { invalidatePrepared, isFullyPrepared, markFullyPrepared } from "../../../src/metadata/prepared-sentinel";
 
 describe("prepared-sentinel", () => {
 	test("isFullyPrepared returns false by default", () => {
@@ -15,34 +14,28 @@ describe("prepared-sentinel", () => {
 		expect(isFullyPrepared(A)).toBe(true);
 	});
 
-	test("invalidatePreparedFor drops sentinel for the registered ctor", () => {
+	test("invalidatePrepared drops the sentinel for a marked ctor", () => {
 		class A {}
-		const correlation = {};
-		registerCtor(A, correlation);
 		markFullyPrepared(A);
 		expect(isFullyPrepared(A)).toBe(true);
 
-		invalidatePreparedFor(correlation);
+		invalidatePrepared(A);
 		expect(isFullyPrepared(A)).toBe(false);
 	});
 
-	test("invalidatePreparedFor is a no-op when correlation has no ctor yet", () => {
-		const correlation = {};
-		// No registerCtor call; invalidation should silently do nothing.
-		expect(() => invalidatePreparedFor(correlation)).not.toThrow();
+	test("invalidatePrepared is a no-op for an unmarked ctor", () => {
+		class A {}
+		expect(() => invalidatePrepared(A)).not.toThrow();
+		expect(isFullyPrepared(A)).toBe(false);
 	});
 
-	test("invalidatePreparedFor only drops the ctor mapped to that correlation", () => {
+	test("invalidatePrepared targets only the supplied ctor", () => {
 		class A {}
 		class B {}
-		const correlationA = {};
-		const correlationB = {};
-		registerCtor(A, correlationA);
-		registerCtor(B, correlationB);
 		markFullyPrepared(A);
 		markFullyPrepared(B);
 
-		invalidatePreparedFor(correlationA);
+		invalidatePrepared(A);
 		expect(isFullyPrepared(A)).toBe(false);
 		expect(isFullyPrepared(B)).toBe(true);
 	});

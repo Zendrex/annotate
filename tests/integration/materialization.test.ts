@@ -4,7 +4,7 @@ import { describe, expect, test } from "bun:test";
 import { decorate } from "../../src";
 
 describe("subclass-of-parent-only-decorated regression", () => {
-	test("property: has / hasOwn / reader for child of decorated parent", () => {
+	test("has/hasOwn/reader + token dedup under interleaved construction", () => {
 		const Field = decorate.property<string>();
 		class A {
 			@Field("a")
@@ -20,15 +20,6 @@ describe("subclass-of-parent-only-decorated regression", () => {
 		const props = Field.reader(B).properties();
 		expect(props).toHaveLength(1);
 		expect(props[0]?.name).toBe("foo");
-	});
-
-	test("token-dedup invariant across interleaved constructions", () => {
-		const Field = decorate.property<string>();
-		class A {
-			@Field("a")
-			foo!: number;
-		}
-		class B extends A {}
 
 		for (let i = 0; i < 100; i++) {
 			if (i % 3 === 0) {
@@ -38,7 +29,6 @@ describe("subclass-of-parent-only-decorated regression", () => {
 			}
 		}
 		const list = Field.reader(A).properties();
-		// Unique-cardinality key: metadata is a scalar string value.
 		expect(list[0]?.metadata).toBe("a");
 		expect(Field.hasOwn(B, "foo")).toBe(false);
 	});

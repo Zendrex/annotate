@@ -119,6 +119,63 @@ void _scopedUniqueAsList;
 const _scopedListAsUnique: ScopedReflector<string, "unique"> = createScopedReflector(ctor, ListMethod.key);
 void _scopedListAsUnique;
 
+// ── createScopedReflector: class & property keys ──────────────────────────────
+
+const scopedUniqueClass = createScopedReflector(ctor, UniqueClass.key);
+void scopedUniqueClass;
+const scopedListClass = createScopedReflector(ctor, ListClass.key);
+void scopedListClass;
+const scopedUniqueProperty = createScopedReflector(ctor, UniqueProperty.key);
+void scopedUniqueProperty;
+const scopedListProperty = createScopedReflector(ctor, ListProperty.key);
+void scopedListProperty;
+
+// @ts-expect-error: unique-key scoped reflector is not assignable to ScopedReflector<string, "list">
+const _uniqueClassKeyAsList: ScopedReflector<string, "list"> = createScopedReflector(ctor, UniqueClass.key);
+void _uniqueClassKeyAsList;
+
+// @ts-expect-error: list-key scoped reflector is not assignable to ScopedReflector<string, "unique">
+const _listClassKeyAsUnique: ScopedReflector<string, "unique"> = createScopedReflector(ctor, ListClass.key);
+void _listClassKeyAsUnique;
+
+// @ts-expect-error: unique-key scoped reflector is not assignable to ScopedReflector<string, "list">
+const _uniquePropertyKeyAsList: ScopedReflector<string, "list"> = createScopedReflector(ctor, UniqueProperty.key);
+void _uniquePropertyKeyAsList;
+
+// @ts-expect-error: list-key scoped reflector is not assignable to ScopedReflector<string, "unique">
+const _listPropertyKeyAsUnique: ScopedReflector<string, "unique"> = createScopedReflector(ctor, ListProperty.key);
+void _listPropertyKeyAsUnique;
+
+// ── ScopedReflector: class() / properties() on class- and property-key readers ─
+
+const scopedUniquePropertyEntries: DecoratedPropertyUnique<string>[] = scopedUniqueProperty.properties();
+void scopedUniquePropertyEntries;
+
+// @ts-expect-error: unique-scoped properties() not assignable to DecoratedPropertyList<string>[]
+const _scopedUniquePropsAsList: DecoratedPropertyList<string>[] = scopedUniqueProperty.properties();
+void _scopedUniquePropsAsList;
+
+const scopedListPropertyEntries: DecoratedPropertyList<string>[] = scopedListProperty.properties();
+void scopedListPropertyEntries;
+
+// @ts-expect-error: list-scoped properties() not assignable to DecoratedPropertyUnique<string>[]
+const _scopedListPropsAsUnique: DecoratedPropertyUnique<string>[] = scopedListProperty.properties();
+void _scopedListPropsAsUnique;
+
+const scopedUniqueClassResult: DecoratedClassUnique<string> | undefined = scopedUniqueClass.class();
+void scopedUniqueClassResult;
+
+// @ts-expect-error: unique-scoped class() not assignable to DecoratedClassList | undefined
+const _scopedUniqueClassAsList: DecoratedClassList<string> | undefined = scopedUniqueClass.class();
+void _scopedUniqueClassAsList;
+
+const scopedListClassResult: DecoratedClassList<string> | undefined = scopedListClass.class();
+void scopedListClassResult;
+
+// @ts-expect-error: list-scoped class() not assignable to DecoratedClassUnique | undefined
+const _scopedListClassAsUnique: DecoratedClassUnique<string> | undefined = scopedListClass.class();
+void _scopedListClassAsUnique;
+
 // ── ScopedReflector brand-driven metadata narrowing ───────────────────────────
 
 // methods() on unique scoped reflector returns DecoratedMethodUnique[]

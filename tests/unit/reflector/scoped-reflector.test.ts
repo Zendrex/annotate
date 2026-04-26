@@ -47,17 +47,7 @@ describe("factory.reader()", () => {
 	});
 });
 
-describe("decorate.class reader — class() cardinality shape", () => {
-	test("unique key: scalar class metadata", () => {
-		const Tag = decorate.class<number>();
-
-		@Tag(42)
-		class MyClass {}
-
-		const entry = Tag.reader(MyClass).class();
-		expect(entry?.metadata).toBe(42);
-	});
-
+describe("decorate.class reader — list class() cardinality", () => {
 	test("list key: array class metadata", () => {
 		const Tags = decorate.class.list<string>();
 

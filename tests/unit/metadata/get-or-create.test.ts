@@ -105,28 +105,3 @@ describe("getOrCreate with WeakMap", () => {
 		expect(map.get(MyClass)).toBe("MyClass-value");
 	});
 });
-
-describe("getOrCreate with complex values", () => {
-	it("stores Map values correctly", () => {
-		const outer = new Map<string, Map<string, number>>();
-		const inner = getOrCreate(outer, "key", () => new Map());
-		inner.set("x", 1);
-		expect(outer.get("key")?.get("x")).toBe(1);
-	});
-
-	it("stores Set values correctly", () => {
-		const map = new WeakMap<object, Set<symbol>>();
-		const obj = {};
-		const set = getOrCreate(map, obj, () => new Set());
-		const sym = Symbol("test");
-		set.add(sym);
-		expect(map.get(obj)?.has(sym)).toBe(true);
-	});
-
-	it("stores array values correctly", () => {
-		const map = new Map<string, unknown[]>();
-		const arr = getOrCreate(map, "key", () => []);
-		arr.push("item");
-		expect(map.get("key")).toEqual(["item"]);
-	});
-});

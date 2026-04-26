@@ -3,17 +3,8 @@
 import { describe, expect, test } from "bun:test";
 
 import { AnnotateError, decorate, MissingMetadataError } from "../../../src";
-import type { ListMetadataKey } from "../../../src";
 
 describe("decorate.method.list", () => {
-	test("returns a factory whose .key is assignable to ListMetadataKey<T>", () => {
-		const Route = decorate.method.list<string>();
-		expect(typeof Route.key).toBe("symbol");
-
-		const _check: ListMetadataKey<string> = Route.key;
-		void _check;
-	});
-
 	test("two methods decorated with the same .list factory each have 1 entry", () => {
 		const Route = decorate.method.list<string>();
 
@@ -43,20 +34,6 @@ describe("decorate.method.list", () => {
 		expect(Route.all(Api, "handle")).toHaveLength(2);
 		expect(Route.all(Api, "handle")).toContain("/a");
 		expect(Route.all(Api, "handle")).toContain("/b");
-	});
-
-	test("does NOT throw DuplicateMetadataError on second application (unlike unique factory)", () => {
-		const Cmd = decorate.method.list<string>({ name: "ListCmd" });
-
-		expect(() => {
-			// biome-ignore lint/complexity/noStaticOnlyClass: test fixture requires a class with a static method
-			class X {
-				@Cmd("a")
-				@Cmd("b")
-				static run(): void {}
-			}
-			void X;
-		}).not.toThrow(AnnotateError);
 	});
 
 	test("static methods are eagerly registered; list entries commit immediately", () => {

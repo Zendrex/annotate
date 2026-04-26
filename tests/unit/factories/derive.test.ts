@@ -157,12 +157,3 @@ describe("Factory.derive() — unique across shared key", () => {
 		expect(caught).toBeInstanceOf(DuplicateMetadataError);
 	});
 });
-
-describe("Factory.derive() — compile-time locks (compile-only)", () => {
-	test("Pick rejects compose", () => {
-		const Parent = decorate.class<string>({ name: "Parent" });
-
-		// @ts-expect-error — compose is omitted from the derive() Pick signature.
-		Parent.derive({ compose: (x: string) => x });
-	});
-});

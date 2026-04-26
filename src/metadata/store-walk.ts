@@ -2,6 +2,16 @@ import { walkPrototypeChain } from "../runtime/prototype-chain";
 import type { Ctor } from "./types";
 
 /**
+ * Single trust boundary for the `unknown[] -> readonly T[]` brand laundering
+ * the metadata stores rely on. The stored array is `unknown[]`; callers project
+ * it to `readonly T[]` based on the brand on a `MetadataKey<T>`. Centralizing
+ * the cast keeps every store reader honest about where the assertion happens.
+ */
+export function readValues<T>(values: unknown[] | undefined): readonly T[] | undefined {
+	return values as T[] | undefined;
+}
+
+/**
  * Walks the prototype chain of `ctor` (subclass first) and returns `true` as
  * soon as `probe` reports a non-empty hit on any link. Used by the metadata
  * stores to answer "does anything in this chain have data" without

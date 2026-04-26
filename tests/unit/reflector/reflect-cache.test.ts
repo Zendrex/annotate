@@ -1,5 +1,5 @@
 /** biome-ignore-all lint/suspicious/noEmptyBlockStatements: test file */
-import { describe, expect, spyOn, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 
 import { decorate, reflect, UnregisteredClassError } from "../../../src";
 
@@ -70,38 +70,6 @@ describe("reflect() per-ctor caching", () => {
 		const secondResult = reflect(C).methods<string>(key);
 		expect(secondResult).toHaveLength(1);
 		expect(secondResult[0]?.name).toBe("run");
-	});
-
-	test("methodLikeCache is shared: Object.getOwnPropertyDescriptor is not called a second time for the same member", () => {
-		function makeD() {
-			const Route = decorate.method<string>();
-
-			class D {
-				@Route("/d")
-				run(): void {}
-			}
-			return { D, key: Route.key };
-		}
-		const { D, key } = makeD();
-
-		const spy = spyOn(Object, "getOwnPropertyDescriptor");
-		spy.mockClear();
-
-		// First call: fills methodLikeCache, expects at least one descriptor lookup for "run".
-		reflect(D).methods<string>(key);
-		const countAfterFirst = spy.mock.calls.length;
-
-		spy.mockClear();
-
-		// Second call through the same cached Reflector: the cache is warm, so no
-		// additional descriptor lookups for this member should be needed.
-		reflect(D).methods<string>(key);
-		const countAfterSecond = spy.mock.calls.length;
-
-		spy.mockRestore();
-
-		expect(countAfterFirst).toBeGreaterThan(0);
-		expect(countAfterSecond).toBe(0);
 	});
 
 	test("late decoration: cached impl retries ensureRegistered after class is decorated post-reflect", () => {

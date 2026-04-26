@@ -1,9 +1,25 @@
 import { getOrCreate } from "./get-or-create";
 import { appendMemberMeta } from "./member-meta-store";
-import { invalidatePreparedFor } from "./prepared-sentinel";
+import { resolveCtorFromMetadata } from "./metadata-ctor-correlation";
+import { invalidatePrepared } from "./prepared-sentinel";
 import type { Ctor, Deferred, DeferredValidateContext } from "./types";
 
 const pendingByMetadata: WeakMap<object, Deferred[]> = new WeakMap();
+
+function runValidators(entry: Deferred, ctor: Ctor): void {
+	if (!entry.validators || entry.validators.length === 0) {
+		return;
+	}
+	const context: DeferredValidateContext = {
+		target: ctor,
+		memberName: entry.name,
+		kind: entry.kind,
+		static: entry.static,
+	};
+	for (const validator of entry.validators) {
+		validator(entry.meta, context);
+	}
+}
 
 /**
  * Stages member metadata until ctor correlation is registered. Uses the same `correlation`
@@ -20,7 +36,10 @@ export function queueDeferred(correlation: object | null, deferred: Deferred): v
 	list.push(deferred);
 	// Any new deferred work invalidates the "fully prepared" sentinel for the
 	// resolved ctor (if registered) so the next `prepare` re-walks and flushes.
-	invalidatePreparedFor(correlation);
+	const ctor = resolveCtorFromMetadata(correlation);
+	if (ctor) {
+		invalidatePrepared(ctor);
+	}
 }
 
 /**
@@ -53,17 +72,7 @@ export function flushFor(ctor: Ctor, correlation: object | null): void {
 	try {
 		for (; index < list.length; index++) {
 			const entry = list[index] as Deferred;
-			if (entry.validators && entry.validators.length > 0) {
-				const context: DeferredValidateContext = {
-					target: ctor,
-					memberName: entry.name,
-					kind: entry.kind,
-					static: entry.static,
-				};
-				for (const validator of entry.validators) {
-					validator(entry.meta, context);
-				}
-			}
+			runValidators(entry, ctor);
 			appendMemberMeta(ctor, entry.key, entry.name, entry.meta, entry.token, {
 				static: entry.static,
 				kind: entry.kind,
