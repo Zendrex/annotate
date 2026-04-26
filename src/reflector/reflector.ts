@@ -1,12 +1,7 @@
 import { UnregisteredClassError } from "../errors";
 import { getKeyCardinality } from "../metadata/cardinality-registry";
 import { collectClassMeta, hasAnyClassMeta } from "../metadata/class-meta-store";
-import {
-	collectMemberMeta,
-	collectMemberNames,
-	getMemberStatic,
-	hasAnyMemberMeta,
-} from "../metadata/member-meta-store";
+import { hasAnyMemberMeta, snapshotMembers } from "../metadata/member-meta-store";
 import { prepare } from "../runtime/prepare";
 import { targetDisplayName } from "./class-name";
 import { resolveReflectTarget } from "./resolve-instance";
@@ -129,20 +124,18 @@ export class ReflectorImpl implements Reflector {
 		kind: "method" | "property",
 		wantMethod: boolean
 	): R[] {
-		const names = collectMemberNames(this.ctor, key);
+		const snapshot = snapshotMembers(this.ctor, key);
 		const cardinality = getKeyCardinality(key);
 		const out: R[] = [];
-		for (const name of names) {
-			const isStatic = getMemberStatic(this.ctor, key, name);
-			if (this.isMethod(name, isStatic) !== wantMethod) {
+		for (const [name, entry] of snapshot) {
+			if (this.isMethod(name, entry.static) !== wantMethod) {
 				continue;
 			}
-			const raw = collectMemberMeta<T>(this.ctor, key, name);
 			out.push({
 				kind,
 				name,
-				static: isStatic,
-				metadata: cardinality === "unique" ? (raw[0] as T) : raw,
+				static: entry.static,
+				metadata: cardinality === "unique" ? (entry.values[0] as T) : (entry.values as T[]),
 			} as unknown as R);
 		}
 		return out;

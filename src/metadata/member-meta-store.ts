@@ -109,6 +109,39 @@ export function collectMemberNames(ctor: Ctor, key: symbol): Set<string | symbol
 }
 
 /**
+ * One-pass chain walk for all members under `key` on `ctor`. Returns a map
+ * from member name to a {@link MemberEntry} whose `values` is the chain-merged
+ * list (subclass first) and whose `static` flag matches the most-derived link
+ * that has an entry for that name.
+ *
+ * The returned `values` arrays are fresh copies — mutating them does not
+ * affect the underlying store. This consolidates what would otherwise be
+ * three separate chain walks per member (`collectMemberNames` +
+ * `collectMemberMeta` + `getMemberStatic`) into a single pass.
+ */
+export function snapshotMembers(ctor: Ctor, key: symbol): Map<string | symbol, MemberEntry> {
+	const out = new Map<string | symbol, MemberEntry>();
+	walkPrototypeChain(ctor, (current) => {
+		const inner = memberMetaStore.get(current)?.get(key);
+		if (!inner) {
+			return;
+		}
+		for (const [name, entry] of inner) {
+			const existing = out.get(name);
+			if (existing) {
+				// Subclass-first order: existing wins for `static`; superclass values appended after.
+				for (const value of entry.values) {
+					existing.values.push(value);
+				}
+			} else {
+				out.set(name, { static: entry.static, values: [...entry.values] });
+			}
+		}
+	});
+	return out;
+}
+
+/**
  * First value for `key`+`name` when walking from `ctor` up the chain.
  */
 export function firstMemberMetaForKey<T>(ctor: Ctor, key: symbol, name: string | symbol): T | undefined {

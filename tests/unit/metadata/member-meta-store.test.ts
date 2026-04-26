@@ -10,6 +10,7 @@ import {
 	getMemberStatic,
 	hasAnyMemberMeta,
 	hasOwnMemberMeta,
+	snapshotMembers,
 } from "../../../src/metadata/member-meta-store";
 
 describe("member metadata store", () => {
@@ -151,6 +152,71 @@ describe("getMemberStatic", () => {
 		// Second append on the same entry: static is invariant, captured at first commit.
 		appendMemberMeta(A, key, "foo", "v2", Symbol("t2"), { static: true, kind: "method" });
 		expect(getMemberStatic(A, key, "foo")).toBe(false);
+	});
+});
+
+describe("snapshotMembers", () => {
+	test("returns empty map when no entries", () => {
+		const key = mintListKey("k");
+		class A {}
+		const snapshot = snapshotMembers(A, key);
+		expect(snapshot.size).toBe(0);
+	});
+
+	test("captures own entries with values and static flag", () => {
+		const key = mintListKey<string>("k");
+		class A {}
+		appendMemberMeta(A, key, "instance", "v1", Symbol("t1"), { static: false, kind: "method" });
+		appendMemberMeta(A, key, "klass", "v2", Symbol("t2"), { static: true, kind: "method" });
+		const snapshot = snapshotMembers(A, key);
+		expect(snapshot.size).toBe(2);
+		expect(snapshot.get("instance")).toEqual({ static: false, values: ["v1"] });
+		expect(snapshot.get("klass")).toEqual({ static: true, values: ["v2"] });
+	});
+
+	test("merges chain in subclass-first order", () => {
+		const key = mintListKey<string>("k");
+		class A {}
+		class B extends A {}
+		class C extends B {}
+		appendMemberMeta(A, key, "foo", "from-a", Symbol("ta"), { static: false, kind: "method" });
+		appendMemberMeta(B, key, "foo", "from-b", Symbol("tb"), { static: false, kind: "method" });
+		appendMemberMeta(C, key, "foo", "from-c1", Symbol("tc1"), { static: false, kind: "method" });
+		appendMemberMeta(C, key, "foo", "from-c2", Symbol("tc2"), { static: false, kind: "method" });
+		const snapshot = snapshotMembers(C, key);
+		expect(snapshot.get("foo")?.values).toEqual(["from-c1", "from-c2", "from-b", "from-a"]);
+	});
+
+	test("static flag taken from most-derived defining link", () => {
+		const key = mintListKey("k");
+		class Parent {}
+		class Child extends Parent {}
+		appendMemberMeta(Parent, key, "foo", "p", Symbol("tp"), { static: true, kind: "method" });
+		appendMemberMeta(Child, key, "foo", "c", Symbol("tc"), { static: false, kind: "method" });
+		expect(snapshotMembers(Child, key).get("foo")?.static).toBe(false);
+		expect(snapshotMembers(Parent, key).get("foo")?.static).toBe(true);
+	});
+
+	test("unions distinct names across chain", () => {
+		const key = mintListKey("k");
+		class A {}
+		class B extends A {}
+		appendMemberMeta(A, key, "a", "x", Symbol("t1"), { static: false, kind: "method" });
+		appendMemberMeta(B, key, "b", "y", Symbol("t2"), { static: false, kind: "method" });
+		const snapshot = snapshotMembers(B, key);
+		expect(snapshot.size).toBe(2);
+		expect(snapshot.get("a")?.values).toEqual(["x"]);
+		expect(snapshot.get("b")?.values).toEqual(["y"]);
+	});
+
+	test("returned values arrays are copies — mutation does not affect store", () => {
+		const key = mintListKey<string>("k");
+		class A {}
+		appendMemberMeta(A, key, "foo", "v", Symbol("t"), { static: false, kind: "method" });
+		const snapshot = snapshotMembers(A, key);
+		const entry = snapshot.get("foo");
+		entry?.values.push("mutated");
+		expect(getMemberMeta<string>(A, key, "foo")).toEqual(["v"]);
 	});
 });
 
