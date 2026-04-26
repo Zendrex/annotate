@@ -39,9 +39,21 @@ export type ListMetadataKey<T> = MetadataKey<T, "list">;
 export type ClassBucket = Map<symbol, unknown[]>;
 
 /**
- * Per-class own member metadata: key → member name → list of values for that member only.
+ * One member's own entry under a single metadata key on a single class:
+ * the append-only list of values plus the `static` flag captured at first append.
+ *
+ * `static` is invariant for the `(key, name)` pair: once written it is not changed,
+ * because cardinality + token dedup make subsequent appends either no-ops or errors.
  */
-export type MemberBucket = Map<symbol, Map<string | symbol, unknown[]>>;
+export interface MemberEntry {
+	readonly static: boolean;
+	readonly values: unknown[];
+}
+
+/**
+ * Per-class own member metadata: key → member name → entry holding values and `static`.
+ */
+export type MemberBucket = Map<symbol, Map<string | symbol, MemberEntry>>;
 
 /**
  * Whether metadata was attached to a class method or a property.

@@ -4,28 +4,26 @@ import { getKeyCardinality } from "./cardinality-registry";
 import { getOrCreate } from "./get-or-create";
 import { chainHasNonEmpty, collectFromChain, firstOnChain } from "./store-walk";
 import type { AnyConstructor } from "../reflector/types";
-import type { Ctor, MemberBucket, MemberKind, MetadataKey } from "./types";
+import type { Ctor, MemberBucket, MemberEntry, MemberKind, MetadataKey } from "./types";
 
 const memberMetaStore = new WeakMap<Ctor, MemberBucket>();
 
 const committedTokens = new WeakMap<Ctor, Set<symbol>>();
-
-const memberStaticStore = new WeakMap<Ctor, Map<string | symbol, boolean>>();
 
 /**
  * Own member metadata for `ctor`, `key`, and `name` (no prototype walk).
  */
 export function getMemberMeta<T>(ctor: Ctor, key: symbol, name: string | symbol): readonly T[] {
 	// safe: T is the caller's narrowed view of the unknown[] stored internally
-	return (memberMetaStore.get(ctor)?.get(key)?.get(name) as T[] | undefined) ?? [];
+	return (memberMetaStore.get(ctor)?.get(key)?.get(name)?.values as T[] | undefined) ?? [];
 }
 
 /**
  * True if this exact constructor has at least one value for the member+key (own only).
  */
 export function hasOwnMemberMeta(ctor: Ctor, key: symbol, name: string | symbol): boolean {
-	const list = memberMetaStore.get(ctor)?.get(key)?.get(name);
-	return !!list && list.length > 0;
+	const entry = memberMetaStore.get(ctor)?.get(key)?.get(name);
+	return !!entry && entry.values.length > 0;
 }
 
 /**
@@ -56,26 +54,28 @@ export function appendMemberMeta<T>(
 
 	const outer = getOrCreate(memberMetaStore, ctor, () => new Map());
 	const inner = getOrCreate(outer, key, () => new Map());
-	const list: unknown[] = getOrCreate(inner, name, () => []);
-	if (cardinality === "unique" && list.length > 0) {
+	const entry: MemberEntry = getOrCreate(inner, name, () => ({ values: [], static: options.static }));
+	if (cardinality === "unique" && entry.values.length > 0) {
 		throw new DuplicateMetadataError(ctor as AnyConstructor, key as MetadataKey, cardinality, options.kind, name);
 	}
-	list.push(meta);
+	entry.values.push(meta);
 	tokens.add(token);
-
-	const staticMap = getOrCreate(memberStaticStore, ctor, () => new Map());
-	staticMap.set(name, options.static);
 }
 
 /**
- * Whether the member is static as recorded on the nearest defining class in the prototype chain of `ctor`.
+ * Whether the member is static as recorded on the nearest class in the prototype chain
+ * of `ctor` that has an entry for the given `(key, name)` pair.
+ *
+ * Caller must pass a `key` for which the member is known to have an entry somewhere
+ * in the chain — typically a name yielded by {@link collectMemberNames}. Returns
+ * `false` if no entry is found, matching the historical default.
  */
-export function getMemberStatic(ctor: Ctor, name: string | symbol): boolean {
+export function getMemberStatic(ctor: Ctor, key: symbol, name: string | symbol): boolean {
 	let result = false;
 	walkPrototypeChain(ctor, (current) => {
-		const map = memberStaticStore.get(current);
-		if (map?.has(name)) {
-			result = map.get(name) as boolean;
+		const entry = memberMetaStore.get(current)?.get(key)?.get(name);
+		if (entry) {
+			result = entry.static;
 			return true;
 		}
 	});
@@ -86,7 +86,10 @@ export function getMemberStatic(ctor: Ctor, name: string | symbol): boolean {
  * All values for this member+key from `ctor` up the chain (subclass first at each level).
  */
 export function collectMemberMeta<T>(ctor: Ctor, key: symbol, name: string | symbol): T[] {
-	return collectFromChain<T>(ctor, (current) => memberMetaStore.get(current)?.get(key)?.get(name) as T[] | undefined);
+	return collectFromChain<T>(
+		ctor,
+		(current) => memberMetaStore.get(current)?.get(key)?.get(name)?.values as T[] | undefined
+	);
 }
 
 /**
@@ -109,7 +112,10 @@ export function collectMemberNames(ctor: Ctor, key: symbol): Set<string | symbol
  * First value for `key`+`name` when walking from `ctor` up the chain.
  */
 export function firstMemberMetaForKey<T>(ctor: Ctor, key: symbol, name: string | symbol): T | undefined {
-	return firstOnChain<T>(ctor, (current) => memberMetaStore.get(current)?.get(key)?.get(name) as T[] | undefined);
+	return firstOnChain<T>(
+		ctor,
+		(current) => memberMetaStore.get(current)?.get(key)?.get(name)?.values as T[] | undefined
+	);
 }
 
 /**
@@ -127,7 +133,7 @@ export function hasAnyMemberMeta(ctor: Ctor): boolean {
  */
 export function hasAnyMemberMetaForKey(ctor: Ctor, key: symbol, name: string | symbol): boolean {
 	return chainHasNonEmpty(ctor, (current) => {
-		const list = memberMetaStore.get(current)?.get(key)?.get(name);
-		return !!list && list.length > 0;
+		const entry = memberMetaStore.get(current)?.get(key)?.get(name);
+		return !!entry && entry.values.length > 0;
 	});
 }

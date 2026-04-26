@@ -133,7 +133,7 @@ export class ReflectorImpl implements Reflector {
 		const cardinality = getKeyCardinality(key);
 		const out: R[] = [];
 		for (const name of names) {
-			const isStatic = getMemberStatic(this.ctor, name);
+			const isStatic = getMemberStatic(this.ctor, key, name);
 			if (this.isMethod(name, isStatic) !== wantMethod) {
 				continue;
 			}

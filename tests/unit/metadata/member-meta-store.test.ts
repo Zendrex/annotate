@@ -7,6 +7,7 @@ import {
 	collectMemberMeta,
 	collectMemberNames,
 	getMemberMeta,
+	getMemberStatic,
 	hasAnyMemberMeta,
 	hasOwnMemberMeta,
 } from "../../../src/metadata/member-meta-store";
@@ -114,6 +115,42 @@ describe("collectMemberNames ancestor walk", () => {
 		expect(names.size).toBe(2);
 		expect(names.has("a")).toBe(true);
 		expect(names.has("b")).toBe(true);
+	});
+});
+
+describe("getMemberStatic", () => {
+	test("returns false when no entry exists for the (key, name)", () => {
+		const key = mintListKey("k");
+		class A {}
+		expect(getMemberStatic(A, key, "missing")).toBe(false);
+	});
+
+	test("returns the static flag captured at first append", () => {
+		const key = mintListKey("k");
+		class A {}
+		appendMemberMeta(A, key, "instance", "v", Symbol("t1"), { static: false, kind: "method" });
+		appendMemberMeta(A, key, "klass", "v", Symbol("t2"), { static: true, kind: "method" });
+		expect(getMemberStatic(A, key, "instance")).toBe(false);
+		expect(getMemberStatic(A, key, "klass")).toBe(true);
+	});
+
+	test("walks the prototype chain and uses the most-derived defining link", () => {
+		const key = mintListKey("k");
+		class Parent {}
+		class Child extends Parent {}
+		appendMemberMeta(Parent, key, "foo", "p", Symbol("tp"), { static: true, kind: "method" });
+		appendMemberMeta(Child, key, "foo", "c", Symbol("tc"), { static: false, kind: "method" });
+		expect(getMemberStatic(Child, key, "foo")).toBe(false);
+		expect(getMemberStatic(Parent, key, "foo")).toBe(true);
+	});
+
+	test("subsequent appends to the same (key, name) do not change the static flag", () => {
+		const key = mintListKey("k");
+		class A {}
+		appendMemberMeta(A, key, "foo", "v1", Symbol("t1"), { static: false, kind: "method" });
+		// Second append on the same entry: static is invariant, captured at first commit.
+		appendMemberMeta(A, key, "foo", "v2", Symbol("t2"), { static: true, kind: "method" });
+		expect(getMemberStatic(A, key, "foo")).toBe(false);
 	});
 });
 
