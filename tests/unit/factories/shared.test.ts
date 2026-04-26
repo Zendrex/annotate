@@ -22,3 +22,47 @@ describe("decorate.class — all() shape", () => {
 		expect(() => Tag.all(Bare)).toThrow(UnregisteredClassError);
 	});
 });
+
+describe("reader prepares deferred instance-member metadata (asymmetry fix)", () => {
+	test("reader flushes pending deferred instance members like sibling helpers do", () => {
+		const Field = decorate.property<string>();
+
+		class User {
+			@Field("varchar")
+			name!: string;
+
+			@Field("text")
+			bio!: string;
+		}
+
+		// reader should prepare just like first/all do, flushing deferred instance members
+		const reader = Field.reader(User);
+		const properties = reader.properties();
+
+		expect(properties).toHaveLength(2);
+		const names = properties.map((p) => p.name);
+		expect(names).toContain("name");
+		expect(names).toContain("bio");
+	});
+
+	test("member reader is prepared like member first() is", () => {
+		const Method = decorate.method<string>();
+
+		class Service {
+			@Method("endpoint")
+			// biome-ignore lint/suspicious/noEmptyBlockStatements: test stub method
+			fetch(): void {}
+
+			@Method("handler")
+			// biome-ignore lint/suspicious/noEmptyBlockStatements: test stub method
+			process(): void {}
+		}
+
+		// reader should prepare just like first/all, flushing deferred instance methods
+		const readerMethods = Method.reader(Service).methods();
+		expect(readerMethods).toHaveLength(2);
+		const methodNames = readerMethods.map((m) => m.name);
+		expect(methodNames).toContain("fetch");
+		expect(methodNames).toContain("process");
+	});
+});

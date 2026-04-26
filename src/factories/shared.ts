@@ -201,8 +201,10 @@ export function createClassFactoryHelpers<TMeta, TCard extends Cardinality = "un
 	const firstClassMeta = (ctor: Ctor): TMeta | undefined => firstClassMetaForKey<TMeta>(ctor, key);
 
 	return {
-		reader: (target: object): ScopedReflector<TMeta, TCard> =>
-			createScopedReflector<TMeta, TCard>(resolveReflectTarget(target), key),
+		reader: (target: object): ScopedReflector<TMeta, TCard> => {
+			const ctor = prepareForRead(target);
+			return createScopedReflector<TMeta, TCard>(ctor, key);
+		},
 		first: (target: object): TMeta | undefined => {
 			const ctor = prepareForRead(target);
 			ensureClassRegistered(ctor);
@@ -248,8 +250,10 @@ export function createMemberFactoryHelpers<TMeta, TCard extends Cardinality = "u
 		firstMemberMetaForKey<TMeta>(ctor, key, member);
 
 	return {
-		reader: (target: object): ScopedReflector<TMeta, TCard> =>
-			createScopedReflector<TMeta, TCard>(resolveReflectTarget(target), key),
+		reader: (target: object): ScopedReflector<TMeta, TCard> => {
+			const ctor = prepareForRead(target);
+			return createScopedReflector<TMeta, TCard>(ctor, key);
+		},
 		first: (target: object, member: string | symbol): TMeta | undefined => {
 			const ctor = prepareForRead(target);
 			ensureClassRegistered(ctor);
