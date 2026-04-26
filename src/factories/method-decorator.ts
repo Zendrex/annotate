@@ -37,7 +37,7 @@ export function createMethodDecorator<
 	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
 	TThis = any,
 >(options?: DecoratorOptions<TMeta, TArgs>): DecoratedMethodFactory<TMeta, TArgs, TMethod, TThis> {
-	const key = mintMetadataKey<TMeta, "unique">("unique", options?.name);
+	const key = mintMetadataKey<TMeta>("unique", options?.name);
 	return buildMethodFactory<TMeta, TArgs, TMethod, TThis>(key, options);
 }
 
@@ -131,6 +131,6 @@ export function createMethodListDecorator<
 	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
 	TThis = any,
 >(options?: DecoratorOptions<TMeta, TArgs>): DecoratedMethodFactory<TMeta, TArgs, TMethod, TThis, "list"> {
-	const key = mintMetadataKey<TMeta, "list">("list", options?.name);
+	const key = mintMetadataKey<TMeta>("list", options?.name);
 	return buildMethodFactory<TMeta, TArgs, TMethod, TThis, "list">(key, options);
 }

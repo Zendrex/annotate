@@ -50,7 +50,7 @@ export function createAccessorInterceptor<
 >(options: AccessorInterceptorOptions<TMeta, TArgs, TValue>): DecoratedAccessorFactory<TMeta, TArgs, TValue, TThis> {
 	requireAccessorHook(options, "intercept.accessor");
 
-	const key = mintMetadataKey<TMeta, "unique">("unique", options.name);
+	const key = mintMetadataKey<TMeta>("unique", options.name);
 	const { onGet, onSet, ...rest } = options;
 	return buildAccessorFactory<TMeta, TArgs, TValue, TThis>(key, rest as DecoratorOptions<TMeta, TArgs>, {
 		onGet,
@@ -150,7 +150,7 @@ export function createAccessorListInterceptor<
 ): DecoratedAccessorFactory<TMeta, TArgs, TValue, TThis, "list"> {
 	requireAccessorHook(options, "intercept.accessor.list");
 
-	const key = mintMetadataKey<TMeta, "list">("list", options.name);
+	const key = mintMetadataKey<TMeta>("list", options.name);
 	const { onGet, onSet, ...rest } = options;
 	return buildAccessorFactory<TMeta, TArgs, TValue, TThis, "list">(key, rest as DecoratorOptions<TMeta, TArgs>, {
 		onGet,

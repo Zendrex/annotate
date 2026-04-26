@@ -10,25 +10,26 @@ import type { Cardinality, ListMetadataKey, MetadataKey, UniqueMetadataKey } fro
 const registry = new WeakMap<symbol, Cardinality>();
 
 /**
- * Mint a new symbol branded as a `MetadataKey<T, C>` and register it under the given
- * `cardinality`. The cardinality parameter is reflected at the type level, so passing
- * `"unique"` returns a value assignable to {@link UniqueMetadataKey} and `"list"`
- * returns a value assignable to {@link ListMetadataKey}.
+ * Mint a new symbol branded as a `MetadataKey<T>` and register it under the given
+ * cardinality. The overloads narrow the return type from the literal argument:
+ * passing `"unique"` returns a {@link UniqueMetadataKey} and `"list"` returns a
+ * {@link ListMetadataKey} — no redundant second generic required at call sites.
  *
  * Prefer the cardinality-specific helpers — {@link mintUniqueKey} and {@link mintListKey} —
  * for end-user code: they read more clearly at call sites. Use `mintMetadataKey`
- * inside generic builders that need to pass cardinality through as a type parameter
- * without forking on the constant.
+ * inside generic builders that need to pass cardinality as a runtime argument.
  *
  * @param cardinality - `"unique"` (at most one value per site) or `"list"` (accumulates).
  * @param description - Optional symbol description, forwarded to `Symbol()` as-is.
- * @returns A branded `MetadataKey<T, C>` registered in the cardinality registry.
+ * @returns A branded `MetadataKey<T>` registered in the cardinality registry.
  */
-export function mintMetadataKey<T, C extends Cardinality>(cardinality: C, description?: string): MetadataKey<T, C> {
+export function mintMetadataKey<T>(cardinality: "unique", description?: string): UniqueMetadataKey<T>;
+export function mintMetadataKey<T>(cardinality: "list", description?: string): ListMetadataKey<T>;
+export function mintMetadataKey<T>(cardinality: Cardinality, description?: string): MetadataKey<T> {
 	const key = Symbol(description);
 	registry.set(key, cardinality);
 	// Safe: brand is phantom-only; we control both cardinality and symbol creation.
-	return key as MetadataKey<T, C>;
+	return key as MetadataKey<T>;
 }
 
 /**
@@ -39,7 +40,7 @@ export function mintMetadataKey<T, C extends Cardinality>(cardinality: C, descri
  * @returns A branded `UniqueMetadataKey<T>` registered in the cardinality registry.
  */
 export function mintUniqueKey<T>(description?: string): UniqueMetadataKey<T> {
-	return mintMetadataKey<T, "unique">("unique", description);
+	return mintMetadataKey<T>("unique", description);
 }
 
 /**
@@ -50,7 +51,7 @@ export function mintUniqueKey<T>(description?: string): UniqueMetadataKey<T> {
  * @returns A branded `ListMetadataKey<T>` registered in the cardinality registry.
  */
 export function mintListKey<T>(description?: string): ListMetadataKey<T> {
-	return mintMetadataKey<T, "list">("list", description);
+	return mintMetadataKey<T>("list", description);
 }
 
 /**

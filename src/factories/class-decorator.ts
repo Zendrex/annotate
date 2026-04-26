@@ -17,7 +17,7 @@ import type { DecoratedClassFactory, DecoratorOptions, DeriveOptions } from "./t
 export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta], TInstance = unknown>(
 	options?: DecoratorOptions<TMeta, TArgs>
 ): DecoratedClassFactory<TMeta, TArgs, TInstance> {
-	const key = mintMetadataKey<TMeta, "unique">("unique", options?.name);
+	const key = mintMetadataKey<TMeta>("unique", options?.name);
 	return buildClassFactory<TMeta, TArgs, TInstance>(key, options);
 }
 
@@ -86,6 +86,6 @@ export function buildClassFactory<TMeta, TArgs extends unknown[], TInstance, TCa
 export function createClassListDecorator<TMeta, TArgs extends unknown[] = [TMeta], TInstance = unknown>(
 	options?: DecoratorOptions<TMeta, TArgs>
 ): DecoratedClassFactory<TMeta, TArgs, TInstance, "list"> {
-	const key = mintMetadataKey<TMeta, "list">("list", options?.name);
+	const key = mintMetadataKey<TMeta>("list", options?.name);
 	return buildClassFactory<TMeta, TArgs, TInstance, "list">(key, options);
 }

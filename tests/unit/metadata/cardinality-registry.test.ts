@@ -71,7 +71,7 @@ describe("getKeyCardinality", () => {
 
 describe("mintMetadataKey", () => {
 	test("with cardinality 'unique' produces a UniqueMetadataKey registered as 'unique'", () => {
-		const key = mintMetadataKey<string, "unique">("unique", "test:mint:unique");
+		const key = mintMetadataKey<string>("unique", "test:mint:unique");
 		expect(typeof key).toBe("symbol");
 		expect(key.description).toBe("test:mint:unique");
 		expect(getKeyCardinality(key)).toBe("unique");
@@ -82,7 +82,7 @@ describe("mintMetadataKey", () => {
 	});
 
 	test("with cardinality 'list' produces a ListMetadataKey registered as 'list'", () => {
-		const key = mintMetadataKey<number, "list">("list", "test:mint:list");
+		const key = mintMetadataKey<number>("list", "test:mint:list");
 		expect(typeof key).toBe("symbol");
 		expect(key.description).toBe("test:mint:list");
 		expect(getKeyCardinality(key)).toBe("list");
@@ -93,8 +93,8 @@ describe("mintMetadataKey", () => {
 	});
 
 	test("works without a description argument", () => {
-		const unique = mintMetadataKey<unknown, "unique">("unique");
-		const list = mintMetadataKey<unknown, "list">("list");
+		const unique = mintMetadataKey<unknown>("unique");
+		const list = mintMetadataKey<unknown>("list");
 		expect(unique.description).toBeUndefined();
 		expect(list.description).toBeUndefined();
 		expect(getKeyCardinality(unique)).toBe("unique");
@@ -102,11 +102,19 @@ describe("mintMetadataKey", () => {
 	});
 
 	test("distinct calls produce distinct symbols", () => {
-		const a = mintMetadataKey<string, "unique">("unique", "shared");
-		const b = mintMetadataKey<string, "unique">("unique", "shared");
-		const c = mintMetadataKey<string, "list">("list", "shared");
+		const a = mintMetadataKey<string>("unique", "shared");
+		const b = mintMetadataKey<string>("unique", "shared");
+		const c = mintMetadataKey<string>("list", "shared");
 		expect(a).not.toBe(b);
 		expect(a).not.toBe(c);
 		expect(b).not.toBe(c);
+	});
+
+	test("overload narrowing: literal argument drives return type without second generic", () => {
+		// Verify the overloads narrow correctly — no cast needed.
+		const uniqueKey: UniqueMetadataKey<string> = mintMetadataKey<string>("unique");
+		const listKey: ListMetadataKey<string> = mintMetadataKey<string>("list");
+		expect(getKeyCardinality(uniqueKey)).toBe("unique");
+		expect(getKeyCardinality(listKey)).toBe("list");
 	});
 });

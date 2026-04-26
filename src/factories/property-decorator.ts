@@ -21,7 +21,7 @@ export function createPropertyDecorator<
 	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
 	TThis = any,
 >(options?: DecoratorOptions<TMeta, TArgs>): DecoratedPropertyFactory<TMeta, TArgs, TField, TThis> {
-	const key = mintMetadataKey<TMeta, "unique">("unique", options?.name);
+	const key = mintMetadataKey<TMeta>("unique", options?.name);
 	return buildPropertyFactory<TMeta, TArgs, TField, TThis>(key, options);
 }
 
@@ -90,6 +90,6 @@ export function createPropertyListDecorator<
 	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
 	TThis = any,
 >(options?: DecoratorOptions<TMeta, TArgs>): DecoratedPropertyFactory<TMeta, TArgs, TField, TThis, "list"> {
-	const key = mintMetadataKey<TMeta, "list">("list", options?.name);
+	const key = mintMetadataKey<TMeta>("list", options?.name);
 	return buildPropertyFactory<TMeta, TArgs, TField, TThis, "list">(key, options);
 }
