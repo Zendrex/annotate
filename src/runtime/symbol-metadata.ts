@@ -1,5 +1,4 @@
-// biome-ignore lint/complexity/noBannedTypes: Constructor identity uses Function for parity with store/declaring-class modules.
-type Ctor = Function;
+import type { Ctor } from "../metadata/types";
 
 /**
  * Key used for Symbol.metadata-style constructor metadata. Uses native
