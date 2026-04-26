@@ -102,7 +102,7 @@ for (const { name, metadata } of Route.reader(Users).methods()) {
 
 ### Schema-validated entity fields
 
-Validators run at decoration time. Bad shapes throw before your app boots. `requireInstanceOf` rejects classes that do not extend a required base, also at decoration time, not when the first request lands.
+Validators run early. For class and static-member decorators they fire during class evaluation; for instance fields and methods they run on the first `new` (or first reflective read), well before any traffic. `requireInstanceOf` is part of the same chain, so non-conforming hosts are rejected on the same path.
 
 ```typescript
 class Entity {}
@@ -124,11 +124,11 @@ class User extends Entity {
 Field.reader(User).properties();
 ```
 
-Apply `@Field` to a non-`Entity` class and you get `InvalidDecorationTargetError` immediately.
+Apply `@Field` to a non-`Entity` class and you get `InvalidDecorationTargetError` on the first `new` (or the first reflective read) — well before the property is actually used.
 
-### Method interceptors that see sibling metadata
+### Method interceptors read metadata fresh at call time
 
-Interceptors do not snapshot at decoration time. They read fresh, so an interceptor stacked alongside other decorators sees their metadata regardless of declaration order.
+An interceptor's `readMetadata(instance)` returns the values stored under its own factory's key. The read happens at invocation time, not decoration time, so the interceptor always sees the fully committed list — independent of where the interceptor sits in a decorator stack.
 
 ```typescript
 const Audit = intercept.method<string>({
@@ -175,11 +175,11 @@ A factory bundles a decorator, a `MetadataKey`, and a typed reader. No string ke
 
 ### Metadata is lazy
 
-Instance metadata commits on first `new`. Statics commit immediately. Helpers `prepare()` automatically on read, so you only call it manually when an external tool walks `Object.getOwnPropertyNames` before any instance exists.
+Instance metadata commits on first `new`. Statics commit during class evaluation. Read helpers call `prepare()` automatically, so you only invoke it manually when an external tool walks `Object.getOwnPropertyNames` before any instance exists.
 
 ### Failures are typed and early
 
-Validation, base-class requirement, and uniqueness checks all run at decoration time. The errors are domain types you can branch on.
+Validation, base-class requirement, and uniqueness checks all fire well before runtime use: class- and static-member decorators check during class evaluation; instance-member decorators check on the first `new` or reflective read. The errors are domain types you can branch on.
 
 ## API surface
 
@@ -250,8 +250,9 @@ for (const { name, metadata } of Role.reader(Api).methods()) {
 }
 
 // Tag.key is ListMetadataKey<string> → metadata: readonly string[]
+// Stage-3 applies decorators inner-first, so the closest @Tag stores first.
 for (const { name, metadata } of Tag.reader(Api).methods()) {
-  console.log(name, metadata); // "get", ["public", "internal"]
+  console.log(name, metadata); // "get", ["internal", "public"]
 }
 ```
 
@@ -288,11 +289,11 @@ type A = ArgsOf<typeof Route>;      // ["GET" | "POST", string]
 
 ### prepare
 
-Instance metadata commits on first `new`. Reader helpers auto-prepare. Call `prepare(Ctor)` manually only when an external tool needs the flush before any instance exists.
+Instance metadata commits on first `new`. Statics commit during class evaluation. Reader helpers auto-prepare. Call `prepare(Ctor)` manually only when an external tool needs the flush before any instance exists.
 
 ## Errors
 
-Every domain error extends `AnnotateError` and carries `code`, `target`, `kind?`, `memberName?`.
+Every domain error extends `AnnotateError` and carries `code`, `target`, `key?`, `kind?`, `memberName?`.
 
 
 | Class                          | `code`              | When                                                                                                                 |

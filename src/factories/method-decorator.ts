@@ -4,31 +4,25 @@ import {
 	createMemberFactoryHelpers,
 	createMemberMetadataReader,
 	emitMemberDecoration,
-	labelFor,
 	mergeExtendedOptions,
+	prepareFactoryShell,
 } from "./shared";
-import { buildValidatorChain } from "./validator-chain";
 import type { Cardinality, MetadataKey } from "../metadata/types";
 import type { AnyFn, DecoratedMethodFactory, DecoratorOptions, DeriveOptions, InterceptorContext } from "./types";
 
 /**
- * Optional hooks for a method factory built with {@link buildMethodFactory}. When
- * `intercept` is supplied, the method decorator may return a replacement function;
- * the hook receives the original method, a reader over existing metadata for that
- * member, and an {@link InterceptorContext} (name, static flag, `kind: "method"`).
+ * Hook bundle for {@link buildMethodFactory}. The `intercept` callback receives
+ * the original method, a per-member `readMetadata` reader, and an
+ * {@link InterceptorContext}; its return value replaces the method.
  */
 export interface MethodHookRefs<TMeta, TMethod extends AnyFn> {
 	intercept: (original: TMethod, readMetadata: (instance: object) => TMeta[], context: InterceptorContext) => TMethod;
 }
 
 /**
- * Returns a method decorator factory. Metadata is written through
- * `emitMemberDecoration` with the same key and validation as other member factories:
- * composed `TMeta` is stored and optionally validated. When advanced wiring is needed,
- * {@link buildMethodFactory} accepts {@link MethodHookRefs} for intercept-based replacement
- * and a distinct internal decoration token.
- *
- * @param options - Optional `name`, `compose`, `validate`, `requireInstanceOf`.
+ * Builds a method decorator factory using the shared member metadata path.
+ * Pair with {@link MethodHookRefs} via {@link buildMethodFactory} to add
+ * method interception.
  */
 export function createMethodDecorator<
 	TMeta,
@@ -42,19 +36,11 @@ export function createMethodDecorator<
 }
 
 /**
- * Core implementation shared with {@link createMethodDecorator} and (with
- * `hookRefs`) other builds. Composes `TMeta` from args, then schedules member
- * metadata via `emitMemberDecoration` (class initialization callback path), applying
- * validators. If `hookRefs.intercept` is set, it runs first and the return value,
- * if any, becomes the new method; metadata emission still uses a stable token so
- * storage stays aligned with the non-intercept path. The returned object includes
- * `key`, reader helpers, and `derive` (reuses `hookRefs` and merges child options;
- * see inline note on `TNewMethod` narrowing).
- *
- * @param key - Fixed metadata key for this family of decorators.
- * @param options - Factory options; merged into derived factories by `derive`.
- * @param hookRefs - When present, enables intercept-based method replacement
- *   while metadata is still recorded for the member.
+ * Lower-level form of {@link createMethodDecorator} that accepts a pre-minted
+ * key and optional {@link MethodHookRefs}. The intercept return value (if any)
+ * replaces the original method; storage uses a distinct token per decoration
+ * to keep ordering consistent with non-intercepting variants. `derive` reuses
+ * `hookRefs` and merges options.
  */
 export function buildMethodFactory<
 	TMeta,
@@ -67,9 +53,7 @@ export function buildMethodFactory<
 	options: DecoratorOptions<TMeta, TArgs> | undefined,
 	hookRefs?: MethodHookRefs<TMeta, TMethod>
 ): DecoratedMethodFactory<TMeta, TArgs, TMethod, TThis, TCard> {
-	const { compose: composeFn, name } = options ?? {};
-	const label = labelFor(name, key);
-	const validators = buildValidatorChain<TMeta>(options, label, key);
+	const { composeFn, label, validators } = prepareFactoryShell<TMeta, TArgs>(key, options);
 	const intercept = hookRefs?.intercept;
 
 	const decoratorFn =
@@ -101,13 +85,13 @@ export function buildMethodFactory<
 			return replacement;
 		};
 
-	const derive = <TNewMethod extends AnyFn = TMethod, TNewThis = TThis>(
+	const derive = <TNewThis = TThis>(
 		childOptions?: DeriveOptions<TMeta, TArgs>
-	): DecoratedMethodFactory<TMeta, TArgs, TNewMethod, TNewThis, TCard> =>
-		buildMethodFactory<TMeta, TArgs, TNewMethod, TNewThis, TCard>(
+	): DecoratedMethodFactory<TMeta, TArgs, TMethod, TNewThis, TCard> =>
+		buildMethodFactory<TMeta, TArgs, TMethod, TNewThis, TCard>(
 			key,
 			mergeExtendedOptions(options, childOptions),
-			hookRefs as MethodHookRefs<TMeta, TNewMethod> | undefined
+			hookRefs
 		);
 
 	return Object.assign(decoratorFn, {
@@ -118,11 +102,8 @@ export function buildMethodFactory<
 }
 
 /**
- * Returns a method decorator factory that accumulates metadata (list cardinality).
- * Multiple decorations of the same method with the same factory each append one entry.
- * Exposes `.key` typed as `ListMetadataKey<TMeta>`.
- *
- * @param options - Optional `name`, `compose`, `validate`, `requireInstanceOf`.
+ * List-cardinality method decorator: repeat decorations append entries instead
+ * of throwing on duplicates. `.key` is branded as a list key.
  */
 export function createMethodListDecorator<
 	TMeta,

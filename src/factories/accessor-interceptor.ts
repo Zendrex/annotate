@@ -4,10 +4,9 @@ import {
 	createMemberFactoryHelpers,
 	createMemberMetadataReader,
 	emitMemberDecoration,
-	labelFor,
 	mergeExtendedOptions,
+	prepareFactoryShell,
 } from "./shared";
-import { buildValidatorChain } from "./validator-chain";
 import type { Cardinality, MetadataKey } from "../metadata/types";
 import type {
 	AccessorInterceptorOptions,
@@ -18,9 +17,8 @@ import type {
 } from "./types";
 
 /**
- * Hook implementations passed into {@link buildAccessorFactory}. Separated from
- * {@link AccessorInterceptorOptions} so the factory can be built with stable
- * references for `derive` reuse.
+ * Get/set hooks split from {@link AccessorInterceptorOptions} so `derive` can
+ * preserve the original hook references across re-builds.
  */
 export interface AccessorHookRefs<TMeta, TValue> {
 	onGet?: (
@@ -36,10 +34,9 @@ export interface AccessorHookRefs<TMeta, TValue> {
 }
 
 /**
- * Like `intercept.method`, but for Stage 3 auto-accessors. Supply at least one of
- * `onGet` or `onSet` to wrap the generated getter and/or setter.
+ * Stage 3 auto-accessor interceptor that wraps the generated getter and/or setter.
  *
- * @throws {TypeError} If neither `onGet` nor `onSet` is provided.
+ * @throws {TypeError} When neither `onGet` nor `onSet` is provided.
  */
 export function createAccessorInterceptor<
 	TMeta,
@@ -59,9 +56,9 @@ export function createAccessorInterceptor<
 }
 
 /**
- * Low-level accessor interceptor factory: emits metadata through the same path
- * as `createAccessorInterceptor` but accepts a precomputed key and optional
- * `derive` merging. Exposed for advanced composition; prefer `createAccessorInterceptor`.
+ * Lower-level form of {@link createAccessorInterceptor} that accepts a
+ * pre-minted key. Prefer the public entry unless composing multiple factories
+ * on a single shared key.
  */
 export function buildAccessorFactory<
 	TMeta,
@@ -74,9 +71,7 @@ export function buildAccessorFactory<
 	options: DecoratorOptions<TMeta, TArgs> | undefined,
 	hookRefs: AccessorHookRefs<TMeta, TValue>
 ): DecoratedAccessorFactory<TMeta, TArgs, TValue, TThis, TCard> {
-	const { compose: composeFn, name } = options ?? {};
-	const label = labelFor(name, key);
-	const validators = buildValidatorChain<TMeta>(options, label, key);
+	const { composeFn, label, validators } = prepareFactoryShell<TMeta, TArgs>(key, options);
 	const { onGet, onSet } = hookRefs;
 
 	const decoratorFn =
@@ -116,13 +111,13 @@ export function buildAccessorFactory<
 			return result;
 		};
 
-	const derive = <TNewValue = TValue, TNewThis = TThis>(
+	const derive = <TNewThis = TThis>(
 		childOptions?: DeriveOptions<TMeta, TArgs>
-	): DecoratedAccessorFactory<TMeta, TArgs, TNewValue, TNewThis, TCard> =>
-		buildAccessorFactory<TMeta, TArgs, TNewValue, TNewThis, TCard>(
+	): DecoratedAccessorFactory<TMeta, TArgs, TValue, TNewThis, TCard> =>
+		buildAccessorFactory<TMeta, TArgs, TValue, TNewThis, TCard>(
 			key,
 			mergeExtendedOptions(options, childOptions),
-			hookRefs as unknown as AccessorHookRefs<TMeta, TNewValue>
+			hookRefs
 		);
 
 	return Object.assign(decoratorFn, {
@@ -133,11 +128,10 @@ export function buildAccessorFactory<
 }
 
 /**
- * Like `intercept.accessor`, but for list-cardinality metadata. Multiple decorations
- * of the same accessor with the same factory each append one entry (no `DuplicateMetadataError`).
- * Exposes `.key` typed as `ListMetadataKey<TMeta>`.
+ * List-cardinality variant of {@link createAccessorInterceptor}: repeat
+ * decorations append entries instead of throwing on duplicates.
  *
- * @throws {TypeError} If neither `onGet` nor `onSet` is provided.
+ * @throws {TypeError} When neither `onGet` nor `onSet` is provided.
  */
 export function createAccessorListInterceptor<
 	TMeta,

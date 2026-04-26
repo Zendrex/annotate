@@ -1,18 +1,18 @@
 import { mintMetadataKey } from "../metadata/cardinality-registry";
-import { compose, createMemberFactoryHelpers, emitMemberDecoration, labelFor, mergeExtendedOptions } from "./shared";
-import { buildValidatorChain } from "./validator-chain";
+import {
+	compose,
+	createMemberFactoryHelpers,
+	emitMemberDecoration,
+	mergeExtendedOptions,
+	prepareFactoryShell,
+} from "./shared";
 import type { Cardinality, MetadataKey } from "../metadata/types";
 import type { DecoratedPropertyFactory, DecoratorOptions, DeriveOptions } from "./types";
 
 /**
- * Returns a class field (property) decorator factory. The Stage-3 field form passes
- * `undefined` for the value; all work happens in `emitMemberDecoration`, which
- * composes `TMeta`, runs validators, and records metadata when the class is initialized
- * (same member-decoration pipeline as methods, without an intercept/replacement hook).
- * The result includes `key`, `reader` / `first` / `has` / `all` scoped to property names,
- * and `derive` for merged child options.
- *
- * @param options - Optional `name`, `compose`, `validate`, `requireInstanceOf`.
+ * Class field decorator factory. Stage 3 always passes `undefined` for the
+ * field value; metadata commits via the shared member path with no value
+ * replacement. Reader and `derive` shape match the other member factories.
  */
 export function createPropertyDecorator<
 	TMeta,
@@ -26,13 +26,9 @@ export function createPropertyDecorator<
 }
 
 /**
- * Builds a {@link createPropertyDecorator}-style factory for a fixed key. Behavior
- * matches the public entrypoint: `emitMemberDecoration` with `kind: "property"`,
- * composed metadata, and optional validator chain. `derive` reuses the key and merges
- * options via `mergeExtendedOptions`.
- *
- * @param key - Metadata key this factory reads and writes.
- * @param options - Optional compose/validation and display `name` for labels.
+ * Lower-level form of {@link createPropertyDecorator} that accepts a
+ * pre-minted key. `derive` reuses the key and merges options via
+ * {@link mergeExtendedOptions}.
  */
 export function buildPropertyFactory<
 	TMeta,
@@ -44,9 +40,7 @@ export function buildPropertyFactory<
 	key: MetadataKey<TMeta, TCard>,
 	options: DecoratorOptions<TMeta, TArgs> | undefined
 ): DecoratedPropertyFactory<TMeta, TArgs, TField, TThis, TCard> {
-	const { compose: composeFn, name } = options ?? {};
-	const label = labelFor(name, key);
-	const validators = buildValidatorChain<TMeta>(options, label, key);
+	const { composeFn, label, validators } = prepareFactoryShell<TMeta, TArgs>(key, options);
 
 	const decoratorFn =
 		(...args: TArgs) =>
@@ -77,11 +71,8 @@ export function buildPropertyFactory<
 }
 
 /**
- * Returns a property decorator factory that accumulates metadata (list cardinality).
- * Multiple decorations of the same field with the same factory each append one entry.
- * Exposes `.key` typed as `ListMetadataKey<TMeta>`.
- *
- * @param options - Optional `name`, `compose`, `validate`, `requireInstanceOf`.
+ * List-cardinality field decorator: repeat decorations append entries instead
+ * of throwing on duplicates. `.key` is branded as a list key.
  */
 export function createPropertyListDecorator<
 	TMeta,

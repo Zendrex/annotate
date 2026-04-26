@@ -1,15 +1,13 @@
 import type { AnyConstructor } from "./types";
 
 /**
- * Obtains the class constructor from an **instance** by reading `instance.constructor`.
+ * Reads `instance.constructor` and validates it is a real class-shaped
+ * constructor. Plain `Object`, missing constructors, and non-object prototypes
+ * are rejected so reflection only runs against user-defined classes.
  *
- * Rejects plain `Object` results and values that are not ordinary constructors with an object
- * prototype, so reflection stays tied to real class-shaped targets.
- *
- * @param instance - Object instance whose prototype chain should yield a usable constructor
- * @returns The instance’s class constructor
- * @throws {TypeError} If the value is not a non-null object, has no usable `constructor`, the
- *   constructor is `Object`, or the constructor lacks a non-null object `prototype`
+ * @throws {TypeError} If `instance` is not a non-null object, has no usable
+ *   `constructor`, the constructor is `Object`, or its `prototype` is not an
+ *   object.
  */
 export function resolveConstructorFromInstance(instance: object): AnyConstructor {
 	if (instance === null || typeof instance !== "object") {
@@ -33,16 +31,12 @@ export function resolveConstructorFromInstance(instance: object): AnyConstructor
 }
 
 /**
- * Normalizes a **reflect** target to a {@link AnyConstructor}.
+ * Normalises a reflect target to a class constructor: passes constructors
+ * through after the same shape checks, and delegates instance values to
+ * {@link resolveConstructorFromInstance}.
  *
- * Pass a class constructor directly, or an instance (resolved via
- * {@link resolveConstructorFromInstance}). This is the shared resolution path for the
- * `reflect()` function in `./reflector.ts`.
- *
- * @param target - A class constructor or an instance object
- * @returns The constructor to use for metadata lookup
- * @throws {TypeError} If `target` is not a constructor or instance that satisfies the same
- *   constraints as {@link resolveConstructorFromInstance}, or if the constructor is `Object`
+ * @throws {TypeError} If `target` is not a class-shaped constructor or a
+ *   resolvable instance, or if it resolves to `Object`.
  */
 export function resolveReflectTarget(target: unknown): AnyConstructor {
 	if (typeof target === "function") {

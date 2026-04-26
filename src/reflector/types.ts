@@ -1,22 +1,13 @@
 import type { Cardinality } from "../metadata/types";
 
-/**
- * Any class constructor this library treats as a decoration **target**: a `function` with a
- * non-null object `prototype` (ordinary constructor shape).
- */
+/** Function with a non-null object `prototype` — i.e. anything class-shaped. */
 // biome-ignore lint/complexity/noBannedTypes: needed for constructor type
 export type AnyConstructor = Function & { prototype: object };
 
-/**
- * Which syntactic construct carried the metadata: the class itself, a method, or a property/field.
- */
 export type DecoratedKind = "class" | "method" | "property";
 
 // ── Class ─────────────────────────────────────────────────────────────────────
 
-/**
- * Class-level decoration where metadata is a single value (unique-cardinality key).
- */
 export interface DecoratedClassUnique<TMeta> {
 	kind: "class";
 	metadata: TMeta;
@@ -24,9 +15,6 @@ export interface DecoratedClassUnique<TMeta> {
 	target: AnyConstructor;
 }
 
-/**
- * Class-level decoration where metadata is an ordered list (list-cardinality key).
- */
 export interface DecoratedClassList<TMeta> {
 	kind: "class";
 	metadata: readonly TMeta[];
@@ -34,14 +22,15 @@ export interface DecoratedClassList<TMeta> {
 	target: AnyConstructor;
 }
 
-/** Internal alias used by impl signatures; consumers receive `DecoratedClassUnique` or `DecoratedClassList` via the branded key overloads. */
 export type DecoratedClass<TMeta> = DecoratedClassUnique<TMeta> | DecoratedClassList<TMeta>;
 
 // ── Method ────────────────────────────────────────────────────────────────────
 
 /**
- * Method-level decoration where metadata is a single value (unique-cardinality key).
- * **static** distinguishes own properties on the constructor vs the prototype.
+ * Method-level decoration with a unique-cardinality key.
+ *
+ * `static` is `true` for own properties on the constructor and `false` for
+ * properties on the prototype.
  */
 export interface DecoratedMethodUnique<TMeta> {
 	kind: "method";
@@ -50,10 +39,7 @@ export interface DecoratedMethodUnique<TMeta> {
 	static: boolean;
 }
 
-/**
- * Method-level decoration where metadata is an ordered list (list-cardinality key).
- * **static** has the same meaning as for {@link DecoratedMethodUnique}.
- */
+/** Method-level decoration with a list-cardinality key. `static` as for {@link DecoratedMethodUnique}. */
 export interface DecoratedMethodList<TMeta> {
 	kind: "method";
 	metadata: readonly TMeta[];
@@ -61,15 +47,12 @@ export interface DecoratedMethodList<TMeta> {
 	static: boolean;
 }
 
-/** Internal alias used by impl signatures; consumers receive `DecoratedMethodUnique` or `DecoratedMethodList` via the branded key overloads. */
+/** Internal union; branded keys narrow to one method shape on the public API. */
 export type DecoratedMethod<TMeta> = DecoratedMethodUnique<TMeta> | DecoratedMethodList<TMeta>;
 
 // ── Property ──────────────────────────────────────────────────────────────────
 
-/**
- * Property- or field-level decoration where metadata is a single value (unique-cardinality key).
- * **static** has the same meaning as for {@link DecoratedMethodUnique}.
- */
+/** Property/field decoration with a unique-cardinality key. `static` as for {@link DecoratedMethodUnique}. */
 export interface DecoratedPropertyUnique<TMeta> {
 	kind: "property";
 	metadata: TMeta;
@@ -78,8 +61,8 @@ export interface DecoratedPropertyUnique<TMeta> {
 }
 
 /**
- * Property- or field-level decoration where metadata is an ordered list (list-cardinality key).
- * **static** has the same meaning as for {@link DecoratedMethodUnique}.
+ * Property/field decoration with a list-cardinality key. `metadata` preserves
+ * decoration order. `static` as for {@link DecoratedMethodUnique}.
  */
 export interface DecoratedPropertyList<TMeta> {
 	kind: "property";
@@ -88,35 +71,48 @@ export interface DecoratedPropertyList<TMeta> {
 	static: boolean;
 }
 
-/** Internal alias used by impl signatures; consumers receive `DecoratedPropertyUnique` or `DecoratedPropertyList` via the branded key overloads. */
+/** Internal union; consumers receive a narrowed shape via branded key overloads. */
 export type DecoratedProperty<TMeta> = DecoratedPropertyUnique<TMeta> | DecoratedPropertyList<TMeta>;
 
 // ── DecoratedItem ─────────────────────────────────────────────────────────────
 
+/** Selects class-decoration shape from a cardinality brand. */
+export type DecoratedClassFor<TMeta, TCard extends Cardinality> = TCard extends "unique"
+	? DecoratedClassUnique<TMeta>
+	: DecoratedClassList<TMeta>;
+
+/** Selects method-decoration shape from a cardinality brand. */
+export type DecoratedMethodFor<TMeta, TCard extends Cardinality> = TCard extends "unique"
+	? DecoratedMethodUnique<TMeta>
+	: DecoratedMethodList<TMeta>;
+
+/** Selects property-decoration shape from a cardinality brand. */
+export type DecoratedPropertyFor<TMeta, TCard extends Cardinality> = TCard extends "unique"
+	? DecoratedPropertyUnique<TMeta>
+	: DecoratedPropertyList<TMeta>;
+
 /**
- * Any single reflected item, specialised on cardinality.
+ * Any reflected item, specialised on cardinality:
  *
- * - `DecoratedItem<T, "unique">` — every `metadata` field is a scalar `T`.
- * - `DecoratedItem<T, "list">` — every `metadata` field is `readonly T[]`.
- * - `DecoratedItem<T>` (no second param) — distributes to the union of both.
+ * - `DecoratedItem<T, "unique">` — `metadata` is a scalar `T`.
+ * - `DecoratedItem<T, "list">` — `metadata` is `readonly T[]`.
+ * - `DecoratedItem<T>` — union of both.
  */
-export type DecoratedItem<TMeta, TCard extends Cardinality = Cardinality> = TCard extends "unique"
-	? DecoratedClassUnique<TMeta> | DecoratedMethodUnique<TMeta> | DecoratedPropertyUnique<TMeta>
-	: DecoratedClassList<TMeta> | DecoratedMethodList<TMeta> | DecoratedPropertyList<TMeta>;
+export type DecoratedItem<TMeta, TCard extends Cardinality = Cardinality> =
+	| DecoratedClassFor<TMeta, TCard>
+	| DecoratedMethodFor<TMeta, TCard>
+	| DecoratedPropertyFor<TMeta, TCard>;
 
 // ── ScopedReflector ───────────────────────────────────────────────────────────
 
 /**
- * Read API for one **metadata key** on a fixed class: same queries as the `Reflector` interface,
- * but the key is bound so callers do not pass it on every call. The second type parameter `TCard`
- * narrows `metadata` shapes to scalar (`"unique"`) or array (`"list"`).
- *
- * @typeParam TMeta - Metadata type associated with the bound key
- * @typeParam TCard - Cardinality brand: `"unique"` or `"list"`
+ * Read API for a single key bound to a fixed class. Same queries as
+ * {@link Reflector}, with the key elided. `TCard` narrows `metadata` to scalar
+ * (`"unique"`) or array (`"list"`) form.
  */
 export interface ScopedReflector<TMeta, TCard extends Cardinality = Cardinality> {
 	all(): DecoratedItem<TMeta, TCard>[];
-	class(): TCard extends "unique" ? DecoratedClassUnique<TMeta> | undefined : DecoratedClassList<TMeta> | undefined;
-	methods(): TCard extends "unique" ? DecoratedMethodUnique<TMeta>[] : DecoratedMethodList<TMeta>[];
-	properties(): TCard extends "unique" ? DecoratedPropertyUnique<TMeta>[] : DecoratedPropertyList<TMeta>[];
+	class(): DecoratedClassFor<TMeta, TCard> | undefined;
+	methods(): DecoratedMethodFor<TMeta, TCard>[];
+	properties(): DecoratedPropertyFor<TMeta, TCard>[];
 }

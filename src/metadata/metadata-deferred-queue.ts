@@ -42,9 +42,7 @@ export function queueDeferred(correlation: object | null, deferred: Deferred): v
 	}
 }
 
-/**
- * True if there is a non-empty pending list for this correlation (metadata not yet flushed or failed mid-flush).
- */
+/** True if pending metadata exists (not yet flushed, or failed mid-flush). */
 export function hasPendingFor(correlation: object): boolean {
 	const list = pendingByMetadata.get(correlation);
 	return !!list && list.length > 0;
@@ -55,10 +53,7 @@ export function hasPendingFor(correlation: object): boolean {
  * optional validators, then `appendMemberMeta` in order. On success, removes the queue.
  *
  * If a validator or `appendMemberMeta` throws, entries from the failed index onward stay
- * queued (already committed entries are not rolled back; tokens prevent double-append on retry).
- *
- * @param ctor - The resolved class constructor; must match the ctor registered for this `correlation`
- * @param correlation - The same object identity used with `queueDeferred` / `registerCtor`
+ * queued (already-committed entries are not rolled back; tokens prevent double-append on retry).
  */
 export function flushFor(ctor: Ctor, correlation: object | null): void {
 	if (!correlation) {

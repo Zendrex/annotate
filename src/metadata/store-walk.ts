@@ -12,10 +12,8 @@ export function readValues<T>(values: unknown[] | undefined): readonly T[] | und
 }
 
 /**
- * Walks the prototype chain of `ctor` (subclass first) and returns `true` as
- * soon as `probe` reports a non-empty hit on any link. Used by the metadata
- * stores to answer "does anything in this chain have data" without
- * materializing intermediates.
+ * Walks the prototype chain of `ctor` (subclass first) and short-circuits at
+ * the first link where `probe` reports a hit. Avoids materializing intermediates.
  */
 export function chainHasNonEmpty(ctor: Ctor, probe: (current: Ctor) => boolean): boolean {
 	let found = false;
@@ -29,9 +27,8 @@ export function chainHasNonEmpty(ctor: Ctor, probe: (current: Ctor) => boolean):
 }
 
 /**
- * Returns the first element of the first non-empty list yielded by `getList`
- * when walking the prototype chain of `ctor` (subclass before superclass), or
- * `undefined` if every link is empty or missing.
+ * First element of the first non-empty list yielded along the prototype chain of `ctor`
+ * (subclass before superclass), or `undefined` if every link is empty or missing.
  */
 export function firstOnChain<T>(ctor: Ctor, getList: (current: Ctor) => readonly T[] | undefined): T | undefined {
 	let result: T | undefined;
@@ -46,8 +43,8 @@ export function firstOnChain<T>(ctor: Ctor, getList: (current: Ctor) => readonly
 }
 
 /**
- * Concatenates every list yielded by `getList` along the prototype chain of `ctor`,
- * in walk order (subclass first). Empty or missing links are skipped.
+ * Concatenates every list yielded along the prototype chain of `ctor` in walk
+ * order (subclass first). Empty or missing links are skipped.
  */
 export function collectFromChain<T>(ctor: Ctor, getList: (current: Ctor) => readonly T[] | undefined): T[] {
 	const out: T[] = [];

@@ -19,37 +19,52 @@ import { resolveReflectTarget } from "../reflector/resolve-instance";
 import { createScopedReflector } from "../reflector/scoped-reflector";
 import { prepare } from "../runtime/prepare";
 import { walkPrototypeChain } from "../runtime/prototype-chain";
-import { asDeferredValidators, chainValidators, runValidatorChain } from "./validator-chain";
+import { asDeferredValidators, buildValidatorChain, chainValidators, runValidatorChain } from "./validator-chain";
 import type { Cardinality, Ctor, Deferred, MemberKind, MetadataArray, MetadataKey } from "../metadata/types";
 import type { AnyConstructor, DecoratedKind, ScopedReflector } from "../reflector/types";
 import type { DecoratorOptions, DeriveOptions } from "./types";
 import type { ValidateContext, ValidatorFn } from "./validator-types";
 
 /**
- * Produces a single metadata value from factory arguments: if `fn` is set, returns `fn(...args)`;
- * otherwise the first element of `args` is treated as `TMeta` (the common `(...meta) =>` shape).
+ * Applies the optional `compose` mapper, falling back to `args[0]` for the
+ * identity-tuple case. Overloads distinguish the public single-arg shape from
+ * the internal call with a configured `composeFn`.
  */
+export function compose<TMeta>(args: [TMeta]): TMeta;
+export function compose<TMeta, TArgs extends unknown[]>(args: TArgs, fn: ((...a: TArgs) => TMeta) | undefined): TMeta;
 export function compose<TMeta, TArgs extends unknown[]>(args: TArgs, fn?: (...a: TArgs) => TMeta): TMeta {
 	return fn ? fn(...args) : (args[0] as TMeta);
 }
 
-/**
- * Resolves a stable display name for the decorator, preferring an explicit `name` when provided.
- */
+/** Resolves a display label from the explicit `name` option or the key. */
 export function labelFor(name: string | undefined, key: MetadataKey): string {
 	return name ?? keyDisplayName(key);
 }
 
 /**
- * Throws a structured "metadata missing" error for a class (used by `firstOrThrow` when no entry exists).
+ * Common setup for every `build*Factory`: extracts `compose`, derives the
+ * display label, and builds the validator chain.
  */
+export function prepareFactoryShell<TMeta, TArgs extends unknown[]>(
+	key: MetadataKey<TMeta>,
+	options: DecoratorOptions<TMeta, TArgs> | undefined
+): {
+	composeFn: ((...args: TArgs) => TMeta) | undefined;
+	label: string;
+	validators: ValidatorFn<TMeta>[] | undefined;
+} {
+	const { compose: composeFn, name } = options ?? {};
+	const label = labelFor(name, key);
+	const validators = buildValidatorChain<TMeta>(options, label, key);
+	return { composeFn, label, validators };
+}
+
+/** @throws {MissingMetadataError} Always; used by class `firstOrThrow` when the key has no entry. */
 export function throwMissingClass(key: MetadataKey, ctor: AnyConstructor, label: string): never {
 	throw new MissingMetadataError({ key, kind: "class", target: ctor, label });
 }
 
-/**
- * Throws a structured "metadata missing" error for a method or property member.
- */
+/** @throws {MissingMetadataError} Always; used by member `firstOrThrow` when the key has no entry. */
 export function throwMissingMember(
 	key: MetadataKey,
 	kind: Extract<DecoratedKind, "method" | "property">,
@@ -61,8 +76,10 @@ export function throwMissingMember(
 }
 
 /**
- * Ensures the constructor is known to the metadata system (any class- or member-level entry); used by
- * read helpers so unregistered types fail fast.
+ * Asserts the constructor has at least one class- or member-level entry so
+ * read helpers fail fast on unregistered types.
+ *
+ * @throws {UnregisteredClassError} When no metadata is associated with `ctor`.
  */
 export function ensureClassRegistered(ctor: Ctor): void {
 	if (!hasAnyMeta(ctor)) {
@@ -77,11 +94,12 @@ function prepareForRead(target: object): Ctor {
 }
 
 /**
- * Returns a per-member reader that returns all metadata entries for `memberName` on the given key,
- * using instance vs static rules (`static` — metadata lives on the constructor; otherwise on the instance prototype chain).
+ * Returns a reader that collects all metadata entries for `memberName` on
+ * `key`. Static reads target the constructor directly; instance reads walk
+ * the instance's prototype chain.
  */
 export function createMemberMetadataReader<TMeta>(
-	key: MetadataKey,
+	key: MetadataKey<TMeta>,
 	memberName: string | symbol,
 	isStatic: boolean
 ): (instance: object) => TMeta[] {
@@ -99,13 +117,12 @@ interface MemberEmitContext {
 }
 
 /**
- * Shared commit envelope for class- and static-member decorators: runs the optional
- * validator chain, performs the kind-specific append via `append`, then correlates
- * the constructor with the decorator-context metadata bag and flushes any deferred
- * reflector work for that bag.
+ * Commit envelope for class- and static-member decorators: validates, runs
+ * the kind-specific `append`, correlates the constructor with the decorator
+ * context bag, then flushes any reflector work deferred against that bag.
  *
- * Instance-member decorators do not use this helper because their work is queued
- * via {@link queueDeferred} and drained later by `prepare`.
+ * Instance-member decorators bypass this helper; their work is queued via
+ * {@link queueDeferred} and drained by `prepare`.
  */
 export function commitDecoration<TMeta>(params: {
 	append: () => void;
@@ -125,9 +142,11 @@ export function commitDecoration<TMeta>(params: {
 }
 
 /**
- * Emits a member decoration: for static members, validators run and metadata commits immediately; for
- * instance members, work is {@link queueDeferred} until `prepare` drains the chain. The `token` prevents
- * double-commit; cardinality (unique vs list) is resolved from the registry inside `appendMemberMeta`.
+ * Emits a member decoration. Static members validate and commit immediately;
+ * instance members are queued via {@link queueDeferred} and drained when
+ * `prepare` walks the prototype chain. The `token` guards against
+ * double-commit; cardinality is resolved from the registry inside
+ * `appendMemberMeta`.
  */
 export function emitMemberDecoration<TMeta>(params: {
 	context: MemberEmitContext;
@@ -186,17 +205,26 @@ export function emitMemberDecoration<TMeta>(params: {
 }
 
 /**
- * Merges a base factory’s {@link DecoratorOptions} with a `derive` child’s {@link DeriveOptions}.
- * `validate` runs as a chained pipeline via `chainValidators` (parent first, then child). `name` and
- * `requireInstanceOf` are overridden when the child supplies them. `compose` is taken only from the
- * parent (it is not part of `DeriveOptions`).
+ * Merges a base factory's {@link DecoratorOptions} with a `derive` child's
+ * {@link DeriveOptions}. `validate` chains parent-then-child via
+ * `chainValidators`; `name` and `requireInstanceOf` prefer the child when
+ * present; `compose` only ever comes from the parent (it is absent from
+ * `DeriveOptions`).
  */
 export function mergeExtendedOptions<TMeta, TArgs extends unknown[]>(
 	parent: DecoratorOptions<TMeta, TArgs> | undefined,
 	child: DeriveOptions<TMeta, TArgs> | undefined
 ): DecoratorOptions<TMeta, TArgs> {
 	const validate = chainValidators<TMeta>(parent?.validate, child?.validate);
-	const merged: DecoratorOptions<TMeta, TArgs> = {};
+	// Build with a non-conditional shape; the final cast is sound because the
+	// parent already satisfied `ComposeRequirement` and is the only source of
+	// `compose` (absent from `DeriveOptions`).
+	const merged: {
+		compose?: (...args: TArgs) => TMeta;
+		name?: string;
+		requireInstanceOf?: AnyConstructor;
+		validate?: ValidatorFn<TMeta>;
+	} = {};
 	if (parent?.compose) {
 		merged.compose = parent.compose;
 	}
@@ -211,17 +239,19 @@ export function mergeExtendedOptions<TMeta, TArgs extends unknown[]>(
 	if (name !== undefined) {
 		merged.name = name;
 	}
-	return merged;
+	return merged as DecoratorOptions<TMeta, TArgs>;
 }
 
 /**
- * Read helpers for a class-level metadata key, sharing one `key` and error `label` with the public factory.
+ * Builds the read-side helpers attached to a class factory, sharing one `key`
+ * and error `label`.
  *
- * - **reader** — {@link createScopedReflector} for this `key` (navigate decorated classes, methods, properties).
- * - **first** — first class-scoped value for the key, or `undefined` after {@link ensureClassRegistered}.
- * - **firstOrThrow** — like `first`, but throws if missing.
- * - **has** / **hasOwn** — whether an entry exists anywhere in the class metadata chain / on the constructor only.
- * - **all** — a frozen list of all class-level entries in declaration order.
+ * - **reader** — scoped reflector for `key`.
+ * - **first** / **firstOrThrow** — first class-scoped entry; throw variant
+ *   raises `MissingMetadataError` when absent.
+ * - **has** / **hasOwn** — entry exists anywhere on the class chain vs only
+ *   on the constructor.
+ * - **all** — frozen list of class-level entries in declaration order.
  */
 export function createClassFactoryHelpers<TMeta, TCard extends Cardinality = "unique">(
 	key: MetadataKey<TMeta, TCard>,
@@ -262,13 +292,14 @@ export function createClassFactoryHelpers<TMeta, TCard extends Cardinality = "un
 }
 
 /**
- * Read helpers for a member-level (method/property) metadata `key`, sharing one `key` and error `label`.
+ * Builds the read-side helpers attached to a member (method/property)
+ * factory, sharing one `key` and error `label`.
  *
- * - **reader** — {@link createScopedReflector} for this `key` (same as class factory `reader`).
- * - **first** — first value for the given `member` on the resolved constructor, or `undefined`.
- * - **firstOrThrow** — like `first`, but throws if missing.
- * - **has** / **hasOwn** — any vs own entry for that member+key.
- * - **all** — frozen list of all entries for the member+key in declaration order.
+ * - **reader** — scoped reflector for `key` (same shape as the class factory).
+ * - **first** / **firstOrThrow** — first entry for `(target, member)`; throw
+ *   variant raises `MissingMetadataError` when absent.
+ * - **has** / **hasOwn** — any vs own entry for `member + key`.
+ * - **all** — frozen list of all entries for `member + key` in declaration order.
  */
 export function createMemberFactoryHelpers<TMeta, TCard extends Cardinality = "unique">(
 	key: MetadataKey<TMeta, TCard>,

@@ -1,12 +1,9 @@
 /** biome-ignore-all lint/performance/noBarrelFile: main index file */
 
 /**
- * Public API for **@zendrex/annotate**: the primary barrel for this package. It
- * exposes two frozen registries of decorator and interceptor factories, re-exports
- * domain errors from the metadata layer, `reflect` and `prepare` for reading and
- * bootstrapping metadata, and the TypeScript types that shape options, validators,
- * and the reflector API. Use the factory registries as the supported entry when
- * building on this library; they keep the public surface small and version-stable.
+ * Public API barrel for `@zendrex/annotate`: errors, `reflect`, `prepare`, key
+ * helpers, and shared types. Prefer the frozen `decorate` and `intercept`
+ * registries over deep imports — same factories, version-stable surface.
  */
 export {
 	AnnotateError,
@@ -28,13 +25,10 @@ import { createPropertyDecorator, createPropertyListDecorator } from "./factorie
 const withList = <U extends object, L>(unique: U, list: L): U & { list: L } => Object.assign(unique, { list });
 
 /**
- * Version-stable registry of decorator factories (class, method, property). Each
- * member is callable as the unique factory and exposes a `.list` sibling for
- * list-cardinality metadata. Prefer this object over deep imports.
- *
- * - `decorate.class(opts)` / `decorate.class.list(opts)` — class decorator factories
- * - `decorate.method(opts)` / `decorate.method.list(opts)` — method decorator factories
- * - `decorate.property(opts)` / `decorate.property.list(opts)` — property decorator factories
+ * Frozen registry of decorator factories. Each `class`, `method`, and
+ * `property` entry exposes the unique-cardinality factory directly and a
+ * `.list` sibling for list-cardinality metadata. Prefer this over deep
+ * imports.
  */
 export const decorate = Object.freeze({
 	class: withList(createClassDecorator, createClassListDecorator),
@@ -43,12 +37,9 @@ export const decorate = Object.freeze({
 } as const);
 
 /**
- * Version-stable registry of method and accessor interceptor factories. Each
- * member exposes a `.list` sibling for list-cardinality metadata. Prefer this
- * object over deep imports.
- *
- * - `intercept.method(opts)` / `intercept.method.list(opts)` — method interceptor factories
- * - `intercept.accessor(opts)` / `intercept.accessor.list(opts)` — accessor interceptor factories
+ * Frozen registry of interceptor factories. `method` and `accessor` expose
+ * the unique-cardinality factory and a `.list` sibling for list-cardinality
+ * metadata. Prefer this over deep imports.
  */
 export const intercept = Object.freeze({
 	method: withList(createMethodInterceptor, createMethodListInterceptor),
@@ -62,6 +53,7 @@ export type {
 	AccessorInterceptorOptions,
 	AnyFn,
 	ArgsOf,
+	CardinalityOf,
 	DecoratedAccessorFactory,
 	DecoratedClassFactory,
 	DecoratedMethodFactory,

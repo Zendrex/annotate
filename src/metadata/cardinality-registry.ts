@@ -5,8 +5,7 @@ import type { Cardinality, ListMetadataKey, MetadataKey, UniqueMetadataKey } fro
 const registry = new WeakMap<symbol, Cardinality>();
 
 /**
- * Mints a new symbol branded as a `MetadataKey<T>` and registers it under the given
- * cardinality. Overloads narrow the return type from the literal `cardinality` argument.
+ * Mints a new symbol branded as `MetadataKey<T>` and registers it under the given cardinality.
  *
  * Prefer {@link mintUniqueKey} and {@link mintListKey} at call sites; reach for
  * `mintMetadataKey` only inside generic builders that pass cardinality as a runtime arg.
@@ -22,9 +21,6 @@ export function mintMetadataKey<T>(cardinality: Cardinality, description?: strin
 /**
  * Mints a new `"unique"` metadata key. Each call produces a distinct symbol — never
  * reuse the same key across separate factories.
- *
- * @param description - Optional symbol description, forwarded to `Symbol()` as-is.
- * @returns A branded `UniqueMetadataKey<T>` registered in the cardinality registry.
  */
 export function mintUniqueKey<T>(description?: string): UniqueMetadataKey<T> {
 	return mintMetadataKey<T>("unique", description);
@@ -33,9 +29,6 @@ export function mintUniqueKey<T>(description?: string): UniqueMetadataKey<T> {
 /**
  * Mints a new `"list"` metadata key. Each call produces a distinct symbol — never
  * reuse the same key across separate factories.
- *
- * @param description - Optional symbol description, forwarded to `Symbol()` as-is.
- * @returns A branded `ListMetadataKey<T>` registered in the cardinality registry.
  */
 export function mintListKey<T>(description?: string): ListMetadataKey<T> {
 	return mintMetadataKey<T>("list", description);

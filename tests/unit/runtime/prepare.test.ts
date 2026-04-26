@@ -21,7 +21,7 @@ describe("prepare(ctor)", () => {
 	});
 
 	test("flushes pending Deferreds via cached correlation", () => {
-		const key = mintUniqueKey("k");
+		const key = mintUniqueKey<string>("k");
 		const correlation = {};
 		class A {}
 		queueDeferred(correlation, {
@@ -39,7 +39,7 @@ describe("prepare(ctor)", () => {
 	});
 
 	test("flushes ancestor pending via prototype chain walk", () => {
-		const key = mintUniqueKey("k");
+		const key = mintUniqueKey<string>("k");
 		const correlation = {};
 		class A {}
 		class B extends A {}
@@ -64,7 +64,7 @@ describe("prepare(ctor)", () => {
 	});
 
 	test("repeat prepare on cached ctor short-circuits (no re-flush)", () => {
-		const key = mintUniqueKey("k");
+		const key = mintUniqueKey<string>("k");
 		const correlation = {};
 		class A {}
 		const token = Symbol("token");
@@ -123,7 +123,7 @@ describe("prepare(ctor)", () => {
 	});
 
 	test("queueDeferred before registerCtor does not invalidate (no ctor yet); prepare drains normally", () => {
-		const key = mintUniqueKey("k");
+		const key = mintUniqueKey<string>("k");
 		const correlation = {};
 		class A {}
 		// Enqueue first, then register: this is the typical decorator-time order.
@@ -144,7 +144,7 @@ describe("prepare(ctor)", () => {
 	});
 
 	test("chain-walk: prepare(B) with pending ancestor does NOT mark B as fully prepared", () => {
-		const key = mintUniqueKey("k");
+		const key = mintUniqueKey<string>("k");
 		const correlation = {};
 		class A {}
 		class B extends A {}

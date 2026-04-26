@@ -12,6 +12,7 @@ import {
 	hasOwnMemberMeta,
 	snapshotMembers,
 } from "../../../src/metadata/member-meta-store";
+import type { MetadataKey } from "../../../src/metadata/types";
 
 describe("member metadata store", () => {
 	test("returns empty array when missing", () => {
@@ -53,7 +54,7 @@ describe("member metadata store", () => {
 	});
 
 	test("unregistered bare symbol throws UnregisteredMetadataKeyError", () => {
-		const key = Symbol("k");
+		const key = Symbol("k") as unknown as MetadataKey<string>;
 		class A {}
 		expect(() => appendMemberMeta(A, key, "foo", "v", Symbol("t"), { static: false, kind: "method" })).toThrow(
 			UnregisteredMetadataKeyError

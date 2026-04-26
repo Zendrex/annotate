@@ -8,24 +8,18 @@ import type { Ctor } from "../metadata/types";
 import type { AnyConstructor } from "../reflector/types";
 
 /**
- * Ensures deferred annotate metadata for `ctor` is registered and flushed so
- * consumers (e.g. reflection) see a consistent correlation.
+ * Registers `ctor` (or the first ancestor with pending work) and drains any
+ * queued deferred decorations so subsequent reflection sees a consistent
+ * correlation. Call before reflecting if class setup may still be staged or if
+ * reads could race registration.
  *
- * Call before reading metadata for a constructor that may have staged work, or
- * when continuing after class setup where registration might not have run yet.
- *
- * **Side effects:** May call `registerCtor` and `flushFor` on this constructor
- * or an ancestor with pending work, applying queued metadata to the store.
- *
- * @param ctor - Constructor to prepare
- * @throws {UnregisteredClassError} When the constructor has an own
- *   `Symbol.metadata` slot but the value is null or undefined (degraded path:
- *   the key exists without valid correlation data).
+ * @throws {UnregisteredClassError} If `ctor` has an own `Symbol.metadata` slot
+ *   but it is null or undefined (the key exists with no correlation).
  */
 export function prepare(ctor: Ctor): void {
-	// Hot-path short-circuit: if we have already drained this ctor and no new
-	// deferred work has been enqueued (sentinel invalidated on `queueDeferred`),
-	// there is nothing to do.
+	// Short-circuit: nothing to do if this ctor was already drained and no new
+	// deferred work has been queued since (the sentinel is invalidated on
+	// `queueDeferred`).
 	if (isFullyPrepared(ctor)) {
 		return;
 	}
@@ -48,11 +42,10 @@ export function prepare(ctor: Ctor): void {
 		throw new UnregisteredClassError(ctor as AnyConstructor);
 	}
 
-	// Chain-walk fallback (rare): the ctor itself has no own metadata slot, but
-	// an ancestor may have pending deferred work. Walk until we find one and
-	// flush it. We do NOT mark `ctor` fully prepared here because the walk stops
-	// at the first hit; further ancestors may still hold pending work to drain
-	// on subsequent calls (preserves the historical contract of this branch).
+	// Chain-walk fallback (rare): `ctor` has no own metadata slot, but an
+	// ancestor may have pending deferred work. Walk until we find one and flush
+	// it. Do NOT mark `ctor` fully prepared here — the walk stops at the first
+	// hit, and further ancestors may still hold pending work for later calls.
 	walkPrototypeChain(Object.getPrototypeOf(ctor) as Ctor, (current) => {
 		if (!hasOwnMetadata(current)) {
 			return;

@@ -7,7 +7,7 @@ import { flushFor, hasPendingFor, queueDeferred } from "../../../src/metadata/me
 describe("metadata deferred queue", () => {
 	test("queueDeferred + flushFor commits pending entries", () => {
 		const correlation = {};
-		const key = mintUniqueKey("k");
+		const key = mintUniqueKey<string>("k");
 		const token = Symbol("t");
 		class A {}
 		queueDeferred(correlation, {
@@ -26,7 +26,7 @@ describe("metadata deferred queue", () => {
 
 	test("flushFor is idempotent (no double-write)", () => {
 		const correlation = {};
-		const key = mintUniqueKey("k");
+		const key = mintUniqueKey<string>("k");
 		const token = Symbol("t");
 		class A {}
 		queueDeferred(correlation, {

@@ -3,10 +3,10 @@ import { buildMethodFactory } from "./method-decorator";
 import type { AnyFn, DecoratedMethodFactory, DecoratorOptions, MethodInterceptorOptions } from "./types";
 
 /**
- * Builds a method decorator factory that replaces the method with the return
- * value of `intercept`. That function receives the original method, a
- * `readMetadata(instance)` callback, and `InterceptorContext` (member name,
- * static flag, kind `"method"`).
+ * Method decorator factory that replaces the method with the return value of
+ * `intercept`. The hook receives the original method, a `readMetadata(instance)`
+ * reader, and an {@link InterceptorContext} carrying the member name, static
+ * flag, and `kind: "method"`.
  */
 export function createMethodInterceptor<
 	TMeta,
@@ -21,13 +21,11 @@ export function createMethodInterceptor<
 }
 
 /**
- * Like `intercept.method`, but for list-cardinality metadata. Multiple decorations
- * of the same method with the same factory each append one entry (no `DuplicateMetadataError`).
- *
- * Inside each `intercept` callback, `readMetadata(instance)` returns the full accumulated
- * list for the `(instance, member, key)` site — all decorations applied to that method.
- *
- * Exposes `.key` typed as `ListMetadataKey<TMeta>`.
+ * List-cardinality variant of {@link createMethodInterceptor}: repeat
+ * decorations append one entry each instead of throwing
+ * `DuplicateMetadataError`. Inside `intercept`, `readMetadata(instance)`
+ * returns the full accumulated list for the `(instance, member, key)` site.
+ * `.key` is branded as a list key.
  */
 export function createMethodListInterceptor<
 	TMeta,

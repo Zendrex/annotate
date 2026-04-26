@@ -1,103 +1,58 @@
-/**
- * Class constructor as stored in metadata maps. Uses `Function` so the same
- * key type lines up with `WeakMap` usage and reflection across the package.
- */
+/** Bare `Function` to match `WeakMap` keys and reflection usage. */
 // biome-ignore lint/complexity/noBannedTypes: WeakMap key parity requires bare Function across the store and related modules.
 export type Ctor = Function;
 
-/**
- * Cardinality discriminant for a metadata key: `"unique"` allows at most one value
- * per site; `"list"` accumulates an ordered list.
- */
+/** `"unique"`: at most one value per site. `"list"`: append-only ordered list. */
 export type Cardinality = "unique" | "list";
 
-/**
- * Branded symbol for a metadata "channel" that carries cardinality at the type level.
- *
- * The phantom field `__metadataKey` is never present at runtime — it exists solely to
- * prevent bare `symbol` from being assignable to a `MetadataKey<T, C>`. A branded key
- * IS a `symbol`, so it flows into any API that accepts a raw `symbol`.
- *
- * Default params preserve existing `MetadataKey` usage sites (no-arg imports remain valid).
- *
- * @typeParam TValue - The value type stored under this key.
- * @typeParam TCard - Cardinality discriminant: `"unique"` (at most one value) or `"list"`.
- */
+/** Branded so bare `symbol` is not assignable; `__metadataKey` is compile-time only. */
 export type MetadataKey<TValue = unknown, TCard extends Cardinality = Cardinality> = symbol & {
 	readonly __metadataKey: { value: TValue; cardinality: TCard };
 };
 
-/** Shorthand for a key that allows exactly one metadata value per site. */
 export type UniqueMetadataKey<T> = MetadataKey<T, "unique">;
 
-/** Shorthand for a key that accumulates a list of metadata values per site. */
 export type ListMetadataKey<T> = MetadataKey<T, "list">;
 
-/**
- * Per-class own metadata: each key holds an append-only list of values for that class only.
- */
+/** Per-class class-only metadata: each key maps to an append-only value list. */
 export type ClassBucket = Map<symbol, unknown[]>;
 
 /**
- * One member's own entry under a single metadata key on a single class:
- * the append-only list of values plus the `static` flag captured at first append.
- *
- * `static` is invariant for the `(key, name)` pair: once written it is not changed,
- * because cardinality + token dedup make subsequent appends either no-ops or errors.
+ * One member's own values under a key. `static` is fixed at first append; later
+ * appends do not change it.
  */
 export interface MemberEntry {
 	readonly static: boolean;
 	values: unknown[];
 }
 
-/**
- * Per-class own member metadata: key → member name → entry holding values and `static`.
- */
+/** Per-class member metadata: key → member name → entry. */
 export type MemberBucket = Map<symbol, Map<string | symbol, MemberEntry>>;
 
-/**
- * Whether metadata was attached to a class method or a property.
- */
 export type MemberKind = "method" | "property";
 
-/**
- * Member metadata that could not be written immediately because the target class
- * was not the runtime constructor yet. The deferred queue flushes this into
- * the member store once ctor correlation and the real `Ctor` are known.
- */
+/** Member metadata held until ctor correlation supplies the real `Ctor`. */
 export interface Deferred {
-	/** Metadata channel (same as keys used in `appendMemberMeta`). */
-	key: symbol;
+	key: MetadataKey;
 	kind: MemberKind;
 	meta: unknown;
 	name: string | symbol;
 	static: boolean;
-	/**
-	 * Idempotency token: `appendMemberMeta` skips re-applying the same
-	 * deferred item after a failed partial flush.
-	 */
+	/** Skips re-apply after a failed partial flush. */
 	token: symbol;
-	/** Optional checks run on flush before the value is stored. */
 	validators?: readonly DeferredValidatorFn[];
 }
 
-/**
- * Called during a deferred flush with the final constructor and the pending meta value.
- */
+/** Runs on deferred flush with the resolved constructor and pending value. */
 export type DeferredValidatorFn = (meta: unknown, context: DeferredValidateContext) => void;
 
-/**
- * Context passed to deferred validators: enough to reason about the member without re-reading the store.
- */
+/** What validators see when flushing, without re-reading the store. */
 export interface DeferredValidateContext {
 	kind: MemberKind;
 	memberName?: string | symbol;
 	static: boolean;
-	/** The resolved class constructor for this metadata. */
 	target: Ctor;
 }
 
-/**
- * Read-only list of stored metadata values (append order preserved where relevant).
- */
+/** Read-only view of stored values; append order preserved for list keys. */
 export type MetadataArray<T = unknown> = readonly T[];

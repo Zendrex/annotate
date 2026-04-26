@@ -9,6 +9,7 @@ import {
 	hasOwnAnyClassMeta,
 	hasOwnClassMeta,
 } from "../../../src/metadata/class-meta-store";
+import type { MetadataKey } from "../../../src/metadata/types";
 
 describe("class metadata store", () => {
 	test("returns empty array when no entries", () => {
@@ -35,7 +36,7 @@ describe("class metadata store", () => {
 	});
 
 	test("unregistered bare symbol throws UnregisteredMetadataKeyError", () => {
-		const key = Symbol("k");
+		const key = Symbol("k") as unknown as MetadataKey<string, "unique">;
 		class A {}
 		expect(() => appendClassMeta(A, key, "v")).toThrow(UnregisteredMetadataKeyError);
 	});

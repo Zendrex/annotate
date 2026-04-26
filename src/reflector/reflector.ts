@@ -6,38 +6,34 @@ import { snapshotMembers } from "../metadata/member-meta-store";
 import { prepare } from "../runtime/prepare";
 import { targetDisplayName } from "./class-name";
 import { resolveReflectTarget } from "./resolve-instance";
-import type { Ctor, ListMetadataKey, MetadataKey, UniqueMetadataKey } from "../metadata/types";
+import type { Cardinality, Ctor, MetadataKey } from "../metadata/types";
 import type {
 	AnyConstructor,
 	DecoratedClass,
+	DecoratedClassFor,
 	DecoratedClassList,
 	DecoratedClassUnique,
 	DecoratedItem,
 	DecoratedMethod,
-	DecoratedMethodList,
-	DecoratedMethodUnique,
+	DecoratedMethodFor,
 	DecoratedProperty,
-	DecoratedPropertyList,
-	DecoratedPropertyUnique,
+	DecoratedPropertyFor,
 } from "./types";
 
 /**
- * Read view over all decoration for a class constructor. Queries are lazy:
- * the first call runs {@link prepare} and fails with {@link UnregisteredClassError}
- * if no metadata is registered for the class.
+ * Read API for a single class. Query keys must be minted via `mintUniqueKey`
+ * or `mintListKey`; bare symbols are rejected.
  *
- * All key parameters must be branded: minted via `mintUniqueKey` or `mintListKey`.
- * Bare `symbol` and unbranded `MetadataKey<T>` are no longer accepted.
+ * The first query triggers {@link prepare}; if no metadata is registered
+ * afterward, {@link UnregisteredClassError} is thrown.
+ *
+ * @throws {UnregisteredClassError} When the class has no metadata at first query.
  */
 export interface Reflector {
-	all<T>(key: UniqueMetadataKey<T>): DecoratedItem<T, "unique">[];
-	all<T>(key: ListMetadataKey<T>): DecoratedItem<T, "list">[];
-	class<T>(key: UniqueMetadataKey<T>): DecoratedClassUnique<T> | undefined;
-	class<T>(key: ListMetadataKey<T>): DecoratedClassList<T> | undefined;
-	methods<T>(key: UniqueMetadataKey<T>): DecoratedMethodUnique<T>[];
-	methods<T>(key: ListMetadataKey<T>): DecoratedMethodList<T>[];
-	properties<T>(key: UniqueMetadataKey<T>): DecoratedPropertyUnique<T>[];
-	properties<T>(key: ListMetadataKey<T>): DecoratedPropertyList<T>[];
+	all<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedItem<T, C>[];
+	class<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedClassFor<T, C> | undefined;
+	methods<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedMethodFor<T, C>[];
+	properties<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedPropertyFor<T, C>[];
 }
 
 function isMethodLike(ctor: Ctor, name: string | symbol, isStatic: boolean): boolean {
@@ -58,38 +54,31 @@ export class ReflectorImpl implements Reflector {
 		this.ctor = target;
 	}
 
-	all<T>(key: UniqueMetadataKey<T>): DecoratedItem<T, "unique">[];
-	all<T>(key: ListMetadataKey<T>): DecoratedItem<T, "list">[];
-	all<T>(key: MetadataKey<T>): DecoratedItem<T>[] {
+	all<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedItem<T, C>[] {
 		this.ensureRegistered();
 		const c = this.collectClass<T>(key);
 		const methods = this.collectMethods<T>(key);
 		const properties = this.collectProperties<T>(key);
-		return c ? [c, ...methods, ...properties] : [...methods, ...properties];
+		const items = c ? [c, ...methods, ...properties] : [...methods, ...properties];
+		return items as DecoratedItem<T, C>[];
 	}
 
-	class<T>(key: UniqueMetadataKey<T>): DecoratedClassUnique<T> | undefined;
-	class<T>(key: ListMetadataKey<T>): DecoratedClassList<T> | undefined;
-	class<T>(key: MetadataKey<T>): DecoratedClass<T> | undefined {
+	class<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedClassFor<T, C> | undefined {
 		this.ensureRegistered();
-		return this.collectClass<T>(key);
+		return this.collectClass<T>(key) as DecoratedClassFor<T, C> | undefined;
 	}
 
-	methods<T>(key: UniqueMetadataKey<T>): DecoratedMethodUnique<T>[];
-	methods<T>(key: ListMetadataKey<T>): DecoratedMethodList<T>[];
-	methods<T>(key: MetadataKey<T>): DecoratedMethod<T>[] {
+	methods<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedMethodFor<T, C>[] {
 		this.ensureRegistered();
-		return this.collectMethods<T>(key);
+		return this.collectMethods<T>(key) as DecoratedMethodFor<T, C>[];
 	}
 
-	properties<T>(key: UniqueMetadataKey<T>): DecoratedPropertyUnique<T>[];
-	properties<T>(key: ListMetadataKey<T>): DecoratedPropertyList<T>[];
-	properties<T>(key: MetadataKey<T>): DecoratedProperty<T>[] {
+	properties<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedPropertyFor<T, C>[] {
 		this.ensureRegistered();
-		return this.collectProperties<T>(key);
+		return this.collectProperties<T>(key) as DecoratedPropertyFor<T, C>[];
 	}
 
-	private collectClass<T>(key: MetadataKey): DecoratedClass<T> | undefined {
+	private collectClass<T>(key: MetadataKey<T>): DecoratedClass<T> | undefined {
 		const list = collectClassMeta<T>(this.ctor, key);
 		if (list.length === 0) {
 			return;
@@ -99,7 +88,7 @@ export class ReflectorImpl implements Reflector {
 			return {
 				kind: "class",
 				name: targetDisplayName(this.ctor),
-				// Store invariant: unique sites hold at most one value; take [0].
+				// Store invariant: unique-cardinality sites hold at most one value.
 				metadata: list[0] as T,
 				target: this.ctor,
 			} satisfies DecoratedClassUnique<T>;
@@ -112,16 +101,16 @@ export class ReflectorImpl implements Reflector {
 		} satisfies DecoratedClassList<T>;
 	}
 
-	private collectMethods<T>(key: MetadataKey): DecoratedMethod<T>[] {
-		return this.collectMembers<T, DecoratedMethodUnique<T> | DecoratedMethodList<T>>(key, "method", true);
+	private collectMethods<T>(key: MetadataKey<T>): DecoratedMethod<T>[] {
+		return this.collectMembers<T, DecoratedMethod<T>>(key, "method", true);
 	}
 
-	private collectProperties<T>(key: MetadataKey): DecoratedProperty<T>[] {
-		return this.collectMembers<T, DecoratedPropertyUnique<T> | DecoratedPropertyList<T>>(key, "property", false);
+	private collectProperties<T>(key: MetadataKey<T>): DecoratedProperty<T>[] {
+		return this.collectMembers<T, DecoratedProperty<T>>(key, "property", false);
 	}
 
 	private collectMembers<T, R extends DecoratedMethod<T> | DecoratedProperty<T>>(
-		key: MetadataKey,
+		key: MetadataKey<T>,
 		kind: "method" | "property",
 		wantMethod: boolean
 	): R[] {
@@ -169,12 +158,12 @@ export class ReflectorImpl implements Reflector {
 const reflectorCache = new WeakMap<AnyConstructor, ReflectorImpl>();
 
 /**
- * Returns a reflector for the class of `target` (instances resolve to their
- * constructor). Call {@link prepare} on the class earlier if the decoration
- * might not yet be registered (e.g. instance-only classes without a class decorator).
+ * Returns a {@link Reflector} bound to the resolved class. Accepts a
+ * constructor or instance; instances are normalised via
+ * {@link resolveReflectTarget}. The reflector is cached per constructor and
+ * lazily invokes {@link prepare} on its first query.
  *
- * Reflectors are cached per constructor, so repeated calls reuse the same
- * instance (and its internal caches).
+ * @throws {TypeError} If `target` does not resolve to a usable constructor.
  */
 export function reflect(target: object): Reflector {
 	const ctor = resolveReflectTarget(target);

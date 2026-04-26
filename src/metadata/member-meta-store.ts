@@ -2,41 +2,41 @@ import { walkPrototypeChain } from "../runtime/prototype-chain";
 import { assertNotDuplicate, requireCardinality } from "./append-guards";
 import { getOrCreate } from "./get-or-create";
 import { chainHasNonEmpty, collectFromChain, firstOnChain, readValues } from "./store-walk";
-import type { Ctor, MemberBucket, MemberEntry, MemberKind } from "./types";
+import type { Ctor, MemberBucket, MemberEntry, MemberKind, MetadataKey } from "./types";
 
 const memberMetaStore = new WeakMap<Ctor, MemberBucket>();
 
 const committedTokens = new WeakMap<Ctor, Set<symbol>>();
 
-/** Probe used by `hasAnyMeta` to ask whether this exact ctor link has any member metadata (no chain walk). */
+/** Any own member metadata on this ctor (no chain walk). Used by `hasAnyMeta`. */
 export function hasOwnAnyMemberMeta(ctor: Ctor): boolean {
 	const bucket = memberMetaStore.get(ctor);
 	return !!bucket && bucket.size > 0;
 }
 
 /** Own member metadata for `ctor`, `key`, and `name` (no prototype walk). */
-export function getMemberMeta<T>(ctor: Ctor, key: symbol, name: string | symbol): readonly T[] {
-	return readValues<T>(memberMetaStore.get(ctor)?.get(key)?.get(name)?.values) ?? [];
+export function getMemberMeta<TMeta>(ctor: Ctor, key: MetadataKey<TMeta>, name: string | symbol): readonly TMeta[] {
+	return readValues<TMeta>(memberMetaStore.get(ctor)?.get(key)?.get(name)?.values) ?? [];
 }
 
 /** True if this exact constructor has at least one own value for `(key, name)`. */
-export function hasOwnMemberMeta(ctor: Ctor, key: symbol, name: string | symbol): boolean {
+export function hasOwnMemberMeta(ctor: Ctor, key: MetadataKey, name: string | symbol): boolean {
 	const entry = memberMetaStore.get(ctor)?.get(key)?.get(name);
 	return !!entry && entry.values.length > 0;
 }
 
 /**
- * Appends member metadata. Skips if `token` was already committed for this
- * `ctor` (idempotent re-entry after a partial flush).
+ * Appends own member metadata. No-op if `token` was already committed (idempotent
+ * on retry after a partial flush).
  *
- * @throws {UnregisteredMetadataKeyError} If `key` was not minted via `mintUniqueKey` or `mintListKey`
- * @throws {DuplicateMetadataError} If the key is `"unique"` and a value already exists for this member+key on `ctor`
+ * @throws {UnregisteredMetadataKeyError} If `key` was not minted via `mintUniqueKey` / `mintListKey`.
+ * @throws {DuplicateMetadataError} If `key` is `"unique"` and this member already has a value on `ctor`.
  */
-export function appendMemberMeta<T>(
+export function appendMemberMeta<TMeta>(
 	ctor: Ctor,
-	key: symbol,
+	key: MetadataKey<TMeta>,
 	name: string | symbol,
-	meta: T,
+	meta: TMeta,
 	token: symbol,
 	options: { static: boolean; kind: MemberKind }
 ): void {
@@ -56,11 +56,10 @@ export function appendMemberMeta<T>(
 }
 
 /**
- * Static flag recorded on the nearest chain link with an entry for `(key, name)`.
- * Caller must pass a `name` known to exist (e.g. yielded by {@link collectMemberNames}).
- * Returns `false` if no entry is found, matching the historical default.
+ * `static` from the most-derived chain link with an entry for `(key, name)`, or `false`
+ * (legacy default) if none found. Prefer a `name` known to exist, e.g. from {@link collectMemberNames}.
  */
-export function getMemberStatic(ctor: Ctor, key: symbol, name: string | symbol): boolean {
+export function getMemberStatic(ctor: Ctor, key: MetadataKey, name: string | symbol): boolean {
 	let result = false;
 	walkPrototypeChain(ctor, (current) => {
 		const entry = memberMetaStore.get(current)?.get(key)?.get(name);
@@ -73,14 +72,14 @@ export function getMemberStatic(ctor: Ctor, key: symbol, name: string | symbol):
 }
 
 /** All values for `(key, name)` from `ctor` up the chain (subclass first at each level). */
-export function collectMemberMeta<T>(ctor: Ctor, key: symbol, name: string | symbol): T[] {
-	return collectFromChain<T>(ctor, (current) =>
-		readValues<T>(memberMetaStore.get(current)?.get(key)?.get(name)?.values)
+export function collectMemberMeta<TMeta>(ctor: Ctor, key: MetadataKey<TMeta>, name: string | symbol): TMeta[] {
+	return collectFromChain<TMeta>(ctor, (current) =>
+		readValues<TMeta>(memberMetaStore.get(current)?.get(key)?.get(name)?.values)
 	);
 }
 
 /** Union of member names that have metadata for `key` anywhere in the chain of `ctor`. */
-export function collectMemberNames(ctor: Ctor, key: symbol): Set<string | symbol> {
+export function collectMemberNames(ctor: Ctor, key: MetadataKey): Set<string | symbol> {
 	const out = new Set<string | symbol>();
 	walkPrototypeChain(ctor, (current) => {
 		const inner = memberMetaStore.get(current)?.get(key);
@@ -94,12 +93,10 @@ export function collectMemberNames(ctor: Ctor, key: symbol): Set<string | symbol
 }
 
 /**
- * One-pass chain walk for all members under `key` on `ctor`. Replaces three
- * separate walks (`collectMemberNames` + `collectMemberMeta` + `getMemberStatic`)
- * with a single traversal. `values` arrays in the result are fresh copies; the
- * `static` flag matches the most-derived link with an entry for each name.
+ * Merged members under `key` from one chain walk. Per name, values are subclass-first
+ * and `static` comes from the most-derived link with data. `values` arrays are fresh copies.
  */
-export function snapshotMembers(ctor: Ctor, key: symbol): Map<string | symbol, MemberEntry> {
+export function snapshotMembers(ctor: Ctor, key: MetadataKey): Map<string | symbol, MemberEntry> {
 	const out = new Map<string | symbol, MemberEntry>();
 	walkPrototypeChain(ctor, (current) => {
 		const inner = memberMetaStore.get(current)?.get(key);
@@ -122,12 +119,18 @@ export function snapshotMembers(ctor: Ctor, key: symbol): Map<string | symbol, M
 }
 
 /** First value for `(key, name)` walking from `ctor` up the chain. */
-export function firstMemberMetaForKey<T>(ctor: Ctor, key: symbol, name: string | symbol): T | undefined {
-	return firstOnChain<T>(ctor, (current) => readValues<T>(memberMetaStore.get(current)?.get(key)?.get(name)?.values));
+export function firstMemberMetaForKey<TMeta>(
+	ctor: Ctor,
+	key: MetadataKey<TMeta>,
+	name: string | symbol
+): TMeta | undefined {
+	return firstOnChain<TMeta>(ctor, (current) =>
+		readValues<TMeta>(memberMetaStore.get(current)?.get(key)?.get(name)?.values)
+	);
 }
 
 /** True if any class in the chain has at least one value for `(key, name)`. */
-export function hasAnyMemberMetaForKey(ctor: Ctor, key: symbol, name: string | symbol): boolean {
+export function hasAnyMemberMetaForKey(ctor: Ctor, key: MetadataKey, name: string | symbol): boolean {
 	return chainHasNonEmpty(ctor, (current) => {
 		const entry = memberMetaStore.get(current)?.get(key)?.get(name);
 		return !!entry && entry.values.length > 0;

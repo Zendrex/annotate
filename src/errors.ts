@@ -3,9 +3,9 @@ import type { Cardinality, MetadataKey } from "./metadata/types";
 import type { AnyConstructor, DecoratedKind } from "./reflector/types";
 
 /**
- * Domain codes for {@link AnnotateError#code}. Use these instead of matching
- * message strings. Each value maps to a dedicated subclass of
- * {@link AnnotateError} in this module.
+ * Stable codes for {@link AnnotateError#code}. Branch on these (or
+ * `instanceof`) instead of matching messages; each value has a dedicated
+ * subclass in this module.
  */
 export const AnnotateErrorCode = {
 	DUPLICATE: "duplicate",
@@ -16,21 +16,17 @@ export const AnnotateErrorCode = {
 	VALIDATION: "validation",
 } as const;
 
-/** Discriminant string for {@link AnnotateError#code} (see {@link AnnotateErrorCode}). */
 export type AnnotateErrorCode = (typeof AnnotateErrorCode)[keyof typeof AnnotateErrorCode];
 
 /**
- * Human-readable display string for a metadata key: prefers `description`, falls
- * back to `String(key)` (e.g. `"Symbol()"`) when the description is missing.
+ * Human-readable display string for a metadata key: prefers `description`,
+ * falling back to `String(key)` (e.g. `"Symbol()"`) when missing.
  */
 export function keyDisplayName(key: MetadataKey): string {
 	return key.description ?? String(key);
 }
 
-/**
- * Arguments for {@link AnnotateError}. Optional fields add reflection context
- * (key, kind, member) for diagnostics; omit when not applicable.
- */
+/** Constructor options for {@link AnnotateError}; optional fields enrich diagnostics. */
 export interface AnnotateErrorOptions {
 	cause?: unknown;
 	code: AnnotateErrorCode;
@@ -42,13 +38,12 @@ export interface AnnotateErrorOptions {
 }
 
 /**
- * Base error for the library. Check {@link AnnotateError#code} or `instanceof`
- * a concrete error class; message strings are for humans only.
+ * Base error for the library. Branch on {@link AnnotateError#code} or
+ * `instanceof` a concrete subclass; message strings are humans-only.
  */
 export class AnnotateError extends Error {
 	override readonly name: string = "AnnotateError";
 
-	/** Subclass-specific value from {@link AnnotateErrorCode} for programmatic handling. */
 	readonly code: AnnotateErrorCode;
 	/** Class constructor the operation referred to. */
 	readonly target: AnyConstructor;
@@ -62,9 +57,6 @@ export class AnnotateError extends Error {
 	/** Property or method name for member-level issues; absent for class-level. */
 	readonly memberName?: string | symbol;
 
-	/**
-	 * @param options - Message, code, and target are required; other fields are diagnostic context.
-	 */
 	constructor(options: AnnotateErrorOptions) {
 		super(options.message, options.cause === undefined ? undefined : { cause: options.cause });
 		this.code = options.code;
@@ -85,10 +77,10 @@ interface AnnotateErrorSpec<TArgs> {
 }
 
 /**
- * Builds a concrete `AnnotateError` subclass from a uniform spec. The returned
- * class accepts a single `args` value, derives the context fields and message
- * via the spec, and forwards to {@link AnnotateError}'s constructor. The
- * subclass `.name` and instance `.name` both equal `spec.name`.
+ * Builds a concrete {@link AnnotateError} subclass from a uniform spec. The
+ * returned class accepts a single `args` value, derives the message and
+ * diagnostic context via `spec`, and forwards to the base constructor. Both
+ * the class `.name` and instance `.name` equal `spec.name`.
  */
 export function defineAnnotateError<TArgs>(spec: AnnotateErrorSpec<TArgs>): new (args: TArgs) => AnnotateError {
 	class DerivedAnnotateError extends AnnotateError {
@@ -112,8 +104,9 @@ interface DuplicateMetadataArgs {
 }
 
 /**
- * Thrown when a factory would attach metadata to a class or member that already
- * has metadata for that factory. `code` is {@link AnnotateErrorCode.DUPLICATE}.
+ * Thrown when a unique-cardinality factory would attach a second metadata
+ * entry to a class or member that already holds one for the same key.
+ * `code` is {@link AnnotateErrorCode.DUPLICATE}.
  */
 export class DuplicateMetadataError extends defineAnnotateError<DuplicateMetadataArgs>({
 	name: "DuplicateMetadataError",
@@ -123,11 +116,9 @@ export class DuplicateMetadataError extends defineAnnotateError<DuplicateMetadat
 	toContext: ({ ctor, key, kind, memberName }) => ({ target: ctor, key, kind, memberName }),
 }) {
 	/**
-	 * @param ctor - The decorated class
-	 * @param key - Metadata key in conflict
-	 * @param cardinality - Resolved cardinality of `key` (caller already looked it up)
-	 * @param kind - Decoration kind (class vs member, etc.)
-	 * @param memberName - Set for member-level duplicate; omit for class-level
+	 * @param cardinality - Resolved cardinality of `key`; caller pre-looks it up
+	 *   to keep this constructor pure.
+	 * @param memberName - Set for member-level duplicates; omit for class-level.
 	 */
 	constructor(
 		ctor: AnyConstructor,
@@ -149,8 +140,8 @@ interface MissingMetadataArgs {
 }
 
 /**
- * Thrown by `firstOrThrow` read helpers when no metadata entry exists for the
- * requested factory on a registered class or member. `code` is
+ * Thrown by `firstOrThrow` reads when a registered class or member has no
+ * metadata entry for the requested factory. `code` is
  * {@link AnnotateErrorCode.MISSING}.
  */
 export class MissingMetadataError extends defineAnnotateError<MissingMetadataArgs>({
@@ -161,8 +152,11 @@ export class MissingMetadataError extends defineAnnotateError<MissingMetadataArg
 }) {}
 
 /**
- * Thrown when metadata is read for a class that was not registered (no
- * matching decoration / prepare). `code` is {@link AnnotateErrorCode.UNREGISTERED}.
+ * Thrown when metadata is read for a class that was never registered — no
+ * decoration ran, decorations were tree-shaken, legacy
+ * `experimentalDecorators` emit was used, or `prepare(ctor)` was not called
+ * for an instance-member-only class. `code` is
+ * {@link AnnotateErrorCode.UNREGISTERED}.
  */
 export class UnregisteredClassError extends defineAnnotateError<AnyConstructor>({
 	name: "UnregisteredClassError",
@@ -186,7 +180,8 @@ interface InvalidDecorationTargetArgs {
 
 /**
  * Thrown when a decorator is applied to a class (or member) that does not
- * extend the required base. `code` is {@link AnnotateErrorCode.INVALID_TARGET}.
+ * extend the factory's required base class. `code` is
+ * {@link AnnotateErrorCode.INVALID_TARGET}.
  */
 export class InvalidDecorationTargetError extends defineAnnotateError<InvalidDecorationTargetArgs>({
 	name: "InvalidDecorationTargetError",
@@ -198,14 +193,6 @@ export class InvalidDecorationTargetError extends defineAnnotateError<InvalidDec
 	/** The superclass the decorated type was expected to extend. */
 	readonly requiredBase: AnyConstructor;
 
-	/**
-	 * @param args.label - Decorator name shown in the message
-	 * @param args.target - The invalid decorated class
-	 * @param args.requiredBase - Required base class (exposed on {@link InvalidDecorationTargetError#requiredBase})
-	 * @param args.kind - Decoration kind
-	 * @param args.memberName - Member under decoration, if applicable
-	 * @param args.key - Metadata key for the factory
-	 */
 	constructor(args: InvalidDecorationTargetArgs) {
 		super(args);
 		this.requiredBase = args.requiredBase;
@@ -213,9 +200,9 @@ export class InvalidDecorationTargetError extends defineAnnotateError<InvalidDec
 }
 
 /**
- * Thrown when a metadata store operation targets a symbol that is absent from the
- * cardinality registry — i.e. a key not minted via `mintUniqueKey` or `mintListKey`.
- * `code` is {@link AnnotateErrorCode.UNREGISTERED_KEY}.
+ * Thrown when a store operation receives a symbol that was not minted via
+ * `mintUniqueKey` or `mintListKey`, so its cardinality is unknown. `code` is
+ * {@link AnnotateErrorCode.UNREGISTERED_KEY}.
  */
 export class UnregisteredMetadataKeyError extends defineAnnotateError<{ target: AnyConstructor; key: MetadataKey }>({
 	name: "UnregisteredMetadataKeyError",
@@ -225,10 +212,6 @@ export class UnregisteredMetadataKeyError extends defineAnnotateError<{ target: 
 		"was not minted via mintUniqueKey() or mintListKey() and has no registered cardinality.",
 	toContext: ({ target, key }) => ({ target, key }),
 }) {
-	/**
-	 * @param target - The class whose store was targeted
-	 * @param key - The unregistered metadata key
-	 */
 	constructor(target: AnyConstructor, key: MetadataKey) {
 		super({ target, key });
 	}
@@ -245,9 +228,9 @@ interface ValidationArgs {
 }
 
 /**
- * Thrown when a factory rejects configuration or decorated shape during
- * validation. `code` is {@link AnnotateErrorCode.VALIDATION}; optional
- * `cause` chains an underlying error.
+ * Thrown when a factory's `validate` hook rejects configuration or the
+ * decorated shape. `code` is {@link AnnotateErrorCode.VALIDATION}; an optional
+ * `cause` chains the underlying error.
  */
 export class ValidationError extends defineAnnotateError<ValidationArgs>({
 	name: "ValidationError",

@@ -1,5 +1,5 @@
 /**
- * Retrieves or creates a value in a Map/WeakMap, calling the factory only if the key is absent.
+ * Retrieves or creates a value in a Map/WeakMap. The factory runs only on miss.
  */
 export function getOrCreate<K, V>(map: Map<K, V>, key: K, factory: () => V): V;
 export function getOrCreate<K extends object, V>(map: WeakMap<K, V>, key: K, factory: () => V): V;

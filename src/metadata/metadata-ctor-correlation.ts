@@ -9,15 +9,10 @@ const ctorToMetadata = new WeakMap<Ctor, object>();
  * constructor exists; the correlation id lets deferred metadata queue against one object
  * and later register the actual `Ctor` without duplicating work.
  *
- * Idempotent: re-registering the same `(ctor, correlation)` pair is a no-op.
- * Throws if either side is already bound to a different partner — typically a
- * decorator-pipeline bug where one metadata bag has been shared across classes
- * (or vice versa).
+ * Idempotent for the same `(ctor, correlation)` pair. No-op if `correlation` is null.
  *
- * No-op if `correlation` is null.
- *
- * @param ctor - The runtime class constructor
- * @param correlation - Object identity used to tie queued metadata to this ctor (from the same class declaration)
+ * @throws {Error} If either side is already bound to a different partner — typically a
+ * decorator-pipeline bug where one metadata bag has been shared across classes (or vice versa).
  */
 export function registerCtor(ctor: Ctor, correlation: object | null): void {
 	if (!correlation) {
@@ -46,17 +41,14 @@ export function registerCtor(ctor: Ctor, correlation: object | null): void {
 }
 
 /**
- * Resolves the constructor last registered for this correlation, if any.
- * Used when flushing deferred member metadata to find the `Ctor` to store under.
+ * Constructor last registered for this correlation, if any. Used when flushing
+ * deferred member metadata to find the `Ctor` to store under.
  */
 export function resolveCtorFromMetadata(correlation: object): Ctor | undefined {
 	return metadataToCtor.get(correlation);
 }
 
-/**
- * Returns the correlation object associated with this constructor, if one was registered.
- * Inverse of `resolveCtorFromMetadata` for code that has the `Ctor` and needs the id used while deferred.
- */
+/** Inverse of `resolveCtorFromMetadata` for code that has the `Ctor` and needs the deferred-time id. */
 export function getCorrelationFor(ctor: Ctor): object | undefined {
 	return ctorToMetadata.get(ctor);
 }

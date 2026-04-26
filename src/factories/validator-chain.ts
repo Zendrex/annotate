@@ -3,10 +3,6 @@ import type { DeferredValidatorFn, MetadataKey } from "../metadata/types";
 import type { AnyConstructor } from "../reflector/types";
 import type { ValidateContext, ValidatorFn } from "./validator-types";
 
-/**
- * Extracts a human-readable reason from an unknown thrown value.
- * Handles null/undefined, strings, Error instances, and plain objects.
- */
 function extractReason(error: unknown): string {
 	if (error === null || error === undefined) {
 		return String(error);
@@ -54,8 +50,8 @@ function wrapUserValidate<TMeta>(fn: ValidatorFn<TMeta>, label: string, key: Met
 
 /**
  * Composes `requireInstanceOf` and `validate` from decorator options into an
- * ordered list. Instance checks run first; user `validate` is wrapped so
- * non-Error throws become {@link ValidationError}.
+ * ordered chain. The instance check runs first; the user `validate` is
+ * wrapped so non-Error throws are surfaced as {@link ValidationError}.
  */
 export function buildValidatorChain<TMeta>(
 	options: { validate?: ValidatorFn<TMeta>; requireInstanceOf?: AnyConstructor } | undefined,
@@ -89,7 +85,7 @@ export function buildValidatorChain<TMeta>(
 	return chain;
 }
 
-/** Runs each validator in order; the first throw aborts the chain. */
+/** Runs validators sequentially; the first throw aborts the rest of the chain. */
 export function runValidatorChain<TMeta>(
 	chain: readonly ValidatorFn<TMeta>[],
 	meta: TMeta,
@@ -100,14 +96,15 @@ export function runValidatorChain<TMeta>(
 	}
 }
 
-/** Bridges typed {@link ValidatorFn} chains to the deferred-queue storage shape. */
+/** Adapts a typed validator chain to the deferred-queue storage shape. */
 export function asDeferredValidators<TMeta>(chain: readonly ValidatorFn<TMeta>[]): readonly DeferredValidatorFn[] {
 	return chain as unknown as readonly DeferredValidatorFn[];
 }
 
 /**
- * Returns a single validator that runs `parent` then `child`, or whichever side
- * is defined. Used when merging base and derived decorator validation.
+ * Combines two optional validators into one that runs `parent` then `child`,
+ * or returns whichever side is defined. Used when merging base and derived
+ * decorator validation.
  */
 export function chainValidators<TMeta>(
 	parent: ValidatorFn<TMeta> | undefined,
