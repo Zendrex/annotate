@@ -75,14 +75,13 @@ export class AnnotateError extends Error {
 	}
 }
 
-type AnnotateErrorContext = Pick<AnnotateErrorOptions, "target"> &
-	Partial<Pick<AnnotateErrorOptions, "key" | "kind" | "memberName" | "cause">>;
+type AnnotateErrorContext = Pick<AnnotateErrorOptions, "target" | "key" | "kind" | "memberName" | "cause">;
 
 interface AnnotateErrorSpec<TArgs> {
 	code: AnnotateErrorCode;
-	extract: (args: TArgs) => AnnotateErrorContext;
 	format: (args: TArgs) => string;
 	name: string;
+	toContext: (args: TArgs) => AnnotateErrorContext;
 }
 
 /**
@@ -96,16 +95,7 @@ export function defineAnnotateError<TArgs>(spec: AnnotateErrorSpec<TArgs>): new 
 		override readonly name: string = spec.name;
 
 		constructor(args: TArgs) {
-			const context = spec.extract(args);
-			super({
-				code: spec.code,
-				message: spec.format(args),
-				target: context.target,
-				key: context.key,
-				kind: context.kind,
-				memberName: context.memberName,
-				cause: context.cause,
-			});
+			super({ code: spec.code, message: spec.format(args), ...spec.toContext(args) });
 		}
 	}
 
@@ -130,7 +120,7 @@ export class DuplicateMetadataError extends defineAnnotateError<DuplicateMetadat
 	code: AnnotateErrorCode.DUPLICATE,
 	format: ({ ctor, key, cardinality, memberName }) =>
 		`duplicate decoration [${cardinality} key "${keyDisplayName(key)}"]: "${formatSlot(ctor, memberName)}" already has metadata for this factory`,
-	extract: ({ ctor, key, kind, memberName }) => ({ target: ctor, key, kind, memberName }),
+	toContext: ({ ctor, key, kind, memberName }) => ({ target: ctor, key, kind, memberName }),
 }) {
 	/**
 	 * @param ctor - The decorated class
@@ -163,20 +153,18 @@ interface MissingMetadataArgs {
  * requested factory on a registered class or member. `code` is
  * {@link AnnotateErrorCode.MISSING}.
  */
-export const MissingMetadataError = defineAnnotateError<MissingMetadataArgs>({
+export class MissingMetadataError extends defineAnnotateError<MissingMetadataArgs>({
 	name: "MissingMetadataError",
 	code: AnnotateErrorCode.MISSING,
 	format: ({ target, label, memberName }) => `@${label} metadata missing on "${formatSlot(target, memberName)}"`,
-	extract: ({ target, key, kind, memberName }) => ({ target, key, kind, memberName }),
-});
-
-export interface MissingMetadataError extends AnnotateError {}
+	toContext: ({ target, key, kind, memberName }) => ({ target, key, kind, memberName }),
+}) {}
 
 /**
  * Thrown when metadata is read for a class that was not registered (no
  * matching decoration / prepare). `code` is {@link AnnotateErrorCode.UNREGISTERED}.
  */
-export const UnregisteredClassError = defineAnnotateError<AnyConstructor>({
+export class UnregisteredClassError extends defineAnnotateError<AnyConstructor>({
 	name: "UnregisteredClassError",
 	code: AnnotateErrorCode.UNREGISTERED,
 	format: (target) =>
@@ -184,10 +172,8 @@ export const UnregisteredClassError = defineAnnotateError<AnyConstructor>({
 		"Causes: missing decorator import, bundler tree-shake of the decoration module, " +
 		`legacy "experimentalDecorators: true" emit, or instance-member-only class with ` +
 		"no class decorator (call prepare(ctor) before reflect).",
-	extract: (target) => ({ target }),
-});
-
-export interface UnregisteredClassError extends AnnotateError {}
+	toContext: (target) => ({ target }),
+}) {}
 
 interface InvalidDecorationTargetArgs {
 	key: MetadataKey;
@@ -207,7 +193,7 @@ export class InvalidDecorationTargetError extends defineAnnotateError<InvalidDec
 	code: AnnotateErrorCode.INVALID_TARGET,
 	format: ({ label, target, requiredBase, memberName }) =>
 		`@${label} cannot decorate ${formatSlot(target, memberName)}: not a subclass of ${targetDisplayName(requiredBase)}`,
-	extract: ({ target, key, kind, memberName }) => ({ target, key, kind, memberName }),
+	toContext: ({ target, key, kind, memberName }) => ({ target, key, kind, memberName }),
 }) {
 	/** The superclass the decorated type was expected to extend. */
 	readonly requiredBase: AnyConstructor;
@@ -237,7 +223,7 @@ export class UnregisteredMetadataKeyError extends defineAnnotateError<{ target: 
 	format: ({ target, key }) =>
 		`@zendrex/annotate: metadata key ${String(key)} used on "${targetDisplayName(target)}" ` +
 		"was not minted via mintUniqueKey() or mintListKey() and has no registered cardinality.",
-	extract: ({ target, key }) => ({ target, key }),
+	toContext: ({ target, key }) => ({ target, key }),
 }) {
 	/**
 	 * @param target - The class whose store was targeted
@@ -263,14 +249,12 @@ interface ValidationArgs {
  * validation. `code` is {@link AnnotateErrorCode.VALIDATION}; optional
  * `cause` chains an underlying error.
  */
-export const ValidationError = defineAnnotateError<ValidationArgs>({
+export class ValidationError extends defineAnnotateError<ValidationArgs>({
 	name: "ValidationError",
 	code: AnnotateErrorCode.VALIDATION,
 	format: ({ label, target, reason, memberName }) => {
 		const slotPrefix = memberName === undefined ? "" : ` on ${formatSlot(target, memberName)}`;
 		return `@${label} validation failed${slotPrefix}: ${reason}`;
 	},
-	extract: ({ target, key, kind, memberName, cause }) => ({ target, key, kind, memberName, cause }),
-});
-
-export interface ValidationError extends AnnotateError {}
+	toContext: ({ target, key, kind, memberName, cause }) => ({ target, key, kind, memberName, cause }),
+}) {}
