@@ -1,6 +1,7 @@
 import { UnregisteredClassError } from "../errors";
 import { getCorrelationFor, registerCtor } from "../metadata/metadata-ctor-correlation";
 import { flushFor, hasPendingFor } from "../metadata/metadata-deferred-queue";
+import { isFullyPrepared, markFullyPrepared } from "../metadata/prepared-sentinel";
 import { walkPrototypeChain } from "./prototype-chain";
 import { hasOwnMetadata, readOwnMetadata } from "./symbol-metadata";
 import type { Ctor } from "../metadata/types";
@@ -22,9 +23,17 @@ import type { AnyConstructor } from "../reflector/types";
  *   the key exists without valid correlation data).
  */
 export function prepare(ctor: Ctor): void {
+	// Hot-path short-circuit: if we have already drained this ctor and no new
+	// deferred work has been enqueued (sentinel invalidated on `queueDeferred`),
+	// there is nothing to do.
+	if (isFullyPrepared(ctor)) {
+		return;
+	}
+
 	const cached = getCorrelationFor(ctor);
 	if (cached) {
 		flushFor(ctor, cached);
+		markFullyPrepared(ctor);
 		return;
 	}
 
@@ -33,11 +42,17 @@ export function prepare(ctor: Ctor): void {
 		if (own) {
 			registerCtor(ctor, own);
 			flushFor(ctor, own);
+			markFullyPrepared(ctor);
 			return;
 		}
 		throw new UnregisteredClassError(ctor as AnyConstructor);
 	}
 
+	// Chain-walk fallback (rare): the ctor itself has no own metadata slot, but
+	// an ancestor may have pending deferred work. Walk until we find one and
+	// flush it. We do NOT mark `ctor` fully prepared here because the walk stops
+	// at the first hit; further ancestors may still hold pending work to drain
+	// on subsequent calls (preserves the historical contract of this branch).
 	walkPrototypeChain(Object.getPrototypeOf(ctor) as Ctor, (current) => {
 		if (!hasOwnMetadata(current)) {
 			return;

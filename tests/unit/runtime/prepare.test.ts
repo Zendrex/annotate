@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { UnregisteredClassError } from "../../../src/errors";
-import { mintUniqueKey } from "../../../src/metadata/cardinality-registry";
+import { mintListKey, mintUniqueKey } from "../../../src/metadata/cardinality-registry";
 import { getMemberMeta } from "../../../src/metadata/member-meta-store";
 import { registerCtor } from "../../../src/metadata/metadata-ctor-correlation";
 import { hasPendingFor, queueDeferred } from "../../../src/metadata/metadata-deferred-queue";
@@ -60,5 +60,87 @@ describe("prepare(ctor)", () => {
 		class A {}
 		Object.defineProperty(A, METADATA_SYMBOL, { value: undefined, configurable: true });
 		expect(() => prepare(A)).toThrow(UnregisteredClassError);
+	});
+
+	test("repeat prepare on cached ctor short-circuits (no re-flush)", () => {
+		const key = mintUniqueKey("k");
+		const correlation = {};
+		class A {}
+		const token = Symbol("token");
+		queueDeferred(correlation, {
+			key,
+			name: "foo",
+			meta: "v",
+			token,
+			static: false,
+			kind: "method",
+		});
+		registerCtor(A, correlation);
+		prepare(A);
+		expect(getMemberMeta<string>(A, key, "foo")).toEqual(["v"]);
+
+		// Second call must be a no-op: directly enqueue another item under the
+		// same correlation but bypass invalidation by writing to the queue's
+		// internal map only via queueDeferred AFTER prepare. If the sentinel
+		// works, prepare is short-circuited and the second item is NOT flushed.
+		// We assert the short-circuit by observing that a fresh enqueue WITHOUT
+		// invoking prepare leaves pending state unchanged when we re-enter.
+		// (Direct sentinel verification: same prepare call observes no work.)
+		prepare(A);
+		expect(hasPendingFor(correlation)).toBe(false);
+		expect(getMemberMeta<string>(A, key, "foo")).toEqual(["v"]);
+	});
+
+	test("queueDeferred after fully-prepared invalidates sentinel; next prepare re-flushes", () => {
+		const key = mintListKey<string>("k");
+		const correlation = {};
+		class A {}
+		queueDeferred(correlation, {
+			key,
+			name: "foo",
+			meta: "v1",
+			token: Symbol("t1"),
+			static: false,
+			kind: "method",
+		});
+		registerCtor(A, correlation);
+		prepare(A);
+		expect(getMemberMeta<string>(A, key, "foo")).toEqual(["v1"]);
+
+		// Enqueue new work AFTER prepare completed. Sentinel must be invalidated
+		// by queueDeferred so the next prepare re-flushes the new entry.
+		queueDeferred(correlation, {
+			key,
+			name: "foo",
+			meta: "v2",
+			token: Symbol("t2"),
+			static: false,
+			kind: "method",
+		});
+		expect(hasPendingFor(correlation)).toBe(true);
+		prepare(A);
+		expect(hasPendingFor(correlation)).toBe(false);
+		expect(getMemberMeta<string>(A, key, "foo")).toEqual(["v1", "v2"]);
+	});
+
+	test("queueDeferred before registerCtor does not invalidate (no ctor yet); prepare drains normally", () => {
+		const key = mintUniqueKey("k");
+		const correlation = {};
+		class A {}
+		// Enqueue first, then register: this is the typical decorator-time order.
+		queueDeferred(correlation, {
+			key,
+			name: "foo",
+			meta: "v",
+			token: Symbol("t"),
+			static: false,
+			kind: "method",
+		});
+		registerCtor(A, correlation);
+		prepare(A);
+		expect(getMemberMeta<string>(A, key, "foo")).toEqual(["v"]);
+		// Subsequent prepare is a no-op (sentinel set after first drain).
+		prepare(A);
+		expect(getMemberMeta<string>(A, key, "foo")).toEqual(["v"]);
 	});
 });

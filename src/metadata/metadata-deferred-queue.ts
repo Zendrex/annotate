@@ -1,5 +1,6 @@
 import { getOrCreate } from "./get-or-create";
 import { appendMemberMeta } from "./member-meta-store";
+import { invalidatePreparedFor } from "./prepared-sentinel";
 import type { Ctor, Deferred, DeferredValidateContext } from "./types";
 
 const pendingByMetadata: WeakMap<object, Deferred[]> = new WeakMap();
@@ -17,6 +18,9 @@ export function queueDeferred(correlation: object | null, deferred: Deferred): v
 	}
 	const list = getOrCreate(pendingByMetadata, correlation, () => []);
 	list.push(deferred);
+	// Any new deferred work invalidates the "fully prepared" sentinel for the
+	// resolved ctor (if registered) so the next `prepare` re-walks and flushes.
+	invalidatePreparedFor(correlation);
 }
 
 /**
