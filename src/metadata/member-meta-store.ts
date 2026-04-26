@@ -16,6 +16,7 @@ const memberStaticStore = new WeakMap<Ctor, Map<string | symbol, boolean>>();
  * Own member metadata for `ctor`, `key`, and `name` (no prototype walk).
  */
 export function getMemberMeta<T>(ctor: Ctor, key: symbol, name: string | symbol): readonly T[] {
+	// safe: T is the caller's narrowed view of the unknown[] stored internally
 	return (memberMetaStore.get(ctor)?.get(key)?.get(name) as T[] | undefined) ?? [];
 }
 

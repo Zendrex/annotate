@@ -11,6 +11,7 @@ const classMetaStore = new WeakMap<Ctor, ClassBucket>();
  * Own class-level metadata for `ctor` and `key` only (no prototype walk).
  */
 export function getClassMeta<T>(ctor: Ctor, key: symbol): readonly T[] {
+	// safe: T is the caller's narrowed view of the unknown[] stored internally
 	return (classMetaStore.get(ctor)?.get(key) as T[] | undefined) ?? [];
 }
 

@@ -2,9 +2,10 @@ import { walkPrototypeChain } from "../runtime/prototype-chain";
 import type { Ctor } from "./types";
 
 /**
- * Walks the prototype chain of `ctor` and returns `true` as soon as `probe`
- * reports a non-empty hit on any link. Used by the metadata stores to answer
- * "does anything in this chain have data" without materializing intermediates.
+ * Walks the prototype chain of `ctor` (subclass first) and returns `true` as
+ * soon as `probe` reports a non-empty hit on any link. Used by the metadata
+ * stores to answer "does anything in this chain have data" without
+ * materializing intermediates.
  */
 export function chainHasNonEmpty(ctor: Ctor, probe: (current: Ctor) => boolean): boolean {
 	let found = false;
@@ -18,9 +19,9 @@ export function chainHasNonEmpty(ctor: Ctor, probe: (current: Ctor) => boolean):
 }
 
 /**
- * First value produced by walking the prototype chain of `ctor` (subclass before
- * superclass). Returns the first item of the first non-empty list yielded by
- * `getList`, or `undefined` if every link is empty or missing.
+ * Returns the first element of the first non-empty list yielded by `getList`
+ * when walking the prototype chain of `ctor` (subclass before superclass), or
+ * `undefined` if every link is empty or missing.
  */
 export function firstOnChain<T>(ctor: Ctor, getList: (current: Ctor) => readonly T[] | undefined): T | undefined {
 	let result: T | undefined;
