@@ -9,6 +9,16 @@ import type { Cardinality, ListMetadataKey, UniqueMetadataKey } from "./types";
  */
 const registry = new WeakMap<symbol, Cardinality>();
 
+function mintKey<TKey extends UniqueMetadataKey<unknown> | ListMetadataKey<unknown>>(
+	cardinality: Cardinality,
+	description?: string
+): TKey {
+	const key = Symbol(description);
+	registry.set(key, cardinality);
+	// Safe: brand is phantom-only; we control both cardinality and symbol creation.
+	return key as TKey;
+}
+
 /**
  * Mint a new symbol registered as a `"unique"` metadata key. Each call produces a
  * distinct symbol — never reuse the same key across separate factories.
@@ -17,10 +27,7 @@ const registry = new WeakMap<symbol, Cardinality>();
  * @returns A branded `UniqueMetadataKey<T>` registered in the cardinality registry.
  */
 export function mintUniqueKey<T>(description?: string): UniqueMetadataKey<T> {
-	const key = Symbol(description);
-	registry.set(key, "unique");
-	// Safe: we control creation and the brand is phantom-only.
-	return key as UniqueMetadataKey<T>;
+	return mintKey<UniqueMetadataKey<T>>("unique", description);
 }
 
 /**
@@ -31,10 +38,7 @@ export function mintUniqueKey<T>(description?: string): UniqueMetadataKey<T> {
  * @returns A branded `ListMetadataKey<T>` registered in the cardinality registry.
  */
 export function mintListKey<T>(description?: string): ListMetadataKey<T> {
-	const key = Symbol(description);
-	registry.set(key, "list");
-	// Safe: we control creation and the brand is phantom-only.
-	return key as ListMetadataKey<T>;
+	return mintKey<ListMetadataKey<T>>("list", description);
 }
 
 /**
