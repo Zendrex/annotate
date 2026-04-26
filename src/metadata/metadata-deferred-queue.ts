@@ -26,7 +26,8 @@ export function queueDeferred(correlation: object | null, deferred: Deferred): v
  * True if there is a non-empty pending list for this correlation (metadata not yet flushed or failed mid-flush).
  */
 export function hasPendingFor(correlation: object): boolean {
-	return pendingByMetadata.has(correlation);
+	const list = pendingByMetadata.get(correlation);
+	return !!list && list.length > 0;
 }
 
 /**
