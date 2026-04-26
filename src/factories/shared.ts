@@ -23,7 +23,7 @@ import { asDeferredValidators, chainValidators, runValidatorChain } from "./vali
 import type { Cardinality, Ctor, Deferred, MemberKind, MetadataArray, MetadataKey } from "../metadata/types";
 import type { AnyConstructor, DecoratedKind, ScopedReflector } from "../reflector/types";
 import type { DecoratorOptions, DeriveOptions } from "./types";
-import type { ValidatorFn } from "./validator-types";
+import type { ValidateContext, ValidatorFn } from "./validator-types";
 
 /**
  * Produces a single metadata value from factory arguments: if `fn` is set, returns `fn(...args)`;
@@ -99,6 +99,32 @@ interface MemberEmitContext {
 }
 
 /**
+ * Shared commit envelope for class- and static-member decorators: runs the optional
+ * validator chain, performs the kind-specific append via `append`, then correlates
+ * the constructor with the decorator-context metadata bag and flushes any deferred
+ * reflector work for that bag.
+ *
+ * Instance-member decorators do not use this helper because their work is queued
+ * via {@link queueDeferred} and drained later by `prepare`.
+ */
+export function commitDecoration<TMeta>(params: {
+	append: () => void;
+	correlation: object | null;
+	ctor: Ctor;
+	meta: TMeta;
+	validationContext: ValidateContext;
+	validators?: readonly ValidatorFn<TMeta>[];
+}): void {
+	const { append, correlation, ctor, meta, validationContext, validators } = params;
+	if (validators) {
+		runValidatorChain(validators, meta, validationContext);
+	}
+	append();
+	registerCtor(ctor, correlation);
+	flushFor(ctor, correlation);
+}
+
+/**
  * Emits a member decoration: for static members, validators run and metadata commits immediately; for
  * instance members, work is {@link queueDeferred} until `prepare` drains the chain. The `token` prevents
  * double-commit; cardinality (unique vs list) is resolved from the registry inside `appendMemberMeta`.
@@ -120,17 +146,21 @@ export function emitMemberDecoration<TMeta>(params: {
 		context.addInitializer(function (this: unknown) {
 			const ctor = this as Ctor;
 			// Validate, commit, then flush; flush drains sibling instance deferreds on the same bag.
-			if (validators) {
-				runValidatorChain(validators, meta, {
+			commitDecoration({
+				ctor,
+				correlation,
+				meta,
+				validators,
+				validationContext: {
 					target: ctor as AnyConstructor,
 					memberName,
 					kind,
 					static: true,
-				});
-			}
-			appendMemberMeta(ctor, key, memberName, meta, token, { static: true, kind });
-			registerCtor(ctor, correlation);
-			flushFor(ctor, correlation);
+				},
+				append: () => {
+					appendMemberMeta(ctor, key, memberName, meta, token, { static: true, kind });
+				},
+			});
 		});
 		return;
 	}

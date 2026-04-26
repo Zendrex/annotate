@@ -1,10 +1,8 @@
 import { mintListKey, mintUniqueKey } from "../metadata/cardinality-registry";
 import { appendClassMeta } from "../metadata/class-meta-store";
-import { registerCtor } from "../metadata/metadata-ctor-correlation";
-import { flushFor } from "../metadata/metadata-deferred-queue";
-import { compose, createClassFactoryHelpers, labelFor, mergeExtendedOptions } from "./shared";
-import { buildValidatorChain, runValidatorChain } from "./validator-chain";
-import type { Cardinality, MetadataKey } from "../metadata/types";
+import { commitDecoration, compose, createClassFactoryHelpers, labelFor, mergeExtendedOptions } from "./shared";
+import { buildValidatorChain } from "./validator-chain";
+import type { Cardinality, Ctor, MetadataKey } from "../metadata/types";
 import type { AnyConstructor } from "../reflector/types";
 import type { DecoratedClassFactory, DecoratorOptions, DeriveOptions } from "./types";
 
@@ -50,16 +48,20 @@ export function buildClassFactory<TMeta, TArgs extends unknown[], TInstance, TCa
 		// biome-ignore lint/suspicious/noExplicitAny: structural Stage-3 generic
 		<T extends abstract new (...a: any[]) => TInstance>(value: T, context: ClassDecoratorContext<T>): void => {
 			const meta = compose(args, composeFn);
-			if (validators) {
-				runValidatorChain(validators, meta, {
+			commitDecoration({
+				ctor: value as unknown as Ctor,
+				correlation: context.metadata,
+				meta,
+				validators,
+				validationContext: {
 					target: value as unknown as AnyConstructor,
 					kind: "class",
 					static: false,
-				});
-			}
-			appendClassMeta(value, key, meta);
-			registerCtor(value, context.metadata);
-			flushFor(value, context.metadata);
+				},
+				append: () => {
+					appendClassMeta(value, key, meta);
+				},
+			});
 		};
 
 	const derive = <TNewInstance = TInstance>(
