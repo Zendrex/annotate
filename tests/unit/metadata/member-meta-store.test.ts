@@ -8,7 +8,7 @@ import {
 	collectMemberNames,
 	getMemberMeta,
 	getMemberStatic,
-	hasAnyMemberMeta,
+	hasOwnAnyMemberMeta,
 	hasOwnMemberMeta,
 	snapshotMembers,
 } from "../../../src/metadata/member-meta-store";
@@ -220,20 +220,21 @@ describe("snapshotMembers", () => {
 	});
 });
 
-describe("hasAnyMemberMeta", () => {
+describe("hasOwnAnyMemberMeta", () => {
 	test("false when empty, true after append", () => {
 		const key = mintUniqueKey("k");
 		class A {}
-		expect(hasAnyMemberMeta(A)).toBe(false);
+		expect(hasOwnAnyMemberMeta(A)).toBe(false);
 		appendMemberMeta(A, key, "foo", "v", Symbol("t"), { static: false, kind: "method" });
-		expect(hasAnyMemberMeta(A)).toBe(true);
+		expect(hasOwnAnyMemberMeta(A)).toBe(true);
 	});
 
-	test("walks ancestors", () => {
+	test("does not walk ancestors (own-only)", () => {
 		const key = mintUniqueKey("k");
 		class A {}
 		class B extends A {}
 		appendMemberMeta(A, key, "foo", "v", Symbol("t"), { static: false, kind: "method" });
-		expect(hasAnyMemberMeta(B)).toBe(true);
+		expect(hasOwnAnyMemberMeta(B)).toBe(false);
+		expect(hasOwnAnyMemberMeta(A)).toBe(true);
 	});
 });

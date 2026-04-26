@@ -8,6 +8,16 @@ import type { ClassBucket, Ctor, MetadataKey } from "./types";
 const classMetaStore = new WeakMap<Ctor, ClassBucket>();
 
 /**
+ * Probe used by `hasAnyMeta` to ask "does this exact constructor link have any
+ * class metadata?" without walking the prototype chain. Exported only for the
+ * combined chain walk in {@link "./has-any-meta"}.
+ */
+export function hasOwnAnyClassMeta(ctor: Ctor): boolean {
+	const bucket = classMetaStore.get(ctor);
+	return !!bucket && bucket.size > 0;
+}
+
+/**
  * Own class-level metadata for `ctor` and `key` only (no prototype walk).
  */
 export function getClassMeta<T>(ctor: Ctor, key: symbol): readonly T[] {
@@ -50,16 +60,6 @@ export function appendClassMeta<T>(ctor: Ctor, key: symbol, value: T): void {
  */
 export function collectClassMeta<T>(ctor: Ctor, key: symbol): T[] {
 	return collectFromChain<T>(ctor, (current) => classMetaStore.get(current)?.get(key) as T[] | undefined);
-}
-
-/**
- * True if any class in the prototype chain of `ctor` has any class-level metadata in the store.
- */
-export function hasAnyClassMeta(ctor: Ctor): boolean {
-	return chainHasNonEmpty(ctor, (current) => {
-		const bucket = classMetaStore.get(current);
-		return !!bucket && bucket.size > 0;
-	});
 }
 
 /**

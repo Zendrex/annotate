@@ -1,7 +1,8 @@
 import { UnregisteredClassError } from "../errors";
 import { getKeyCardinality } from "../metadata/cardinality-registry";
-import { collectClassMeta, hasAnyClassMeta } from "../metadata/class-meta-store";
-import { hasAnyMemberMeta, snapshotMembers } from "../metadata/member-meta-store";
+import { collectClassMeta } from "../metadata/class-meta-store";
+import { hasAnyMeta } from "../metadata/has-any-meta";
+import { snapshotMembers } from "../metadata/member-meta-store";
 import { prepare } from "../runtime/prepare";
 import { targetDisplayName } from "./class-name";
 import { resolveReflectTarget } from "./resolve-instance";
@@ -156,7 +157,7 @@ export class ReflectorImpl implements Reflector {
 			return;
 		}
 		prepare(this.ctor);
-		if (!(hasAnyClassMeta(this.ctor) || hasAnyMemberMeta(this.ctor))) {
+		if (!hasAnyMeta(this.ctor)) {
 			throw new UnregisteredClassError(this.ctor);
 		}
 		this.registered = true;

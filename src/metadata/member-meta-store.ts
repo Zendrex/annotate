@@ -11,6 +11,16 @@ const memberMetaStore = new WeakMap<Ctor, MemberBucket>();
 const committedTokens = new WeakMap<Ctor, Set<symbol>>();
 
 /**
+ * Probe used by `hasAnyMeta` to ask "does this exact constructor link have any
+ * member metadata?" without walking the prototype chain. Exported only for the
+ * combined chain walk in {@link "./has-any-meta"}.
+ */
+export function hasOwnAnyMemberMeta(ctor: Ctor): boolean {
+	const bucket = memberMetaStore.get(ctor);
+	return !!bucket && bucket.size > 0;
+}
+
+/**
  * Own member metadata for `ctor`, `key`, and `name` (no prototype walk).
  */
 export function getMemberMeta<T>(ctor: Ctor, key: symbol, name: string | symbol): readonly T[] {
@@ -149,16 +159,6 @@ export function firstMemberMetaForKey<T>(ctor: Ctor, key: symbol, name: string |
 		ctor,
 		(current) => memberMetaStore.get(current)?.get(key)?.get(name)?.values as T[] | undefined
 	);
-}
-
-/**
- * True if any class in the chain has any member metadata stored.
- */
-export function hasAnyMemberMeta(ctor: Ctor): boolean {
-	return chainHasNonEmpty(ctor, (current) => {
-		const bucket = memberMetaStore.get(current);
-		return !!bucket && bucket.size > 0;
-	});
 }
 
 /**

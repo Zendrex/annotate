@@ -2,15 +2,14 @@ import { keyDisplayName, MissingMetadataError, UnregisteredClassError } from "..
 import {
 	collectClassMeta,
 	firstClassMetaForKey,
-	hasAnyClassMeta,
 	hasAnyClassMetaForKey,
 	hasOwnClassMeta,
 } from "../metadata/class-meta-store";
+import { hasAnyMeta } from "../metadata/has-any-meta";
 import {
 	appendMemberMeta,
 	collectMemberMeta,
 	firstMemberMetaForKey,
-	hasAnyMemberMeta,
 	hasAnyMemberMetaForKey,
 	hasOwnMemberMeta,
 } from "../metadata/member-meta-store";
@@ -66,7 +65,7 @@ export function throwMissingMember(
  * read helpers so unregistered types fail fast.
  */
 export function ensureClassRegistered(ctor: Ctor): void {
-	if (!(hasAnyClassMeta(ctor) || hasAnyMemberMeta(ctor))) {
+	if (!hasAnyMeta(ctor)) {
 		throw new UnregisteredClassError(ctor as AnyConstructor);
 	}
 }

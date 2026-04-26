@@ -6,7 +6,7 @@ import {
 	appendClassMeta,
 	collectClassMeta,
 	getClassMeta,
-	hasAnyClassMeta,
+	hasOwnAnyClassMeta,
 	hasOwnClassMeta,
 } from "../../../src/metadata/class-meta-store";
 
@@ -76,20 +76,21 @@ describe("collectClassMeta ancestor walk", () => {
 	});
 });
 
-describe("hasAnyClassMeta", () => {
+describe("hasOwnAnyClassMeta", () => {
 	test("false when empty, true after append", () => {
 		const key = mintUniqueKey("k");
 		class A {}
-		expect(hasAnyClassMeta(A)).toBe(false);
+		expect(hasOwnAnyClassMeta(A)).toBe(false);
 		appendClassMeta(A, key, "x");
-		expect(hasAnyClassMeta(A)).toBe(true);
+		expect(hasOwnAnyClassMeta(A)).toBe(true);
 	});
 
-	test("walks ancestors", () => {
+	test("does not walk ancestors (own-only)", () => {
 		const key = mintUniqueKey("k");
 		class A {}
 		class B extends A {}
 		appendClassMeta(A, key, "a");
-		expect(hasAnyClassMeta(B)).toBe(true);
+		expect(hasOwnAnyClassMeta(B)).toBe(false);
+		expect(hasOwnAnyClassMeta(A)).toBe(true);
 	});
 });
