@@ -1,4 +1,4 @@
-import { targetDisplayName } from "./reflector/class-name";
+import { formatSlot, targetDisplayName } from "./reflector/class-name";
 import type { Cardinality, MetadataKey } from "./metadata/types";
 import type { AnyConstructor, DecoratedKind } from "./reflector/types";
 
@@ -96,9 +96,7 @@ export class DuplicateMetadataError extends AnnotateError {
 		kind: DecoratedKind,
 		memberName?: string | symbol
 	) {
-		const slot = memberName
-			? `"${String(memberName)}" on "${targetDisplayName(ctor)}"`
-			: `"${targetDisplayName(ctor)}"`;
+		const slot = formatSlot(ctor, memberName);
 		const keyLabel = keyDisplayName(key);
 		super({
 			code: AnnotateErrorCode.DUPLICATE,
@@ -106,7 +104,7 @@ export class DuplicateMetadataError extends AnnotateError {
 			kind,
 			target: ctor,
 			memberName,
-			message: `duplicate decoration [${cardinality} key "${keyLabel}"]: ${slot} already has metadata for this factory`,
+			message: `duplicate decoration [${cardinality} key "${keyLabel}"]: "${slot}" already has metadata for this factory`,
 		});
 	}
 }
@@ -133,8 +131,7 @@ export class MissingMetadataError extends AnnotateError {
 		kind: DecoratedKind;
 		memberName?: string | symbol;
 	}) {
-		const className = targetDisplayName(args.target);
-		const slot = args.memberName === undefined ? className : `${className}.${String(args.memberName)}`;
+		const slot = formatSlot(args.target, args.memberName);
 		super({
 			code: AnnotateErrorCode.MISSING,
 			key: args.key,
@@ -195,16 +192,15 @@ export class InvalidDecorationTargetError extends AnnotateError {
 		memberName?: string | symbol;
 		key: MetadataKey;
 	}) {
-		const className = targetDisplayName(args.target);
+		const slot = formatSlot(args.target, args.memberName);
 		const baseName = targetDisplayName(args.requiredBase);
-		const memberSuffix = args.memberName === undefined ? "" : `.${String(args.memberName)}`;
 		super({
 			code: AnnotateErrorCode.INVALID_TARGET,
 			key: args.key,
 			kind: args.kind,
 			memberName: args.memberName,
 			target: args.target,
-			message: `@${args.label} cannot decorate ${className}${memberSuffix}: not a subclass of ${baseName}`,
+			message: `@${args.label} cannot decorate ${slot}: not a subclass of ${baseName}`,
 		});
 		this.requiredBase = args.requiredBase;
 	}
@@ -260,15 +256,14 @@ export class ValidationError extends AnnotateError {
 		key: MetadataKey;
 		cause?: unknown;
 	}) {
-		const className = targetDisplayName(args.target);
-		const memberSuffix = args.memberName === undefined ? "" : ` on ${className}.${String(args.memberName)}`;
+		const slotPrefix = args.memberName === undefined ? "" : ` on ${formatSlot(args.target, args.memberName)}`;
 		super({
 			code: AnnotateErrorCode.VALIDATION,
 			key: args.key,
 			kind: args.kind,
 			memberName: args.memberName,
 			target: args.target,
-			message: `@${args.label} validation failed${memberSuffix}: ${args.reason}`,
+			message: `@${args.label} validation failed${slotPrefix}: ${args.reason}`,
 			cause: args.cause,
 		});
 	}

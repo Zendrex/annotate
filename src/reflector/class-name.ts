@@ -9,3 +9,18 @@ import type { AnyConstructor } from "./types";
 export function targetDisplayName(ctor: AnyConstructor): string {
 	return typeof ctor.name === "string" && ctor.name.length > 0 ? ctor.name : "<anonymous>";
 }
+
+/**
+ * Formatted "slot" string used in error messages: the class display name on its
+ * own for class-level slots, or `Class.member` when a member name is supplied.
+ *
+ * Quoting is intentionally omitted so call sites can wrap the result however
+ * their message template requires.
+ *
+ * @param target - Class constructor whose display name forms the slot
+ * @param memberName - Property or method name; omit for class-level slots
+ */
+export function formatSlot(target: AnyConstructor, memberName?: string | symbol): string {
+	const className = targetDisplayName(target);
+	return memberName === undefined ? className : `${className}.${String(memberName)}`;
+}
