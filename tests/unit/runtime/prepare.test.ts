@@ -5,6 +5,7 @@ import { mintListKey, mintUniqueKey } from "../../../src/metadata/cardinality-re
 import { getMemberMeta } from "../../../src/metadata/member-meta-store";
 import { registerCtor } from "../../../src/metadata/metadata-ctor-correlation";
 import { hasPendingFor, queueDeferred } from "../../../src/metadata/metadata-deferred-queue";
+import { isFullyPrepared } from "../../../src/metadata/prepared-sentinel";
 import { prepare } from "../../../src/runtime/prepare";
 import { METADATA_SYMBOL } from "../../../src/runtime/symbol-metadata";
 
@@ -79,13 +80,11 @@ describe("prepare(ctor)", () => {
 		prepare(A);
 		expect(getMemberMeta<string>(A, key, "foo")).toEqual(["v"]);
 
-		// Second call must be a no-op: directly enqueue another item under the
-		// same correlation but bypass invalidation by writing to the queue's
-		// internal map only via queueDeferred AFTER prepare. If the sentinel
-		// works, prepare is short-circuited and the second item is NOT flushed.
-		// We assert the short-circuit by observing that a fresh enqueue WITHOUT
-		// invoking prepare leaves pending state unchanged when we re-enter.
-		// (Direct sentinel verification: same prepare call observes no work.)
+		// The sentinel must have been set — this directly proves the short-circuit
+		// path is wired up. If markFullyPrepared was never called, subsequent
+		// prepare calls would re-enter the flush path on every invocation.
+		expect(isFullyPrepared(A)).toBe(true);
+
 		prepare(A);
 		expect(hasPendingFor(correlation)).toBe(false);
 		expect(getMemberMeta<string>(A, key, "foo")).toEqual(["v"]);
@@ -142,5 +141,60 @@ describe("prepare(ctor)", () => {
 		// Subsequent prepare is a no-op (sentinel set after first drain).
 		prepare(A);
 		expect(getMemberMeta<string>(A, key, "foo")).toEqual(["v"]);
+	});
+
+	test("chain-walk: prepare(B) with pending ancestor does NOT mark B as fully prepared", () => {
+		const key = mintUniqueKey("k");
+		const correlation = {};
+		class A {}
+		class B extends A {}
+		brand(A, correlation);
+		queueDeferred(correlation, {
+			key,
+			name: "foo",
+			meta: "v",
+			token: Symbol("token"),
+			static: false,
+			kind: "method",
+		});
+		// B has no own metadata and no registered correlation — chain-walk fires for A.
+		// The contract: B must NOT be marked fully prepared (only the ancestor that
+		// held pending work is flushed; B itself may have further ancestors to drain).
+		prepare(B);
+		expect(getMemberMeta<string>(A, key, "foo")).toEqual(["v"]);
+		expect(isFullyPrepared(B)).toBe(false);
+	});
+
+	test("chain-walk: subsequent prepare(B) drains newly queued ancestor work", () => {
+		const key = mintListKey<string>("k");
+		const correlation = {};
+		class A {}
+		class B extends A {}
+		brand(A, correlation);
+		queueDeferred(correlation, {
+			key,
+			name: "foo",
+			meta: "v1",
+			token: Symbol("t1"),
+			static: false,
+			kind: "method",
+		});
+		prepare(B);
+		expect(getMemberMeta<string>(A, key, "foo")).toEqual(["v1"]);
+
+		// Enqueue additional work under the same ancestor correlation after the
+		// first prepare(B). prepare(B) must walk the chain again and flush it.
+		queueDeferred(correlation, {
+			key,
+			name: "foo",
+			meta: "v2",
+			token: Symbol("t2"),
+			static: false,
+			kind: "method",
+		});
+		expect(hasPendingFor(correlation)).toBe(true);
+		prepare(B);
+		expect(hasPendingFor(correlation)).toBe(false);
+		expect(getMemberMeta<string>(A, key, "foo")).toEqual(["v1", "v2"]);
 	});
 });
