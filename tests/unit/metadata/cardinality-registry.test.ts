@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
-import { getKeyCardinality, mintListKey, mintUniqueKey } from "../../../src/metadata/cardinality-registry";
+import {
+	getKeyCardinality,
+	mintListKey,
+	mintMetadataKey,
+	mintUniqueKey,
+} from "../../../src/metadata/cardinality-registry";
+import type { ListMetadataKey, UniqueMetadataKey } from "../../../src/metadata/types";
 
 describe("mintUniqueKey", () => {
 	test("produces a symbol registered as 'unique'", () => {
@@ -60,5 +66,47 @@ describe("getKeyCardinality", () => {
 	test("returns undefined for a bare Symbol not registered through mint helpers", () => {
 		const bare = Symbol("x");
 		expect(getKeyCardinality(bare)).toBeUndefined();
+	});
+});
+
+describe("mintMetadataKey", () => {
+	test("with cardinality 'unique' produces a UniqueMetadataKey registered as 'unique'", () => {
+		const key = mintMetadataKey<string, "unique">("unique", "test:mint:unique");
+		expect(typeof key).toBe("symbol");
+		expect(key.description).toBe("test:mint:unique");
+		expect(getKeyCardinality(key)).toBe("unique");
+
+		// Type-level: assignable to UniqueMetadataKey<T> without cast.
+		const typed: UniqueMetadataKey<string> = key;
+		expect(typed).toBe(key);
+	});
+
+	test("with cardinality 'list' produces a ListMetadataKey registered as 'list'", () => {
+		const key = mintMetadataKey<number, "list">("list", "test:mint:list");
+		expect(typeof key).toBe("symbol");
+		expect(key.description).toBe("test:mint:list");
+		expect(getKeyCardinality(key)).toBe("list");
+
+		// Type-level: assignable to ListMetadataKey<T> without cast.
+		const typed: ListMetadataKey<number> = key;
+		expect(typed).toBe(key);
+	});
+
+	test("works without a description argument", () => {
+		const unique = mintMetadataKey<unknown, "unique">("unique");
+		const list = mintMetadataKey<unknown, "list">("list");
+		expect(unique.description).toBeUndefined();
+		expect(list.description).toBeUndefined();
+		expect(getKeyCardinality(unique)).toBe("unique");
+		expect(getKeyCardinality(list)).toBe("list");
+	});
+
+	test("distinct calls produce distinct symbols", () => {
+		const a = mintMetadataKey<string, "unique">("unique", "shared");
+		const b = mintMetadataKey<string, "unique">("unique", "shared");
+		const c = mintMetadataKey<string, "list">("list", "shared");
+		expect(a).not.toBe(b);
+		expect(a).not.toBe(c);
+		expect(b).not.toBe(c);
 	});
 });

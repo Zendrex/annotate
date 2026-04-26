@@ -1,4 +1,4 @@
-import type { Cardinality, ListMetadataKey, UniqueMetadataKey } from "./types";
+import type { Cardinality, ListMetadataKey, MetadataKey, UniqueMetadataKey } from "./types";
 
 /**
  * Module-level registry mapping every minted `MetadataKey` symbol to its cardinality.
@@ -9,14 +9,26 @@ import type { Cardinality, ListMetadataKey, UniqueMetadataKey } from "./types";
  */
 const registry = new WeakMap<symbol, Cardinality>();
 
-function mintKey<TKey extends UniqueMetadataKey<unknown> | ListMetadataKey<unknown>>(
-	cardinality: Cardinality,
-	description?: string
-): TKey {
+/**
+ * Mint a new symbol branded as a `MetadataKey<T, C>` and register it under the given
+ * `cardinality`. The cardinality parameter is reflected at the type level, so passing
+ * `"unique"` returns a value assignable to {@link UniqueMetadataKey} and `"list"`
+ * returns a value assignable to {@link ListMetadataKey}.
+ *
+ * Prefer the cardinality-specific helpers — {@link mintUniqueKey} and {@link mintListKey} —
+ * for end-user code: they read more clearly at call sites. Use `mintMetadataKey`
+ * inside generic builders that need to pass cardinality through as a type parameter
+ * without forking on the constant.
+ *
+ * @param cardinality - `"unique"` (at most one value per site) or `"list"` (accumulates).
+ * @param description - Optional symbol description, forwarded to `Symbol()` as-is.
+ * @returns A branded `MetadataKey<T, C>` registered in the cardinality registry.
+ */
+export function mintMetadataKey<T, C extends Cardinality>(cardinality: C, description?: string): MetadataKey<T, C> {
 	const key = Symbol(description);
 	registry.set(key, cardinality);
 	// Safe: brand is phantom-only; we control both cardinality and symbol creation.
-	return key as TKey;
+	return key as MetadataKey<T, C>;
 }
 
 /**
@@ -27,7 +39,7 @@ function mintKey<TKey extends UniqueMetadataKey<unknown> | ListMetadataKey<unkno
  * @returns A branded `UniqueMetadataKey<T>` registered in the cardinality registry.
  */
 export function mintUniqueKey<T>(description?: string): UniqueMetadataKey<T> {
-	return mintKey<UniqueMetadataKey<T>>("unique", description);
+	return mintMetadataKey<T, "unique">("unique", description);
 }
 
 /**
@@ -38,7 +50,7 @@ export function mintUniqueKey<T>(description?: string): UniqueMetadataKey<T> {
  * @returns A branded `ListMetadataKey<T>` registered in the cardinality registry.
  */
 export function mintListKey<T>(description?: string): ListMetadataKey<T> {
-	return mintKey<ListMetadataKey<T>>("list", description);
+	return mintMetadataKey<T, "list">("list", description);
 }
 
 /**

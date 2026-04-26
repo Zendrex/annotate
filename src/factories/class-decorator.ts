@@ -1,4 +1,4 @@
-import { mintListKey, mintUniqueKey } from "../metadata/cardinality-registry";
+import { mintMetadataKey } from "../metadata/cardinality-registry";
 import { appendClassMeta } from "../metadata/class-meta-store";
 import { commitDecoration, compose, createClassFactoryHelpers, labelFor, mergeExtendedOptions } from "./shared";
 import { buildValidatorChain } from "./validator-chain";
@@ -17,7 +17,7 @@ import type { DecoratedClassFactory, DecoratorOptions, DeriveOptions } from "./t
 export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta], TInstance = unknown>(
 	options?: DecoratorOptions<TMeta, TArgs>
 ): DecoratedClassFactory<TMeta, TArgs, TInstance> {
-	const key = mintUniqueKey<TMeta>(options?.name);
+	const key = mintMetadataKey<TMeta, "unique">("unique", options?.name);
 	return buildClassFactory<TMeta, TArgs, TInstance>(key, options);
 }
 
@@ -86,6 +86,6 @@ export function buildClassFactory<TMeta, TArgs extends unknown[], TInstance, TCa
 export function createClassListDecorator<TMeta, TArgs extends unknown[] = [TMeta], TInstance = unknown>(
 	options?: DecoratorOptions<TMeta, TArgs>
 ): DecoratedClassFactory<TMeta, TArgs, TInstance, "list"> {
-	const key = mintListKey<TMeta>(options?.name);
+	const key = mintMetadataKey<TMeta, "list">("list", options?.name);
 	return buildClassFactory<TMeta, TArgs, TInstance, "list">(key, options);
 }

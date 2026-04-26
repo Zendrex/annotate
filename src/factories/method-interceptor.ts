@@ -1,4 +1,4 @@
-import { mintListKey, mintUniqueKey } from "../metadata/cardinality-registry";
+import { mintMetadataKey } from "../metadata/cardinality-registry";
 import { buildMethodFactory } from "./method-decorator";
 import type { AnyFn, DecoratedMethodFactory, DecoratorOptions, MethodInterceptorOptions } from "./types";
 
@@ -15,7 +15,7 @@ export function createMethodInterceptor<
 	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
 	TThis = any,
 >(options: MethodInterceptorOptions<TMeta, TArgs, TMethod>): DecoratedMethodFactory<TMeta, TArgs, TMethod, TThis> {
-	const key = mintUniqueKey<TMeta>(options.name);
+	const key = mintMetadataKey<TMeta, "unique">("unique", options.name);
 	const { intercept, ...rest } = options;
 	return buildMethodFactory<TMeta, TArgs, TMethod, TThis>(key, rest as DecoratorOptions<TMeta, TArgs>, { intercept });
 }
@@ -38,7 +38,7 @@ export function createMethodListInterceptor<
 >(
 	options: MethodInterceptorOptions<TMeta, TArgs, TMethod>
 ): DecoratedMethodFactory<TMeta, TArgs, TMethod, TThis, "list"> {
-	const key = mintListKey<TMeta>(options.name);
+	const key = mintMetadataKey<TMeta, "list">("list", options.name);
 	const { intercept, ...rest } = options;
 	return buildMethodFactory<TMeta, TArgs, TMethod, TThis, "list">(key, rest as DecoratorOptions<TMeta, TArgs>, {
 		intercept,
