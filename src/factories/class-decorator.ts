@@ -9,8 +9,8 @@ import type { DecoratedClassFactory, DecoratorOptions, DeriveOptions } from "./t
 /**
  * Returns a class decorator factory: each decorated class stores metadata under a
  * generated key, runs optional `validate` / `requireInstanceOf` (see {@link buildClassFactory}),
- * and wires the constructor into the reflector (`registerCtor` + `flushFor` after
- * `appendClassMeta`).
+ * and wires the constructor into the reflector and flushes deferred work via
+ * {@link commitDecoration}.
  *
  * @param options - Optional `name` (affects the key), `compose`, `validate`, and `requireInstanceOf`.
  */
