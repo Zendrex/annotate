@@ -66,7 +66,6 @@ export class AnnotateError extends Error {
 	 * @param options - Message, code, and target are required; other fields are diagnostic context.
 	 */
 	constructor(options: AnnotateErrorOptions) {
-		// Pass `{ cause }` only when set so `Error.cause` is absent, not `undefined`.
 		super(options.message, options.cause === undefined ? undefined : { cause: options.cause });
 		this.code = options.code;
 		this.target = options.target;
