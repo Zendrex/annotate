@@ -4,5 +4,5 @@
 	"initialVersions": {
 		"@zendrex/annotate": "0.2.0"
 	},
-	"changesets": ["stage3-alpha"]
+	"changesets": []
 }
