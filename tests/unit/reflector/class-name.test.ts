@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { formatSlot, targetDisplayName } from "../../../src/reflector/class-name";
+import { formatSlot } from "../../../src/reflector/class-name";
 
 describe("formatSlot", () => {
 	test("returns the class display name when memberName is undefined", () => {
@@ -19,9 +19,9 @@ describe("formatSlot", () => {
 		expect(formatSlot(Subject, sym)).toBe(`Subject.${String(sym)}`);
 	});
 
-	test("falls back to the anonymous label used by targetDisplayName", () => {
+	test("falls back to '<anonymous>' for an unnamed class", () => {
 		const Anon = (() => class {})();
 		Object.defineProperty(Anon, "name", { value: "" });
-		expect(formatSlot(Anon)).toBe(targetDisplayName(Anon));
+		expect(formatSlot(Anon)).toBe("<anonymous>");
 	});
 });

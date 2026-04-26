@@ -59,6 +59,22 @@ describe("MissingMetadataError", () => {
 		expect(err.memberName).toBe("field");
 		expect(err.message).toBe('@Column metadata missing on "Subject.field"');
 	});
+
+	test("symbol member name is stringified in the message", () => {
+		class Subject {}
+		const sym = Symbol("my-key");
+		const err = new MissingMetadataError({
+			target: Subject,
+			key: KEY,
+			label: "Column",
+			kind: "property",
+			memberName: sym,
+		});
+
+		expect(err.memberName).toBe(sym);
+		expect(err.message).toContain("Symbol(my-key)");
+		expect(err.message).toBe(`@Column metadata missing on "Subject.${String(sym)}"`);
+	});
 });
 
 describe("InvalidDecorationTargetError", () => {
