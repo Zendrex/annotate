@@ -1,178 +1,239 @@
-import type { MetadataKey } from "../metadata/types";
-import type { ScopedReflector } from "../reflector/types";
+import type { Cardinality, MetadataArray, MetadataKey } from "../metadata/types";
+import type { AnyConstructor, ScopedReflector } from "../reflector/types";
+import type { ValidatorFn } from "./validator-types";
 
-/** Bound to the instance (or constructor for statics) at access time. */
-export type PropertyGetter = (this: unknown) => unknown;
+export type { ValidateContext, ValidatorFn } from "./validator-types";
 
-/** Bound to the instance (or constructor for statics) at access time. */
-export type PropertySetter = (this: unknown, value: unknown) => void;
+// biome-ignore lint/suspicious/noExplicitAny: required for variance on TMethod
+export type AnyFn = (...args: any[]) => any;
 
-/**
- * Describes the decorated site being intercepted.
- *
- * `owner` is the declaring object — the prototype for instance members, the
- * constructor for static members. Mutating `descriptor` from an interceptor
- * callback is not supported; install behavior through the returned function.
- */
+/** Identifies the member being wrapped, passed into interceptor callbacks. */
 export interface InterceptorContext {
-	descriptor: PropertyDescriptor;
+	kind: "method" | "accessor";
 	name: string | symbol;
-	owner: object;
+	static: boolean;
 }
 
 /**
- * Shared factory configuration for class, method, property, and interceptor
- * decorators.
- *
- * - `compose` maps the decorator's call arguments to the stored metadata shape.
- *   Omit it when `TArgs` is `[TMeta]` (the default) and no transformation is needed.
- * - `name` is used as a prefix in `AnnotateError` messages to aid debugging.
- * - `unique` causes a second application on the same target to throw
- *   `AnnotateError` with `code: "duplicate"`. Not supported by parameter decorators.
- *
- * @typeParam TMeta - Metadata value stored per application
- * @typeParam TArgs - Call arguments passed to the decorator; defaults to `[TMeta]`
+ * Forces `compose` to be supplied when `TArgs` widens beyond the identity
+ * tuple `[TMeta]`. The default form keeps `compose` optional; any wider shape
+ * requires an explicit `TArgs → TMeta` mapper so the runtime `args[0] as TMeta`
+ * fallback in `compose` is unreachable.
  */
-export interface DecoratorOptions<TMeta, TArgs extends unknown[] = [TMeta]> {
-	compose?: (...args: TArgs) => TMeta;
+type ComposeRequirement<TMeta, TArgs extends unknown[]> = [TArgs] extends [[TMeta]]
+	? { compose?: (...args: TArgs) => TMeta }
+	: { compose: (...args: TArgs) => TMeta };
+
+/**
+ * Shared options for every factory and interceptor.
+ *
+ * - `requireInstanceOf` / `validate`: composed into a validator chain via
+ *   `buildValidatorChain`.
+ * - `compose`: maps decorator arguments to the stored metadata value.
+ *   Required when `TArgs` widens beyond `[TMeta]`; optional otherwise.
+ */
+export type DecoratorOptions<TMeta, TArgs extends unknown[] = [TMeta]> = {
 	name?: string;
-	unique?: boolean;
-}
+	requireInstanceOf?: AnyConstructor;
+	validate?: ValidatorFn<TMeta>;
+} & ComposeRequirement<TMeta, TArgs>;
 
-/**
- * Options for parameter decorators. `unique` is not available because parameter
- * metadata is keyed by parameter slot and always appends.
- */
-export type ParameterDecoratorOptions<TMeta, TArgs extends unknown[] = [TMeta]> = Omit<
+/** Options accepted by `derive()`; excludes `compose` (taken from the parent). */
+export type DeriveOptions<TMeta, TArgs extends unknown[]> = Pick<
 	DecoratorOptions<TMeta, TArgs>,
-	"unique"
+	"requireInstanceOf" | "validate" | "name"
 >;
 
 /**
- * Options for {@link createMethodInterceptor}.
- *
- * `intercept` returns a replacement function installed onto the method's property
- * descriptor. The replacement's `name` is restored to the original to preserve
- * stack traces and `Function.prototype.name` lookups.
+ * Options for `intercept.method`. The hook's return value replaces the
+ * original method; `readMetadata` returns every value stored under this
+ * factory's key for `(instance, member)`.
  */
-export interface MethodInterceptorOptions<TMeta, TArgs extends unknown[] = [TMeta]>
-	extends DecoratorOptions<TMeta, TArgs> {
-	intercept: (
-		original: (...args: unknown[]) => unknown,
-		metadata: TMeta[],
+export type MethodInterceptorOptions<
+	TMeta,
+	TArgs extends unknown[] = [TMeta],
+	TMethod extends AnyFn = AnyFn,
+> = DecoratorOptions<TMeta, TArgs> & {
+	intercept: (original: TMethod, readMetadata: (instance: object) => TMeta[], context: InterceptorContext) => TMethod;
+};
+
+/**
+ * Options for `intercept.accessor`. Provide `onGet` and/or `onSet` to wrap
+ * the compiler-generated getter/setter of an auto-accessor.
+ */
+export type AccessorInterceptorOptions<TMeta, TArgs extends unknown[] = [TMeta], TValue = unknown> = DecoratorOptions<
+	TMeta,
+	TArgs
+> & {
+	onGet?: (
+		original: () => TValue,
+		readMetadata: (instance: object) => TMeta[],
 		context: InterceptorContext
-	) => (...args: unknown[]) => unknown;
-}
-
-/**
- * Options for {@link createPropertyInterceptor}. At least one of `onGet` or
- * `onSet` must be provided; omitting both causes the factory to throw `TypeError`.
- *
- * Each hook receives the existing accessor (or a synthesized one wrapping the
- * underlying data property) and must return a replacement with the same signature.
- */
-export interface PropertyInterceptorOptions<TMeta, TArgs extends unknown[] = [TMeta]>
-	extends DecoratorOptions<TMeta, TArgs> {
-	onGet?: (original: PropertyGetter, metadata: TMeta[], context: InterceptorContext) => PropertyGetter;
-	onSet?: (original: PropertySetter, metadata: TMeta[], context: InterceptorContext) => PropertySetter;
-}
-
-export type ClassDecoratorFactory<TMeta, TArgs extends unknown[] = [TMeta]> = (...args: TArgs) => (
-	// biome-ignore lint/complexity/noBannedTypes: class decorator target shape from TS
-	target: Function
-) => void;
-
-export type MethodDecoratorFactory<TMeta, TArgs extends unknown[] = [TMeta]> = (
-	...args: TArgs
-) => (target: object, propertyKey: string | symbol, descriptor?: PropertyDescriptor) => void;
-
-export type PropertyDecoratorFactory<TMeta, TArgs extends unknown[] = [TMeta]> = (
-	...args: TArgs
-) => (target: object, propertyKey: string | symbol) => void;
-
-export type ParameterDecoratorFactory<TMeta, TArgs extends unknown[] = [TMeta]> = (
-	...args: TArgs
-) => (target: object, propertyKey: string | symbol | undefined, parameterIndex: number) => void;
-
-// --- Class factory surface ---
-
-/**
- * Callable decorator produced by {@link createClassDecorator}, augmented with
- * reflection helpers pre-bound to this factory's metadata key.
- *
- * All `target` arguments accept a class constructor or an instance (resolved to
- * its constructor). `metadata` / `applied` walk the prototype chain, so
- * subclasses see parent decoration; use `appliedOwn` to exclude inherited state.
- *
- * @typeParam TMeta - Metadata stored per decorator application
- * @typeParam TArgs - Arguments accepted by the decorator call
- */
-export type DecoratedClassFactory<TMeta, TArgs extends unknown[] = [TMeta]> = ClassDecoratorFactory<TMeta, TArgs> & {
-	key: MetadataKey;
-	reflect(target: object): ScopedReflector<TMeta>;
-	/** First stored value (per declaration order), walking the prototype chain. */
-	metadata(target: object): TMeta | undefined;
-	/** Like {@link DecoratedClassFactory.metadata} but throws `AnnotateError` with `code: "missing"` when absent. */
-	requireMetadata(target: object): TMeta;
-	applied(target: object): boolean;
-	appliedOwn(target: object): boolean;
+	) => () => TValue;
+	onSet?: (
+		original: (value: TValue) => void,
+		readMetadata: (instance: object) => TMeta[],
+		context: InterceptorContext
+	) => (value: TValue) => void;
 };
 
-// --- Method / property factory surface ---
+// biome-ignore lint/suspicious/noExplicitAny: structural Stage-3 generic shape
+export type AnyClass<TInstance> = abstract new (...args: any[]) => TInstance;
+
+export type ClassDecoratorFn<TInstance, TArgs extends unknown[]> = (
+	...args: TArgs
+) => <T extends AnyClass<TInstance>>(value: T, context: ClassDecoratorContext<T>) => void;
+
+export type FieldDecoratorFn<TThis, TField, TArgs extends unknown[]> = (
+	...args: TArgs
+) => (value: undefined, context: ClassFieldDecoratorContext<TThis, TField>) => void;
+
+export type MethodDecoratorFn<TThis, TMethod extends AnyFn, TArgs extends unknown[]> = (
+	...args: TArgs
+) => (value: TMethod, context: ClassMethodDecoratorContext<TThis, TMethod>) => TMethod | undefined;
+
+export type AccessorDecoratorFn<TThis, TValue, TArgs extends unknown[]> = (
+	...args: TArgs
+) => (
+	value: ClassAccessorDecoratorTarget<TThis, TValue>,
+	context: ClassAccessorDecoratorContext<TThis, TValue>
+) => ClassAccessorDecoratorResult<TThis, TValue> | undefined;
 
 /**
- * Callable decorator produced by {@link createMethodDecorator} or
- * {@link createMethodInterceptor}, plus reflection helpers scoped to methods.
+ * Class decorator factory enriched with `key`, read helpers (`reader`,
+ * `first`, `firstOrThrow`, `has`, `hasOwn`, `all`), and `derive` for
+ * narrowing the instance type against the same key.
  *
- * The `name` argument addresses the method by property key; static and instance
- * methods are looked up on the constructor or prototype respectively during
- * reflection.
+ * `TCard` is the cardinality brand carried by `.key`; the `reader` return
+ * type narrows on `TCard` so unique keys yield scalar `metadata` and list
+ * keys yield array `metadata`.
  */
-export type DecoratedMethodFactory<TMeta, TArgs extends unknown[] = [TMeta]> = MethodDecoratorFactory<TMeta, TArgs> & {
-	key: MetadataKey;
-	reflect(target: object): ScopedReflector<TMeta>;
-	metadata(target: object, name: string | symbol): TMeta | undefined;
-	/** @throws `AnnotateError` with `code: "missing"` when no metadata is registered on `name`. */
-	requireMetadata(target: object, name: string | symbol): TMeta;
-	applied(target: object, name: string | symbol): boolean;
-	appliedOwn(target: object, name: string | symbol): boolean;
-};
-
-/**
- * Callable decorator produced by {@link createPropertyDecorator} or
- * {@link createPropertyInterceptor}, plus reflection helpers scoped to properties.
- */
-export type DecoratedPropertyFactory<TMeta, TArgs extends unknown[] = [TMeta]> = PropertyDecoratorFactory<
+export type DecoratedClassFactory<
 	TMeta,
-	TArgs
-> & {
-	key: MetadataKey;
-	reflect(target: object): ScopedReflector<TMeta>;
-	metadata(target: object, name: string | symbol): TMeta | undefined;
-	/** @throws `AnnotateError` with `code: "missing"` when no metadata is registered on `name`. */
-	requireMetadata(target: object, name: string | symbol): TMeta;
-	applied(target: object, name: string | symbol): boolean;
-	appliedOwn(target: object, name: string | symbol): boolean;
+	TArgs extends unknown[] = [TMeta],
+	TInstance = unknown,
+	TCard extends Cardinality = "unique",
+> = ClassDecoratorFn<TInstance, TArgs> & {
+	key: MetadataKey<TMeta, TCard>;
+	reader(target: object): ScopedReflector<TMeta, TCard>;
+	first(target: object): TMeta | undefined;
+	firstOrThrow(target: object): TMeta;
+	has(target: object): boolean;
+	hasOwn(target: object): boolean;
+	all(target: object): MetadataArray<TMeta>;
+	derive<TNewInstance = TInstance>(
+		options?: DeriveOptions<TMeta, TArgs>
+	): DecoratedClassFactory<TMeta, TArgs, TNewInstance, TCard>;
 };
-
-// --- Parameter factory surface ---
 
 /**
- * Callable decorator produced by {@link createParameterDecorator}, plus
- * reflection helpers scoped to parameters.
- *
- * Omit `methodName` to address constructor parameters; supply it for method
- * parameters. The same `parameterIndex` namespace is independent per method.
+ * Method decorator factory with `(target, name)`-scoped read helpers and
+ * `derive` for alternate `this`/method shapes against the same storage key.
+ * See {@link DecoratedClassFactory} for `TCard` semantics.
  */
-export type DecoratedParameterFactory<TMeta, TArgs extends unknown[] = [TMeta]> = ParameterDecoratorFactory<
+export type DecoratedMethodFactory<
 	TMeta,
-	TArgs
-> & {
-	key: MetadataKey;
-	reflect(target: object): ScopedReflector<TMeta>;
-	metadata(target: object, parameterIndex: number, methodName?: string | symbol): TMeta | undefined;
-	/** @throws `AnnotateError` with `code: "missing"` when the slot has no metadata. */
-	requireMetadata(target: object, parameterIndex: number, methodName?: string | symbol): TMeta;
-	applied(target: object, parameterIndex: number, methodName?: string | symbol): boolean;
-	appliedOwn(target: object, parameterIndex: number, methodName?: string | symbol): boolean;
+	TArgs extends unknown[] = [TMeta],
+	TMethod extends AnyFn = AnyFn,
+	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
+	TThis = any,
+	TCard extends Cardinality = "unique",
+> = MethodDecoratorFn<TThis, TMethod, TArgs> & {
+	key: MetadataKey<TMeta, TCard>;
+	reader(target: object): ScopedReflector<TMeta, TCard>;
+	first(target: object, name: string | symbol): TMeta | undefined;
+	firstOrThrow(target: object, name: string | symbol): TMeta;
+	has(target: object, name: string | symbol): boolean;
+	hasOwn(target: object, name: string | symbol): boolean;
+	all(target: object, name: string | symbol): MetadataArray<TMeta>;
+	derive<TNewThis = TThis>(
+		options?: DeriveOptions<TMeta, TArgs>
+	): DecoratedMethodFactory<TMeta, TArgs, TMethod, TNewThis, TCard>;
 };
+
+/**
+ * Stage 3 field decorator factory; mirrors the method factory's reader and
+ * `derive` shape. See {@link DecoratedClassFactory} for `TCard` semantics.
+ */
+export type DecoratedPropertyFactory<
+	TMeta,
+	TArgs extends unknown[] = [TMeta],
+	TField = unknown,
+	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
+	TThis = any,
+	TCard extends Cardinality = "unique",
+> = FieldDecoratorFn<TThis, TField, TArgs> & {
+	key: MetadataKey<TMeta, TCard>;
+	reader(target: object): ScopedReflector<TMeta, TCard>;
+	first(target: object, name: string | symbol): TMeta | undefined;
+	firstOrThrow(target: object, name: string | symbol): TMeta;
+	has(target: object, name: string | symbol): boolean;
+	hasOwn(target: object, name: string | symbol): boolean;
+	all(target: object, name: string | symbol): MetadataArray<TMeta>;
+	derive<TNewField = TField, TNewThis = TThis>(
+		options?: DeriveOptions<TMeta, TArgs>
+	): DecoratedPropertyFactory<TMeta, TArgs, TNewField, TNewThis, TCard>;
+};
+
+/**
+ * Auto-accessor decorator factory. Metadata is stored property-scoped to keep
+ * reflection parity with field decorators. See {@link DecoratedClassFactory}
+ * for `TCard` semantics.
+ */
+export type DecoratedAccessorFactory<
+	TMeta,
+	TArgs extends unknown[] = [TMeta],
+	TValue = unknown,
+	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
+	TThis = any,
+	TCard extends Cardinality = "unique",
+> = AccessorDecoratorFn<TThis, TValue, TArgs> & {
+	key: MetadataKey<TMeta, TCard>;
+	reader(target: object): ScopedReflector<TMeta, TCard>;
+	first(target: object, name: string | symbol): TMeta | undefined;
+	firstOrThrow(target: object, name: string | symbol): TMeta;
+	has(target: object, name: string | symbol): boolean;
+	hasOwn(target: object, name: string | symbol): boolean;
+	all(target: object, name: string | symbol): MetadataArray<TMeta>;
+	derive<TNewThis = TThis>(
+		options?: DeriveOptions<TMeta, TArgs>
+	): DecoratedAccessorFactory<TMeta, TArgs, TValue, TNewThis, TCard>;
+};
+
+// biome-ignore lint/suspicious/noExplicitAny: structural value/method slot intentionally erased by this helper
+type _Any = any;
+
+type FactoryGenerics<F> =
+	F extends DecoratedClassFactory<infer M, infer A, infer T, infer C>
+		? { meta: M; args: A; this: T; card: C }
+		: F extends DecoratedMethodFactory<infer M, infer A, _Any, infer T, infer C>
+			? { meta: M; args: A; this: T; card: C }
+			: F extends DecoratedPropertyFactory<infer M, infer A, _Any, infer T, infer C>
+				? { meta: M; args: A; this: T; card: C }
+				: F extends DecoratedAccessorFactory<infer M, infer A, _Any, infer T, infer C>
+					? { meta: M; args: A; this: T; card: C }
+					: never;
+
+type _Slot<F, K extends "meta" | "args" | "this" | "card"> = [FactoryGenerics<F>] extends [never]
+	? never
+	: FactoryGenerics<F> extends Record<K, infer V>
+		? V
+		: never;
+
+/** Metadata type carried by a `Decorated*Factory`. */
+export type MetadataOf<F> = _Slot<F, "meta">;
+
+/** Decorator argument tuple carried by a `Decorated*Factory`. */
+export type ArgsOf<F> = _Slot<F, "args">;
+
+/** Instance / `this` slot carried by a `Decorated*Factory`. */
+export type ThisOf<F> = _Slot<F, "this">;
+
+/**
+ * Cardinality brand carried by a `Decorated*Factory`.
+ *
+ * When `F` is typed without an explicit `TCard` argument, `infer` falls back
+ * to the constraint `Cardinality` rather than the `"unique"` default. Typed
+ * factory values usually preserve the literal via `.key`.
+ */
+export type CardinalityOf<F> = _Slot<F, "card">;

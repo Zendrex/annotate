@@ -1,61 +1,78 @@
-import { appendMetadata, getMetadataArray } from "../metadata/store";
-import { resolveReflectTarget } from "../reflector/resolve-instance";
-import { createScopedReflector } from "../reflector/scoped-reflector";
+import { mintMetadataKey } from "../metadata/cardinality-registry";
+import { appendClassMeta } from "../metadata/class-meta-store";
 import {
-	classMetadataApplied,
-	classMetadataAppliedOwn,
-	classMetadataFirst,
+	commitDecoration,
 	compose,
-	generateKey,
-	labelFor,
-	normalizeAnnotateErrorTarget,
-	throwDuplicateClass,
-	throwMissingClass,
+	createClassFactoryHelpers,
+	mergeExtendedOptions,
+	prepareFactoryShell,
 } from "./shared";
-import type { DecoratedClassFactory, DecoratorOptions } from "./types";
+import type { Cardinality, Ctor, MetadataKey } from "../metadata/types";
+import type { AnyConstructor } from "../reflector/types";
+import type { AnyClass, DecoratedClassFactory, DecoratorOptions, DeriveOptions } from "./types";
 
 /**
- * Create a typed class decorator factory with a unique metadata key and
- * pre-bound reflection helpers.
- *
- * The returned decorator appends metadata per application so later decorators
- * at the same site add to the array rather than overwriting. When
- * `options.unique` is set, a second application on the same class throws
- * `AnnotateError` with `code: "duplicate"`.
- *
- * Reflection via `metadata` / `applied` walks the prototype chain; use
- * `appliedOwn` to exclude metadata inherited from parent classes.
- *
- * @typeParam TMeta - Metadata stored per application
- * @typeParam TArgs - Arguments accepted by the decorator call; defaults to `[TMeta]`
- * @throws `AnnotateError` with `code: "duplicate"` on a second application when `unique` is set
+ * Builds a class decorator factory. Composed metadata is appended via
+ * {@link commitDecoration}, which validates, registers the constructor, and
+ * flushes any deferred work pending on the decorator-context bag.
  */
-export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta]>(
+export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta], TInstance = unknown>(
 	options?: DecoratorOptions<TMeta, TArgs>
-): DecoratedClassFactory<TMeta, TArgs> {
-	const key = generateKey();
-	const { compose: composeFn, name, unique } = options ?? {};
-	const label = labelFor(name, key);
+): DecoratedClassFactory<TMeta, TArgs, TInstance> {
+	const key = mintMetadataKey<TMeta>("unique", options?.name);
+	return buildClassFactory<TMeta, TArgs, TInstance>(key, options);
+}
+
+/**
+ * Lower-level form of {@link createClassDecorator} that accepts a pre-minted
+ * key. `derive` rebuilds against the same key with options merged via
+ * {@link mergeExtendedOptions}.
+ */
+export function buildClassFactory<TMeta, TArgs extends unknown[], TInstance, TCard extends Cardinality = "unique">(
+	key: MetadataKey<TMeta, TCard>,
+	options: DecoratorOptions<TMeta, TArgs> | undefined
+): DecoratedClassFactory<TMeta, TArgs, TInstance, TCard> {
+	const { composeFn, label, validators } = prepareFactoryShell<TMeta, TArgs>(key, options);
 
 	const decoratorFn =
 		(...args: TArgs) =>
-		(target: object): void => {
-			if (unique && getMetadataArray<TMeta>(key, target).length > 0) {
-				throwDuplicateClass(key, normalizeAnnotateErrorTarget(target), label);
-			}
-			appendMetadata(key, target, compose(args, composeFn));
+		<T extends AnyClass<TInstance>>(value: T, context: ClassDecoratorContext<T>): void => {
+			const meta = compose(args, composeFn);
+			commitDecoration({
+				ctor: value as unknown as Ctor,
+				correlation: context.metadata,
+				meta,
+				validators,
+				validationContext: {
+					target: value as unknown as AnyConstructor,
+					kind: "class",
+					static: false,
+				},
+				append: () => {
+					appendClassMeta(value, key, meta);
+				},
+			});
 		};
+
+	const derive = <TNewInstance = TInstance>(
+		childOptions?: DeriveOptions<TMeta, TArgs>
+	): DecoratedClassFactory<TMeta, TArgs, TNewInstance, TCard> =>
+		buildClassFactory<TMeta, TArgs, TNewInstance, TCard>(key, mergeExtendedOptions(options, childOptions));
 
 	return Object.assign(decoratorFn, {
 		key,
-		reflect: (target: object) => createScopedReflector<TMeta>(resolveReflectTarget(target), key),
-		applied: (target: object): boolean => classMetadataApplied<TMeta>(key, resolveReflectTarget(target)),
-		appliedOwn: (target: object): boolean => classMetadataAppliedOwn<TMeta>(key, resolveReflectTarget(target)),
-		metadata: (target: object): TMeta | undefined => classMetadataFirst<TMeta>(key, resolveReflectTarget(target)),
-		requireMetadata: (target: object): TMeta => {
-			const ctor = resolveReflectTarget(target);
-			const first = classMetadataFirst<TMeta>(key, ctor);
-			return first === undefined ? throwMissingClass(key, ctor, label) : first;
-		},
-	}) as DecoratedClassFactory<TMeta, TArgs>;
+		...createClassFactoryHelpers<TMeta, TCard>(key, label),
+		derive,
+	}) as DecoratedClassFactory<TMeta, TArgs, TInstance, TCard>;
+}
+
+/**
+ * List-cardinality class decorator: repeat decorations append entries instead
+ * of throwing on duplicates. `.key` is branded as a list key.
+ */
+export function createClassListDecorator<TMeta, TArgs extends unknown[] = [TMeta], TInstance = unknown>(
+	options?: DecoratorOptions<TMeta, TArgs>
+): DecoratedClassFactory<TMeta, TArgs, TInstance, "list"> {
+	const key = mintMetadataKey<TMeta>("list", options?.name);
+	return buildClassFactory<TMeta, TArgs, TInstance, "list">(key, options);
 }

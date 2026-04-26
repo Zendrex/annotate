@@ -1,250 +1,92 @@
-import "reflect-metadata";
-
 import { describe, expect, test } from "bun:test";
 
-import { AnnotateError, createMethodDecorator } from "../../../src";
+import { AnnotateError, decorate, MissingMetadataError, UnregisteredClassError } from "../../../src";
 
-describe("createMethodDecorator", () => {
-	test("should store simple metadata on method", () => {
-		const Route = createMethodDecorator<string>();
-
-		class Api {
-			@Route("/users")
-			getUsers() {
-				return [];
-			}
-		}
-
-		const routes = Route.reflect(Api).methods();
-		const route = routes.find((r) => r.name === "getUsers");
-		expect(route?.metadata).toEqual(["/users"]);
-	});
-
-	test("should store metadata on multiple methods", () => {
-		const HttpMethod = createMethodDecorator<string>();
+describe("decorate.method", () => {
+	test("stores metadata on instance method after construction", () => {
+		const Route = decorate.method<string>();
 
 		class Api {
-			@HttpMethod("GET")
-			list() {
-				return [];
-			}
-
-			@HttpMethod("POST")
-			create() {
-				return null;
-			}
+			@Route("/ping")
+			// biome-ignore lint/suspicious/noEmptyBlockStatements: test stub method
+			ping(): void {}
 		}
 
-		const methods = HttpMethod.reflect(Api).methods();
-		expect(methods.find((m) => m.name === "list")?.metadata).toEqual(["GET"]);
-		expect(methods.find((m) => m.name === "create")?.metadata).toEqual(["POST"]);
+		new Api();
+		expect(Route.first(Api, "ping")).toBe("/ping");
+		expect(Route.hasOwn(Api, "ping")).toBe(true);
+		expect(
+			Route.reader(Api)
+				.methods()
+				.find((m) => m.name === "ping")?.metadata
+		).toBe("/ping");
 	});
 
-	test("should support compose function", () => {
-		const Route = createMethodDecorator({
-			compose: (path: string, method: "GET" | "POST") => ({ path, method }),
-		});
+	test("static methods are eagerly registered (no instantiation needed)", () => {
+		const Cmd = decorate.method<string>();
 
-		class Api {
-			@Route("/users", "GET")
-			getUsers() {
-				return [];
-			}
+		// biome-ignore lint/complexity/noStaticOnlyClass: test fixture requires a class with a single static method
+		class Cli {
+			@Cmd("build")
+			// biome-ignore lint/suspicious/noEmptyBlockStatements: test stub method
+			static build(): void {}
 		}
 
-		const routes = Route.reflect(Api).methods();
-		const route = routes.find((r) => r.name === "getUsers");
-		expect(route?.metadata).toEqual([{ path: "/users", method: "GET" }]);
+		expect(Cmd.first(Cli, "build")).toBe("build");
+		expect(Cmd.hasOwn(Cli, "build")).toBe(true);
 	});
 
-	describe("methodsSingular", () => {
-		test("should unwrap metadata to singular value with kind (no method target field)", () => {
-			const Route = createMethodDecorator<string>();
+	test("inheritance: child sees parent metadata via has(), not hasOwn()", () => {
+		const Route = decorate.method<string>();
 
-			class Api {
-				@Route("/users")
-				list() {
-					return [];
-				}
+		class Base {
+			@Route("/parent")
+			// biome-ignore lint/suspicious/noEmptyBlockStatements: test stub method
+			handle(): void {}
+		}
+		class Child extends Base {}
 
-				@Route("/users/:id")
-				get() {
-					return null;
-				}
-			}
-
-			const entries = Route.reflect(Api).methodsSingular();
-			const list = entries.find((entry) => entry.name === "list");
-			const getEntry = entries.find((entry) => entry.name === "get");
-			expect(list?.metadata).toBe("/users");
-			expect(getEntry?.metadata).toBe("/users/:id");
-			expect(list?.kind).toBe("method");
-			expect("target" in (list ?? {})).toBe(false);
-		});
-
-		test("should omit undecorated methods", () => {
-			const Route = createMethodDecorator<string>();
-
-			class Api {
-				@Route("/decorated")
-				decorated() {
-					return null;
-				}
-
-				plain() {
-					return null;
-				}
-			}
-
-			const entries = Route.reflect(Api).methodsSingular();
-			expect(entries.map((entry) => entry.name)).toEqual(["decorated"]);
-		});
-
-		test("should include static methods", () => {
-			const Task = createMethodDecorator<string>();
-
-			class Worker {
-				@Task("cleanup")
-				static cleanup() {
-					return null;
-				}
-
-				run() {
-					return null;
-				}
-			}
-
-			const entry = Task.reflect(Worker)
-				.methodsSingular()
-				.find((item) => item.name === "cleanup");
-			expect(entry?.metadata).toBe("cleanup");
-		});
+		new Child();
+		expect(Route.has(Child, "handle")).toBe(true);
+		expect(Route.hasOwn(Child, "handle")).toBe(false);
+		expect(Route.hasOwn(Base, "handle")).toBe(true);
 	});
 
-	describe("metadata", () => {
-		test("should return undefined for undecorated method", () => {
-			const Route = createMethodDecorator<string>();
+	test("throws DuplicateMetadataError on second application (all factory keys are unique)", () => {
+		const Cmd = decorate.method<string>({ name: "Cmd" });
 
-			class Api {
-				handler() {
-					return null;
-				}
+		expect(() => {
+			// biome-ignore lint/complexity/noStaticOnlyClass: test fixture requires a class with a single static method
+			class X {
+				@Cmd("a")
+				@Cmd("b")
+				// biome-ignore lint/suspicious/noEmptyBlockStatements: test stub method
+				static run(): void {}
 			}
-
-			expect(Route.metadata(Api, "handler")).toBeUndefined();
-		});
-
-		test("should return the first applied value when decorated multiple times", () => {
-			const Route = createMethodDecorator<string>();
-
-			class Api {
-				@Route("second")
-				@Route("first")
-				handle() {
-					return null;
-				}
-			}
-
-			expect(Route.metadata(Api, "handle")).toBe("first");
-		});
-
-		test("should inherit from an ancestor method", () => {
-			const Route = createMethodDecorator<string>();
-
-			class Parent {
-				@Route("/base")
-				list() {
-					return null;
-				}
-			}
-
-			class Child extends Parent {}
-
-			expect(Route.metadata(Child, "list")).toBe("/base");
-		});
-
-		test("should prefer own metadata over inherited", () => {
-			const Route = createMethodDecorator<string>();
-
-			class Parent {
-				@Route("/parent")
-				list() {
-					return null;
-				}
-			}
-
-			class Child extends Parent {
-				@Route("/child")
-				override list() {
-					return null;
-				}
-			}
-
-			expect(Route.metadata(Child, "list")).toBe("/child");
-			expect(Route.metadata(Parent, "list")).toBe("/parent");
-		});
-
-		test("should resolve static methods", () => {
-			const Task = createMethodDecorator<string>();
-
-			class Worker {
-				run() {
-					return null;
-				}
-
-				@Task("cleanup")
-				static cleanup() {
-					return null;
-				}
-			}
-
-			expect(Task.metadata(Worker, "cleanup")).toBe("cleanup");
-		});
-
-		test("should prefer instance over static when both exist", () => {
-			const Tag = createMethodDecorator<string>();
-
-			class Dual {
-				@Tag("instance")
-				handler() {
-					return null;
-				}
-
-				@Tag("static")
-				static handler() {
-					return null;
-				}
-			}
-
-			expect(Tag.metadata(Dual, "handler")).toBe("instance");
-		});
+			// biome-ignore lint/complexity/noVoid: discard class reference to avoid unused-variable warning in test
+			void X;
+		}).toThrow(AnnotateError);
 	});
 
-	describe("requireMetadata", () => {
-		test("should throw AnnotateError with code, kind, and target when method has no metadata", () => {
-			const Route = createMethodDecorator<string>();
+	test("first() throws UnregisteredClassError when class never decorated", () => {
+		const Route = decorate.method<string>({ name: "Route" });
+		class X {}
+		expect(() => Route.first(X, "anything")).toThrow(UnregisteredClassError);
+	});
 
-			class Api {
-				plain() {
-					return null;
-				}
-			}
+	test("firstOrThrow throws MissingMetadataError when class registered but member not decorated", () => {
+		const Route = decorate.method<string>({ name: "Route" });
+		const Other = decorate.method<string>({ name: "Other" });
 
-			expect(() => Route.requireMetadata(Api, "plain")).toThrow(AnnotateError);
+		class X {
+			@Other("o")
+			// biome-ignore lint/suspicious/noEmptyBlockStatements: test stub method
+			elsewhere(): void {}
+		}
 
-			try {
-				Route.requireMetadata(Api, "missing");
-				throw new Error("expected AnnotateError");
-			} catch (error) {
-				expect(error).toBeInstanceOf(AnnotateError);
-				const err = error as AnnotateError;
-				expect(err.code).toBe("missing");
-				expect(err.kind).toBe("method");
-				expect(err.target).toBe(Api);
-				expect(err.memberName).toBe("missing");
-				expect(err.message).toContain("missing");
-				expect(err.message).toContain("Api");
-			}
-		});
+		new X();
+		expect(() => Route.firstOrThrow(X, "absent")).toThrow(MissingMetadataError);
+		expect(() => Route.firstOrThrow(X, "absent")).toThrow(AnnotateError);
+		expect(() => Route.firstOrThrow(X, "absent")).not.toThrow(UnregisteredClassError);
 	});
 });
