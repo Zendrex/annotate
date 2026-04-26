@@ -1,113 +1,118 @@
-import type { MetadataArray } from "../metadata/types";
+import type { Cardinality } from "../metadata/types";
 
-/**
- * Permissive constructor shape accepted by reflection entry points.
- *
- * Typed as `Function & { prototype: object }` to also admit abstract classes
- * and classes with non-public constructors. Runtime validation in
- * `resolveReflectTarget` rejects plain functions that lack an object prototype.
- */
+/** Function with a non-null object `prototype` — i.e. anything class-shaped. */
 // biome-ignore lint/complexity/noBannedTypes: needed for constructor type
 export type AnyConstructor = Function & { prototype: object };
 
-/** Discriminator for the kind of decorated item in {@link DecoratedItem}. */
-export type DecoratedKind = "class" | "method" | "property" | "constructor-parameter" | "method-parameter";
+export type DecoratedKind = "class" | "method" | "property";
+
+// ── Class ─────────────────────────────────────────────────────────────────────
+
+export interface DecoratedClassUnique<TMeta> {
+	kind: "class";
+	metadata: TMeta;
+	name: string;
+	target: AnyConstructor;
+}
+
+export interface DecoratedClassList<TMeta> {
+	kind: "class";
+	metadata: readonly TMeta[];
+	name: string;
+	target: AnyConstructor;
+}
+
+export type DecoratedClass<TMeta> = DecoratedClassUnique<TMeta> | DecoratedClassList<TMeta>;
+
+// ── Method ────────────────────────────────────────────────────────────────────
 
 /**
- * Common shape shared by class / method / property reflection results.
+ * Method-level decoration with a unique-cardinality key.
  *
- * `metadata` preserves declaration order (bottom-up, matching TypeScript's
- * decorator evaluation). Parameters omit `name` because they are identified by
- * slot rather than identifier.
+ * `static` is `true` for own properties on the constructor and `false` for
+ * properties on the prototype.
  */
-export interface DecoratedBase<TMeta> {
-	kind: DecoratedKind;
-	metadata: MetadataArray<TMeta>;
+export interface DecoratedMethodUnique<TMeta> {
+	kind: "method";
+	metadata: TMeta;
 	name: string | symbol;
+	static: boolean;
+}
+
+/** Method-level decoration with a list-cardinality key. `static` as for {@link DecoratedMethodUnique}. */
+export interface DecoratedMethodList<TMeta> {
+	kind: "method";
+	metadata: readonly TMeta[];
+	name: string | symbol;
+	static: boolean;
+}
+
+/** Internal union; branded keys narrow to one method shape on the public API. */
+export type DecoratedMethod<TMeta> = DecoratedMethodUnique<TMeta> | DecoratedMethodList<TMeta>;
+
+// ── Property ──────────────────────────────────────────────────────────────────
+
+/** Property/field decoration with a unique-cardinality key. `static` as for {@link DecoratedMethodUnique}. */
+export interface DecoratedPropertyUnique<TMeta> {
+	kind: "property";
+	metadata: TMeta;
+	name: string | symbol;
+	static: boolean;
 }
 
 /**
- * Reflection result for a decorated class.
- *
- * `name` is derived from the constructor, with a stable fallback when the
- * class is anonymous. `target` is always a resolved constructor, not an
- * instance or prototype.
+ * Property/field decoration with a list-cardinality key. `metadata` preserves
+ * decoration order. `static` as for {@link DecoratedMethodUnique}.
  */
-export type DecoratedClass<TMeta> = DecoratedBase<TMeta> & {
-	kind: "class";
-	name: string;
-	target: AnyConstructor;
-};
-
-/**
- * Reflection result for a decorated method. `static` is `true` when the
- * method is declared on the constructor rather than the prototype.
- */
-export type DecoratedMethod<TMeta> = DecoratedBase<TMeta> & {
-	kind: "method";
-	static: boolean;
-};
-
-/**
- * Flattened {@link DecoratedMethod} exposing the first metadata entry as a
- * scalar. Suitable for factories whose `unique` option guarantees at most one
- * application; with non-unique decorators only the first value is surfaced.
- */
-export type DecoratedMethodSingle<TMeta> = Omit<DecoratedMethod<TMeta>, "metadata"> & {
-	metadata: TMeta;
-};
-
-/** Reflection result for a decorated property. `static` mirrors {@link DecoratedMethod}. */
-export type DecoratedProperty<TMeta> = DecoratedBase<TMeta> & {
+export interface DecoratedPropertyList<TMeta> {
 	kind: "property";
+	metadata: readonly TMeta[];
+	name: string | symbol;
 	static: boolean;
-};
+}
 
-/** Flattened {@link DecoratedProperty}; see {@link DecoratedMethodSingle} for semantics. */
-export type DecoratedPropertySingle<TMeta> = Omit<DecoratedProperty<TMeta>, "metadata"> & {
-	metadata: TMeta;
-};
+/** Internal union; consumers receive a narrowed shape via branded key overloads. */
+export type DecoratedProperty<TMeta> = DecoratedPropertyUnique<TMeta> | DecoratedPropertyList<TMeta>;
 
-/** Reflection result for a decorated constructor parameter, keyed by slot. */
-export type DecoratedConstructorParameter<TMeta> = Omit<DecoratedBase<TMeta>, "name"> & {
-	kind: "constructor-parameter";
-	parameterIndex: number;
-};
+// ── DecoratedItem ─────────────────────────────────────────────────────────────
+
+/** Selects class-decoration shape from a cardinality brand. */
+export type DecoratedClassFor<TMeta, TCard extends Cardinality> = TCard extends "unique"
+	? DecoratedClassUnique<TMeta>
+	: DecoratedClassList<TMeta>;
+
+/** Selects method-decoration shape from a cardinality brand. */
+export type DecoratedMethodFor<TMeta, TCard extends Cardinality> = TCard extends "unique"
+	? DecoratedMethodUnique<TMeta>
+	: DecoratedMethodList<TMeta>;
+
+/** Selects property-decoration shape from a cardinality brand. */
+export type DecoratedPropertyFor<TMeta, TCard extends Cardinality> = TCard extends "unique"
+	? DecoratedPropertyUnique<TMeta>
+	: DecoratedPropertyList<TMeta>;
 
 /**
- * Reflection result for a decorated method parameter. `methodName` identifies
- * the owning method; `static` is `true` when the method lives on the constructor.
- */
-export type DecoratedMethodParameter<TMeta> = Omit<DecoratedBase<TMeta>, "name"> & {
-	kind: "method-parameter";
-	methodName: string | symbol;
-	parameterIndex: number;
-	static: boolean;
-};
-
-export type DecoratedParameter<TMeta> = DecoratedConstructorParameter<TMeta> | DecoratedMethodParameter<TMeta>;
-
-/** Union of every reflection result shape. Narrow by the `kind` discriminator. */
-export type DecoratedItem<TMeta> =
-	| DecoratedClass<TMeta>
-	| DecoratedMethod<TMeta>
-	| DecoratedProperty<TMeta>
-	| DecoratedParameter<TMeta>;
-
-/**
- * Reflector pre-bound to a specific metadata key and target class. Returned by
- * `factory.reflect(target)` and the underlying factory helpers.
+ * Any reflected item, specialised on cardinality:
  *
- * `methodsSingular` / `propertiesSingular` return the first metadata value per
- * member and are intended for `unique: true` factories; use `methods` /
- * `properties` when multiple applications are expected.
+ * - `DecoratedItem<T, "unique">` — `metadata` is a scalar `T`.
+ * - `DecoratedItem<T, "list">` — `metadata` is `readonly T[]`.
+ * - `DecoratedItem<T>` — union of both.
  */
-export interface ScopedReflector<TMeta> {
-	all(): DecoratedItem<TMeta>[];
-	class(): DecoratedClass<TMeta> | undefined;
-	methods(): DecoratedMethod<TMeta>[];
-	methodsSingular(): DecoratedMethodSingle<TMeta>[];
-	parameters(): DecoratedParameter<TMeta>[];
-	properties(): DecoratedProperty<TMeta>[];
-	propertiesSingular(): DecoratedPropertySingle<TMeta>[];
+export type DecoratedItem<TMeta, TCard extends Cardinality = Cardinality> =
+	| DecoratedClassFor<TMeta, TCard>
+	| DecoratedMethodFor<TMeta, TCard>
+	| DecoratedPropertyFor<TMeta, TCard>;
+
+// ── ScopedReflector ───────────────────────────────────────────────────────────
+
+/**
+ * Read API for a single key bound to a fixed class. Same queries as
+ * {@link Reflector}, with the key elided. `TCard` narrows `metadata` to scalar
+ * (`"unique"`) or array (`"list"`) form.
+ */
+export interface ScopedReflector<TMeta, TCard extends Cardinality = Cardinality> {
+	all(): DecoratedItem<TMeta, TCard>[];
+	class(): DecoratedClassFor<TMeta, TCard> | undefined;
+	methods(): DecoratedMethodFor<TMeta, TCard>[];
+	properties(): DecoratedPropertyFor<TMeta, TCard>[];
 }

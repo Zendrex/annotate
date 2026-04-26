@@ -1,189 +1,177 @@
-import { getMetadata, getMetadataArray, getParameterMap } from "../metadata/store";
+import { UnregisteredClassError } from "../errors";
+import { getKeyCardinality } from "../metadata/cardinality-registry";
+import { collectClassMeta } from "../metadata/class-meta-store";
+import { hasAnyMeta } from "../metadata/has-any-meta";
+import { snapshotMembers } from "../metadata/member-meta-store";
+import { prepare } from "../runtime/prepare";
 import { targetDisplayName } from "./class-name";
 import { resolveReflectTarget } from "./resolve-instance";
-import type { MetadataArray, MetadataKey } from "../metadata/types";
+import type { Cardinality, Ctor, MetadataKey } from "../metadata/types";
 import type {
 	AnyConstructor,
 	DecoratedClass,
+	DecoratedClassFor,
+	DecoratedClassList,
+	DecoratedClassUnique,
 	DecoratedItem,
 	DecoratedMethod,
-	DecoratedParameter,
+	DecoratedMethodFor,
 	DecoratedProperty,
+	DecoratedPropertyFor,
 } from "./types";
 
 /**
- * Reflection over decorator metadata attached to a class. Each query takes a
- * {@link MetadataKey} so a single reflector can answer for multiple factories.
+ * Read API for a single class. Query keys must be minted via `mintUniqueKey`
+ * or `mintListKey`; bare symbols are rejected.
  *
- * Exposed as a type only — construct instances via {@link reflect}. For
- * single-factory usage prefer `factory.reflect(target)`, which returns a
- * {@link ScopedReflector} pre-bound to that factory's key.
+ * The first query triggers {@link prepare}; if no metadata is registered
+ * afterward, {@link UnregisteredClassError} is thrown.
+ *
+ * @throws {UnregisteredClassError} When the class has no metadata at first query.
  */
 export interface Reflector {
-	/** Union of class, methods, properties, and parameters in that order. */
-	all<T>(key: MetadataKey): DecoratedItem<T>[];
-	class<T>(key: MetadataKey): DecoratedClass<T> | undefined;
-	/** Includes static and instance methods; inherited instance methods are deduplicated by name. */
-	methods<T>(key: MetadataKey): DecoratedMethod<T>[];
-	/** Constructor params first, then instance-method params (dedup by method name up the chain), then static-method params. */
-	parameters<T>(key: MetadataKey): DecoratedParameter<T>[];
-	/** Includes static and instance properties; inherited instance properties are deduplicated by name. */
-	properties<T>(key: MetadataKey): DecoratedProperty<T>[];
+	all<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedItem<T, C>[];
+	class<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedClassFor<T, C> | undefined;
+	methods<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedMethodFor<T, C>[];
+	properties<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedPropertyFor<T, C>[];
 }
 
-function isMemberMatch(desc: PropertyDescriptor | undefined, wantFunction: boolean): boolean {
-	const isFunction = !!desc && typeof desc.value === "function";
-	return wantFunction ? isFunction : !isFunction;
+function isMethodLike(ctor: Ctor, name: string | symbol, isStatic: boolean): boolean {
+	const target = isStatic ? (ctor as object) : (ctor.prototype as object);
+	const desc = Object.getOwnPropertyDescriptor(target, name);
+	if (!desc) {
+		return false;
+	}
+	return typeof desc.value === "function";
 }
 
-/** @internal */
 export class ReflectorImpl implements Reflector {
 	private readonly ctor: AnyConstructor;
-	private readonly proto: object;
+	private registered = false;
+	private readonly methodLikeCache = new Map<string | symbol, boolean>();
 
 	constructor(target: AnyConstructor) {
 		this.ctor = target;
-		this.proto = target.prototype;
 	}
 
-	all<T>(key: MetadataKey): DecoratedItem<T>[] {
-		const c = this.class<T>(key);
-		return [...(c ? [c] : []), ...this.methods<T>(key), ...this.properties<T>(key), ...this.parameters<T>(key)];
+	all<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedItem<T, C>[] {
+		this.ensureRegistered();
+		const c = this.collectClass<T>(key);
+		const methods = this.collectMethods<T>(key);
+		const properties = this.collectProperties<T>(key);
+		const items = c ? [c, ...methods, ...properties] : [...methods, ...properties];
+		return items as DecoratedItem<T, C>[];
 	}
 
-	class<T>(key: MetadataKey): DecoratedClass<T> | undefined {
-		const metadata = getMetadata<MetadataArray<T>>(key, this.ctor);
-		if (!metadata || metadata.length === 0) {
+	class<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedClassFor<T, C> | undefined {
+		this.ensureRegistered();
+		return this.collectClass<T>(key) as DecoratedClassFor<T, C> | undefined;
+	}
+
+	methods<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedMethodFor<T, C>[] {
+		this.ensureRegistered();
+		return this.collectMethods<T>(key) as DecoratedMethodFor<T, C>[];
+	}
+
+	properties<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedPropertyFor<T, C>[] {
+		this.ensureRegistered();
+		return this.collectProperties<T>(key) as DecoratedPropertyFor<T, C>[];
+	}
+
+	private collectClass<T>(key: MetadataKey<T>): DecoratedClass<T> | undefined {
+		const list = collectClassMeta<T>(this.ctor, key);
+		if (list.length === 0) {
 			return;
+		}
+		const cardinality = getKeyCardinality(key);
+		if (cardinality === "unique") {
+			return {
+				kind: "class",
+				name: targetDisplayName(this.ctor),
+				// Store invariant: unique-cardinality sites hold at most one value.
+				metadata: list[0] as T,
+				target: this.ctor,
+			} satisfies DecoratedClassUnique<T>;
 		}
 		return {
 			kind: "class",
 			name: targetDisplayName(this.ctor),
-			metadata,
+			metadata: list,
 			target: this.ctor,
-		};
+		} satisfies DecoratedClassList<T>;
 	}
 
-	methods<T>(key: MetadataKey): DecoratedMethod<T>[] {
+	private collectMethods<T>(key: MetadataKey<T>): DecoratedMethod<T>[] {
 		return this.collectMembers<T, DecoratedMethod<T>>(key, "method", true);
 	}
 
-	properties<T>(key: MetadataKey): DecoratedProperty<T>[] {
+	private collectProperties<T>(key: MetadataKey<T>): DecoratedProperty<T>[] {
 		return this.collectMembers<T, DecoratedProperty<T>>(key, "property", false);
 	}
 
-	parameters<T>(key: MetadataKey): DecoratedParameter<T>[] {
-		const results: DecoratedParameter<T>[] = [];
-		this.collectParams(key, this.ctor, "constructor", results, true, undefined, false);
-		const seen = new Set<string | symbol>();
-		for (const { target, name } of this.getKeysWithTarget(this.proto)) {
-			if (seen.has(name)) {
-				continue;
-			}
-			if (this.collectParams(key, target, name, results, false, name, false)) {
-				seen.add(name);
-			}
-		}
-		for (const name of this.getOwnKeys(this.ctor)) {
-			this.collectParams(key, this.ctor, name, results, false, name, true);
-		}
-		return results;
-	}
-
 	private collectMembers<T, R extends DecoratedMethod<T> | DecoratedProperty<T>>(
-		key: MetadataKey,
+		key: MetadataKey<T>,
 		kind: "method" | "property",
-		wantFunction: boolean
+		wantMethod: boolean
 	): R[] {
-		const results: R[] = [];
-		const seen = new Set<string | symbol>();
-		for (const { target, name } of this.getKeysWithTarget(this.proto)) {
-			if (seen.has(name)) {
+		const snapshot = snapshotMembers(this.ctor, key);
+		const cardinality = getKeyCardinality(key);
+		const out: R[] = [];
+		for (const [name, entry] of snapshot) {
+			if (this.isMethod(name, entry.static) !== wantMethod) {
 				continue;
 			}
-			const desc = Object.getOwnPropertyDescriptor(target, name);
-			if (!isMemberMatch(desc, wantFunction)) {
-				continue;
-			}
-			const metadata = getMetadataArray<T>(key, target, name);
-			if (metadata.length > 0) {
-				seen.add(name);
-				results.push({ kind, name, static: false, metadata } as R);
-			}
+			out.push({
+				kind,
+				name,
+				static: entry.static,
+				metadata: cardinality === "unique" ? (entry.values[0] as T) : (entry.values as T[]),
+			} as unknown as R);
 		}
-		for (const name of this.getOwnKeys(this.ctor)) {
-			const desc = Object.getOwnPropertyDescriptor(this.ctor, name);
-			if (!isMemberMatch(desc, wantFunction)) {
-				continue;
-			}
-			const metadata = getMetadataArray<T>(key, this.ctor, name);
-			if (metadata.length > 0) {
-				results.push({ kind, name, static: true, metadata } as R);
-			}
-		}
-		return results;
+		return out;
 	}
 
-	private collectParams<T>(
-		key: MetadataKey,
-		target: object,
-		name: string | symbol,
-		results: DecoratedParameter<T>[],
-		isCtor: boolean,
-		methodName: string | symbol | undefined,
-		isStatic: boolean
-	): boolean {
-		const map = getParameterMap<T>(key, target, isCtor ? undefined : name);
-		if (!(map instanceof Map)) {
-			return false;
+	private isMethod(name: string | symbol, isStatic: boolean): boolean {
+		const cached = this.methodLikeCache.get(name);
+		if (cached !== undefined) {
+			return cached;
 		}
-		let added = false;
-		for (const [index, metadata] of map) {
-			if (metadata.length > 0) {
-				added = true;
-				if (isCtor) {
-					results.push({ kind: "constructor-parameter", parameterIndex: index, metadata });
-				} else {
-					results.push({
-						kind: "method-parameter",
-						methodName: methodName as string | symbol,
-						parameterIndex: index,
-						static: isStatic,
-						metadata,
-					});
-				}
-			}
-		}
-		return added;
+		const result = isMethodLike(this.ctor, name, isStatic);
+		this.methodLikeCache.set(name, result);
+		return result;
 	}
 
-	private getOwnKeys(target: object): (string | symbol)[] {
-		return [...Object.getOwnPropertyNames(target), ...Object.getOwnPropertySymbols(target)].filter(
-			(k) => k !== "constructor" && k !== "prototype"
-		);
-	}
-
-	private *getKeysWithTarget(target: object): Generator<{ target: object; name: string | symbol }> {
-		let current: object | null = target;
-		while (current !== null && current !== Object.prototype) {
-			for (const name of this.getOwnKeys(current)) {
-				yield { target: current, name };
-			}
-			current = Object.getPrototypeOf(current);
+	private ensureRegistered(): void {
+		if (this.registered) {
+			return;
 		}
+		prepare(this.ctor);
+		if (!hasAnyMeta(this.ctor)) {
+			throw new UnregisteredClassError(this.ctor);
+		}
+		this.registered = true;
 	}
 }
 
+// Per-ctor cache keeps the registration short-circuit and methodLikeCache warm
+// across repeated reflect() calls; without it, every call rebuilds both.
+const reflectorCache = new WeakMap<AnyConstructor, ReflectorImpl>();
+
 /**
- * Create a {@link Reflector} for a class or instance.
+ * Returns a {@link Reflector} bound to the resolved class. Accepts a
+ * constructor or instance; instances are normalised via
+ * {@link resolveReflectTarget}. The reflector is cached per constructor and
+ * lazily invokes {@link prepare} on its first query.
  *
- * The target is normalized to its constructor: classes pass through, while
- * instances resolve via their `constructor` property. Plain objects, `Object`
- * itself, and arrow functions lack a usable constructor and cause a `TypeError`
- * with a stable `reflect(target):` prefix for matching in tests.
- *
- * @throws {TypeError} When `target` cannot be resolved to a concrete class constructor
+ * @throws {TypeError} If `target` does not resolve to a usable constructor.
  */
 export function reflect(target: object): Reflector {
-	return new ReflectorImpl(resolveReflectTarget(target));
+	const ctor = resolveReflectTarget(target);
+	const cached = reflectorCache.get(ctor);
+	if (cached) {
+		return cached;
+	}
+	const impl = new ReflectorImpl(ctor);
+	reflectorCache.set(ctor, impl);
+	return impl;
 }

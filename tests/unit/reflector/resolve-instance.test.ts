@@ -1,8 +1,6 @@
-import "reflect-metadata";
-
 import { describe, expect, test } from "bun:test";
 
-import { reflect } from "../../../src";
+import { reflect, UnregisteredClassError } from "../../../src";
 
 const REFLECT_PROTOTYPE_PATTERN = /^reflect\(target\):.*prototype/;
 const OBJECT_MENTION = /Object/;
@@ -13,8 +11,14 @@ describe("reflect() target resolution", () => {
 		const arrow = (): void => {
 			return;
 		};
-		expect(() => reflect(arrow as unknown as object)).toThrow(TypeError);
-		expect(() => reflect(arrow as unknown as object)).toThrow(REFLECT_PROTOTYPE_PATTERN);
+		let err: unknown;
+		try {
+			reflect(arrow as unknown as object);
+		} catch (caught) {
+			err = caught;
+		}
+		expect(err).toBeInstanceOf(TypeError);
+		expect(String((err as Error).message)).toMatch(REFLECT_PROTOTYPE_PATTERN);
 	});
 
 	test("rejects Object constructor", () => {
@@ -32,9 +36,9 @@ describe("reflect() target resolution", () => {
 		expect(() => reflect(Object.create(null) as object)).toThrow(CONSTRUCTOR_MENTION);
 	});
 
-	test("reflect(Array) resolves without throwing", () => {
+	test("reflect(Array) constructs but queries throw UnregisteredClassError (no annotate metadata)", () => {
 		expect(() => reflect(Array as unknown as object)).not.toThrow();
 		const r = reflect(Array as unknown as object);
-		expect(r.class(Symbol("k"))).toBeUndefined();
+		expect(() => r.class(Symbol("k") as any)).toThrow(UnregisteredClassError);
 	});
 });
