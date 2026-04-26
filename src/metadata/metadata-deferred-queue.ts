@@ -51,21 +51,21 @@ export function flushFor(ctor: Ctor, correlation: object | null): void {
 	let index = 0;
 	try {
 		for (; index < list.length; index++) {
-			const d = list[index] as Deferred;
-			if (d.validators && d.validators.length > 0) {
+			const entry = list[index] as Deferred;
+			if (entry.validators && entry.validators.length > 0) {
 				const context: DeferredValidateContext = {
 					target: ctor,
-					memberName: d.name,
-					kind: d.kind,
-					static: d.static,
+					memberName: entry.name,
+					kind: entry.kind,
+					static: entry.static,
 				};
-				for (const validator of d.validators) {
-					validator(d.meta, context);
+				for (const validator of entry.validators) {
+					validator(entry.meta, context);
 				}
 			}
-			appendMemberMeta(ctor, d.key, d.name, d.meta, d.token, {
-				static: d.static,
-				kind: d.kind,
+			appendMemberMeta(ctor, entry.key, entry.name, entry.meta, entry.token, {
+				static: entry.static,
+				kind: entry.kind,
 			});
 		}
 	} catch (error) {
