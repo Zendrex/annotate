@@ -10,7 +10,7 @@ const classMetaStore = new WeakMap<Ctor, ClassBucket>();
 /**
  * Probe used by `hasAnyMeta` to ask "does this exact constructor link have any
  * class metadata?" without walking the prototype chain. Exported only for the
- * combined chain walk in {@link "./has-any-meta"}.
+ * combined chain walk in {@link hasAnyMeta}.
  */
 export function hasOwnAnyClassMeta(ctor: Ctor): boolean {
 	const bucket = classMetaStore.get(ctor);

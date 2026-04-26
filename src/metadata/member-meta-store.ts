@@ -13,7 +13,7 @@ const committedTokens = new WeakMap<Ctor, Set<symbol>>();
 /**
  * Probe used by `hasAnyMeta` to ask "does this exact constructor link have any
  * member metadata?" without walking the prototype chain. Exported only for the
- * combined chain walk in {@link "./has-any-meta"}.
+ * combined chain walk in {@link hasAnyMeta}.
  */
 export function hasOwnAnyMemberMeta(ctor: Ctor): boolean {
 	const bucket = memberMetaStore.get(ctor);
