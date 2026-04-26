@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
 	AnnotateError,
 	AnnotateErrorCode,
+	DuplicateMetadataError,
 	InvalidDecorationTargetError,
 	MissingMetadataError,
 	UnregisteredClassError,
@@ -201,5 +202,73 @@ describe("UnregisteredMetadataKeyError", () => {
 		expect(err.key).toBe(key);
 		expect(err.message.length).toBeGreaterThan(0);
 		expect(err.message).toContain("Widget");
+	});
+});
+
+describe("DuplicateMetadataError", () => {
+	test("class-level message and inherited fields", () => {
+		class Subject {}
+		const err = new DuplicateMetadataError(Subject, KEY, "unique", "class");
+
+		expect(err).toBeInstanceOf(Error);
+		expect(err).toBeInstanceOf(AnnotateError);
+		expect(err).toBeInstanceOf(DuplicateMetadataError);
+		expect(err.name).toBe("DuplicateMetadataError");
+		expect(err.code).toBe(AnnotateErrorCode.DUPLICATE);
+		expect(err.key).toBe(KEY);
+		expect(err.kind).toBe("class");
+		expect(err.target).toBe(Subject);
+		expect(err.memberName).toBeUndefined();
+		expect(err.message).toContain("Subject");
+		expect(err.message).toContain("unique");
+		expect(err.message).toContain("test-key");
+	});
+
+	test("member-level retains memberName and slot in message", () => {
+		class Subject {}
+		const err = new DuplicateMetadataError(Subject, KEY, "list", "property", "field");
+
+		expect(err.memberName).toBe("field");
+		expect(err.message).toContain("Subject.field");
+		expect(err.message).toContain("list");
+	});
+});
+
+describe("error class identity preservation (factory invariant)", () => {
+	test("each subclass has its constructor name and instance .name aligned", () => {
+		class Subject {}
+		class Base {}
+		const cases: Array<{ instance: AnnotateError; ctorName: string }> = [
+			{ instance: new UnregisteredClassError(Subject), ctorName: "UnregisteredClassError" },
+			{ instance: new UnregisteredMetadataKeyError(Subject, KEY), ctorName: "UnregisteredMetadataKeyError" },
+			{
+				instance: new DuplicateMetadataError(Subject, KEY, "unique", "class"),
+				ctorName: "DuplicateMetadataError",
+			},
+			{
+				instance: new MissingMetadataError({ target: Subject, key: KEY, label: "X", kind: "class" }),
+				ctorName: "MissingMetadataError",
+			},
+			{
+				instance: new InvalidDecorationTargetError({
+					label: "X",
+					target: Subject,
+					requiredBase: Base,
+					kind: "class",
+					key: KEY,
+				}),
+				ctorName: "InvalidDecorationTargetError",
+			},
+			{
+				instance: new ValidationError({ label: "X", target: Subject, reason: "r", kind: "class", key: KEY }),
+				ctorName: "ValidationError",
+			},
+		];
+
+		for (const { instance, ctorName } of cases) {
+			expect(instance).toBeInstanceOf(AnnotateError);
+			expect(instance.name).toBe(ctorName);
+			expect(instance.constructor.name).toBe(ctorName);
+		}
 	});
 });

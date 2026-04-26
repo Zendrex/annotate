@@ -75,13 +75,63 @@ export class AnnotateError extends Error {
 	}
 }
 
+type AnnotateErrorContext = Pick<AnnotateErrorOptions, "target"> &
+	Partial<Pick<AnnotateErrorOptions, "key" | "kind" | "memberName" | "cause">>;
+
+interface AnnotateErrorSpec<TArgs> {
+	code: AnnotateErrorCode;
+	extract: (args: TArgs) => AnnotateErrorContext;
+	format: (args: TArgs) => string;
+	name: string;
+}
+
+/**
+ * Builds a concrete `AnnotateError` subclass from a uniform spec. The returned
+ * class accepts a single `args` value, derives the context fields and message
+ * via the spec, and forwards to {@link AnnotateError}'s constructor. The
+ * subclass `.name` and instance `.name` both equal `spec.name`.
+ */
+export function defineAnnotateError<TArgs>(spec: AnnotateErrorSpec<TArgs>): new (args: TArgs) => AnnotateError {
+	class DerivedAnnotateError extends AnnotateError {
+		override readonly name: string = spec.name;
+
+		constructor(args: TArgs) {
+			const context = spec.extract(args);
+			super({
+				code: spec.code,
+				message: spec.format(args),
+				target: context.target,
+				key: context.key,
+				kind: context.kind,
+				memberName: context.memberName,
+				cause: context.cause,
+			});
+		}
+	}
+
+	Object.defineProperty(DerivedAnnotateError, "name", { value: spec.name, configurable: true });
+	return DerivedAnnotateError;
+}
+
+interface DuplicateMetadataArgs {
+	cardinality: Cardinality;
+	ctor: AnyConstructor;
+	key: MetadataKey;
+	kind: DecoratedKind;
+	memberName?: string | symbol;
+}
+
 /**
  * Thrown when a factory would attach metadata to a class or member that already
  * has metadata for that factory. `code` is {@link AnnotateErrorCode.DUPLICATE}.
  */
-export class DuplicateMetadataError extends AnnotateError {
-	override readonly name: string = "DuplicateMetadataError";
-
+export class DuplicateMetadataError extends defineAnnotateError<DuplicateMetadataArgs>({
+	name: "DuplicateMetadataError",
+	code: AnnotateErrorCode.DUPLICATE,
+	format: ({ ctor, key, cardinality, memberName }) =>
+		`duplicate decoration [${cardinality} key "${keyDisplayName(key)}"]: "${formatSlot(ctor, memberName)}" already has metadata for this factory`,
+	extract: ({ ctor, key, kind, memberName }) => ({ target: ctor, key, kind, memberName }),
+}) {
 	/**
 	 * @param ctor - The decorated class
 	 * @param key - Metadata key in conflict
@@ -96,17 +146,16 @@ export class DuplicateMetadataError extends AnnotateError {
 		kind: DecoratedKind,
 		memberName?: string | symbol
 	) {
-		const slot = formatSlot(ctor, memberName);
-		const keyLabel = keyDisplayName(key);
-		super({
-			code: AnnotateErrorCode.DUPLICATE,
-			key,
-			kind,
-			target: ctor,
-			memberName,
-			message: `duplicate decoration [${cardinality} key "${keyLabel}"]: "${slot}" already has metadata for this factory`,
-		});
+		super({ ctor, key, cardinality, kind, memberName });
 	}
+}
+
+interface MissingMetadataArgs {
+	key: MetadataKey;
+	kind: DecoratedKind;
+	label: string;
+	memberName?: string | symbol;
+	target: AnyConstructor;
 }
 
 /**
@@ -114,65 +163,52 @@ export class DuplicateMetadataError extends AnnotateError {
  * requested factory on a registered class or member. `code` is
  * {@link AnnotateErrorCode.MISSING}.
  */
-export class MissingMetadataError extends AnnotateError {
-	override readonly name: string = "MissingMetadataError";
+export const MissingMetadataError = defineAnnotateError<MissingMetadataArgs>({
+	name: "MissingMetadataError",
+	code: AnnotateErrorCode.MISSING,
+	format: ({ target, label, memberName }) => `@${label} metadata missing on "${formatSlot(target, memberName)}"`,
+	extract: ({ target, key, kind, memberName }) => ({ target, key, kind, memberName }),
+});
 
-	/**
-	 * @param args.target - Class the read was performed on
-	 * @param args.key - Metadata key whose entry was missing
-	 * @param args.label - Decorator name shown in the message
-	 * @param args.kind - Decoration kind (class vs member)
-	 * @param args.memberName - Set for member-level reads; omit for class-level
-	 */
-	constructor(args: {
-		target: AnyConstructor;
-		key: MetadataKey;
-		label: string;
-		kind: DecoratedKind;
-		memberName?: string | symbol;
-	}) {
-		const slot = formatSlot(args.target, args.memberName);
-		super({
-			code: AnnotateErrorCode.MISSING,
-			key: args.key,
-			kind: args.kind,
-			memberName: args.memberName,
-			target: args.target,
-			message: `@${args.label} metadata missing on "${slot}"`,
-		});
-	}
-}
+export interface MissingMetadataError extends AnnotateError {}
 
 /**
  * Thrown when metadata is read for a class that was not registered (no
  * matching decoration / prepare). `code` is {@link AnnotateErrorCode.UNREGISTERED}.
  */
-export class UnregisteredClassError extends AnnotateError {
-	override readonly name: string = "UnregisteredClassError";
+export const UnregisteredClassError = defineAnnotateError<AnyConstructor>({
+	name: "UnregisteredClassError",
+	code: AnnotateErrorCode.UNREGISTERED,
+	format: (target) =>
+		`@zendrex/annotate: no registered metadata for "${targetDisplayName(target)}". ` +
+		"Causes: missing decorator import, bundler tree-shake of the decoration module, " +
+		`legacy "experimentalDecorators: true" emit, or instance-member-only class with ` +
+		"no class decorator (call prepare(ctor) before reflect).",
+	extract: (target) => ({ target }),
+});
 
-	/**
-	 * @param target - The class that had no registered metadata
-	 */
-	constructor(target: AnyConstructor) {
-		super({
-			code: AnnotateErrorCode.UNREGISTERED,
-			target,
-			message:
-				`@zendrex/annotate: no registered metadata for "${targetDisplayName(target)}". ` +
-				"Causes: missing decorator import, bundler tree-shake of the decoration module, " +
-				`legacy "experimentalDecorators: true" emit, or instance-member-only class with ` +
-				"no class decorator (call prepare(ctor) before reflect).",
-		});
-	}
+export interface UnregisteredClassError extends AnnotateError {}
+
+interface InvalidDecorationTargetArgs {
+	key: MetadataKey;
+	kind: DecoratedKind;
+	label: string;
+	memberName?: string | symbol;
+	requiredBase: AnyConstructor;
+	target: AnyConstructor;
 }
 
 /**
  * Thrown when a decorator is applied to a class (or member) that does not
  * extend the required base. `code` is {@link AnnotateErrorCode.INVALID_TARGET}.
  */
-export class InvalidDecorationTargetError extends AnnotateError {
-	override readonly name: string = "InvalidDecorationTargetError";
-
+export class InvalidDecorationTargetError extends defineAnnotateError<InvalidDecorationTargetArgs>({
+	name: "InvalidDecorationTargetError",
+	code: AnnotateErrorCode.INVALID_TARGET,
+	format: ({ label, target, requiredBase, memberName }) =>
+		`@${label} cannot decorate ${formatSlot(target, memberName)}: not a subclass of ${targetDisplayName(requiredBase)}`,
+	extract: ({ target, key, kind, memberName }) => ({ target, key, kind, memberName }),
+}) {
 	/** The superclass the decorated type was expected to extend. */
 	readonly requiredBase: AnyConstructor;
 
@@ -184,24 +220,8 @@ export class InvalidDecorationTargetError extends AnnotateError {
 	 * @param args.memberName - Member under decoration, if applicable
 	 * @param args.key - Metadata key for the factory
 	 */
-	constructor(args: {
-		label: string;
-		target: AnyConstructor;
-		requiredBase: AnyConstructor;
-		kind: DecoratedKind;
-		memberName?: string | symbol;
-		key: MetadataKey;
-	}) {
-		const slot = formatSlot(args.target, args.memberName);
-		const baseName = targetDisplayName(args.requiredBase);
-		super({
-			code: AnnotateErrorCode.INVALID_TARGET,
-			key: args.key,
-			kind: args.kind,
-			memberName: args.memberName,
-			target: args.target,
-			message: `@${args.label} cannot decorate ${slot}: not a subclass of ${baseName}`,
-		});
+	constructor(args: InvalidDecorationTargetArgs) {
+		super(args);
 		this.requiredBase = args.requiredBase;
 	}
 }
@@ -211,23 +231,31 @@ export class InvalidDecorationTargetError extends AnnotateError {
  * cardinality registry — i.e. a key not minted via `mintUniqueKey` or `mintListKey`.
  * `code` is {@link AnnotateErrorCode.UNREGISTERED_KEY}.
  */
-export class UnregisteredMetadataKeyError extends AnnotateError {
-	override readonly name: string = "UnregisteredMetadataKeyError";
-
+export class UnregisteredMetadataKeyError extends defineAnnotateError<{ target: AnyConstructor; key: MetadataKey }>({
+	name: "UnregisteredMetadataKeyError",
+	code: AnnotateErrorCode.UNREGISTERED_KEY,
+	format: ({ target, key }) =>
+		`@zendrex/annotate: metadata key ${String(key)} used on "${targetDisplayName(target)}" ` +
+		"was not minted via mintUniqueKey() or mintListKey() and has no registered cardinality.",
+	extract: ({ target, key }) => ({ target, key }),
+}) {
 	/**
 	 * @param target - The class whose store was targeted
 	 * @param key - The unregistered metadata key
 	 */
 	constructor(target: AnyConstructor, key: MetadataKey) {
-		super({
-			code: AnnotateErrorCode.UNREGISTERED_KEY,
-			target,
-			key,
-			message:
-				`@zendrex/annotate: metadata key ${String(key)} used on "${targetDisplayName(target)}" ` +
-				"was not minted via mintUniqueKey() or mintListKey() and has no registered cardinality.",
-		});
+		super({ target, key });
 	}
+}
+
+interface ValidationArgs {
+	cause?: unknown;
+	key: MetadataKey;
+	kind: DecoratedKind;
+	label: string;
+	memberName?: string | symbol;
+	reason: string;
+	target: AnyConstructor;
 }
 
 /**
@@ -235,36 +263,14 @@ export class UnregisteredMetadataKeyError extends AnnotateError {
  * validation. `code` is {@link AnnotateErrorCode.VALIDATION}; optional
  * `cause` chains an underlying error.
  */
-export class ValidationError extends AnnotateError {
-	override readonly name: string = "ValidationError";
+export const ValidationError = defineAnnotateError<ValidationArgs>({
+	name: "ValidationError",
+	code: AnnotateErrorCode.VALIDATION,
+	format: ({ label, target, reason, memberName }) => {
+		const slotPrefix = memberName === undefined ? "" : ` on ${formatSlot(target, memberName)}`;
+		return `@${label} validation failed${slotPrefix}: ${reason}`;
+	},
+	extract: ({ target, key, kind, memberName, cause }) => ({ target, key, kind, memberName, cause }),
+});
 
-	/**
-	 * @param args.label - Decorator or factory name in the message
-	 * @param args.target - Class where validation failed
-	 * @param args.reason - Human-readable failure detail
-	 * @param args.kind - Decoration kind
-	 * @param args.memberName - Member under validation, if applicable
-	 * @param args.key - Metadata key for the factory
-	 * @param args.cause - Optional error forwarded to {@link AnnotateError} / `Error.cause`
-	 */
-	constructor(args: {
-		label: string;
-		target: AnyConstructor;
-		reason: string;
-		kind: DecoratedKind;
-		memberName?: string | symbol;
-		key: MetadataKey;
-		cause?: unknown;
-	}) {
-		const slotPrefix = args.memberName === undefined ? "" : ` on ${formatSlot(args.target, args.memberName)}`;
-		super({
-			code: AnnotateErrorCode.VALIDATION,
-			key: args.key,
-			kind: args.kind,
-			memberName: args.memberName,
-			target: args.target,
-			message: `@${args.label} validation failed${slotPrefix}: ${args.reason}`,
-			cause: args.cause,
-		});
-	}
-}
+export interface ValidationError extends AnnotateError {}
