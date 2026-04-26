@@ -47,7 +47,7 @@ export type ClassBucket = Map<symbol, unknown[]>;
  */
 export interface MemberEntry {
 	readonly static: boolean;
-	readonly values: unknown[];
+	values: unknown[];
 }
 
 /**
