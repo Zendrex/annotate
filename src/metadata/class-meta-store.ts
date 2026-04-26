@@ -1,7 +1,7 @@
 import { DuplicateMetadataError, UnregisteredMetadataKeyError } from "../errors";
-import { walkPrototypeChain } from "../runtime/prototype-chain";
 import { getKeyCardinality } from "./cardinality-registry";
 import { getOrCreate } from "./get-or-create";
+import { chainHasNonEmpty, collectFromChain, firstOnChain } from "./store-walk";
 import type { AnyConstructor } from "../reflector/types";
 import type { ClassBucket, Ctor, MetadataKey } from "./types";
 
@@ -48,59 +48,32 @@ export function appendClassMeta<T>(ctor: Ctor, key: symbol, value: T): void {
  * Gathers all values for `key` from `ctor` up the prototype chain, subclass first (own on each level, then super).
  */
 export function collectClassMeta<T>(ctor: Ctor, key: symbol): T[] {
-	const out: T[] = [];
-	walkPrototypeChain(ctor, (current) => {
-		const list = classMetaStore.get(current)?.get(key) as T[] | undefined;
-		if (list) {
-			for (const item of list) {
-				out.push(item);
-			}
-		}
-	});
-	return out;
+	return collectFromChain<T>(ctor, (current) => classMetaStore.get(current)?.get(key) as T[] | undefined);
 }
 
 /**
  * True if any class in the prototype chain of `ctor` has any class-level metadata in the store.
  */
 export function hasAnyClassMeta(ctor: Ctor): boolean {
-	let found = false;
-	walkPrototypeChain(ctor, (current) => {
+	return chainHasNonEmpty(ctor, (current) => {
 		const bucket = classMetaStore.get(current);
-		if (bucket && bucket.size > 0) {
-			found = true;
-			return true;
-		}
+		return !!bucket && bucket.size > 0;
 	});
-	return found;
 }
 
 /**
  * First value for `key` found when walking from `ctor` up the chain (subclass before superclass).
  */
 export function firstClassMetaForKey<T>(ctor: Ctor, key: symbol): T | undefined {
-	let result: T | undefined;
-	walkPrototypeChain(ctor, (current) => {
-		const list = classMetaStore.get(current)?.get(key) as T[] | undefined;
-		if (list && list.length > 0) {
-			result = list[0];
-			return true;
-		}
-	});
-	return result;
+	return firstOnChain<T>(ctor, (current) => classMetaStore.get(current)?.get(key) as T[] | undefined);
 }
 
 /**
  * True if any class in the chain has at least one own value for `key`.
  */
 export function hasAnyClassMetaForKey(ctor: Ctor, key: symbol): boolean {
-	let found = false;
-	walkPrototypeChain(ctor, (current) => {
+	return chainHasNonEmpty(ctor, (current) => {
 		const list = classMetaStore.get(current)?.get(key);
-		if (list && list.length > 0) {
-			found = true;
-			return true;
-		}
+		return !!list && list.length > 0;
 	});
-	return found;
 }

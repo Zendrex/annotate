@@ -2,6 +2,7 @@ import { DuplicateMetadataError, UnregisteredMetadataKeyError } from "../errors"
 import { walkPrototypeChain } from "../runtime/prototype-chain";
 import { getKeyCardinality } from "./cardinality-registry";
 import { getOrCreate } from "./get-or-create";
+import { chainHasNonEmpty, collectFromChain, firstOnChain } from "./store-walk";
 import type { AnyConstructor } from "../reflector/types";
 import type { Ctor, MemberBucket, MemberKind, MetadataKey } from "./types";
 
@@ -84,16 +85,7 @@ export function getMemberStatic(ctor: Ctor, name: string | symbol): boolean {
  * All values for this member+key from `ctor` up the chain (subclass first at each level).
  */
 export function collectMemberMeta<T>(ctor: Ctor, key: symbol, name: string | symbol): T[] {
-	const out: T[] = [];
-	walkPrototypeChain(ctor, (current) => {
-		const list = memberMetaStore.get(current)?.get(key)?.get(name) as T[] | undefined;
-		if (list) {
-			for (const item of list) {
-				out.push(item);
-			}
-		}
-	});
-	return out;
+	return collectFromChain<T>(ctor, (current) => memberMetaStore.get(current)?.get(key)?.get(name) as T[] | undefined);
 }
 
 /**
@@ -116,43 +108,25 @@ export function collectMemberNames(ctor: Ctor, key: symbol): Set<string | symbol
  * First value for `key`+`name` when walking from `ctor` up the chain.
  */
 export function firstMemberMetaForKey<T>(ctor: Ctor, key: symbol, name: string | symbol): T | undefined {
-	let result: T | undefined;
-	walkPrototypeChain(ctor, (current) => {
-		const list = memberMetaStore.get(current)?.get(key)?.get(name) as T[] | undefined;
-		if (list && list.length > 0) {
-			result = list[0];
-			return true;
-		}
-	});
-	return result;
+	return firstOnChain<T>(ctor, (current) => memberMetaStore.get(current)?.get(key)?.get(name) as T[] | undefined);
 }
 
 /**
  * True if any class in the chain has any member metadata stored.
  */
 export function hasAnyMemberMeta(ctor: Ctor): boolean {
-	let found = false;
-	walkPrototypeChain(ctor, (current) => {
+	return chainHasNonEmpty(ctor, (current) => {
 		const bucket = memberMetaStore.get(current);
-		if (bucket && bucket.size > 0) {
-			found = true;
-			return true;
-		}
+		return !!bucket && bucket.size > 0;
 	});
-	return found;
 }
 
 /**
  * True if any class in the chain has at least one value for this member+key.
  */
 export function hasAnyMemberMetaForKey(ctor: Ctor, key: symbol, name: string | symbol): boolean {
-	let found = false;
-	walkPrototypeChain(ctor, (current) => {
+	return chainHasNonEmpty(ctor, (current) => {
 		const list = memberMetaStore.get(current)?.get(key)?.get(name);
-		if (list && list.length > 0) {
-			found = true;
-			return true;
-		}
+		return !!list && list.length > 0;
 	});
-	return found;
 }
