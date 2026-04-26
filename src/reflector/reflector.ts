@@ -164,11 +164,25 @@ export class ReflectorImpl implements Reflector {
 	}
 }
 
+// Per-ctor cache keeps the registration short-circuit and methodLikeCache warm
+// across repeated reflect() calls; without it, every call rebuilds both.
+const reflectorCache = new WeakMap<AnyConstructor, ReflectorImpl>();
+
 /**
  * Returns a reflector for the class of `target` (instances resolve to their
  * constructor). Call {@link prepare} on the class earlier if the decoration
  * might not yet be registered (e.g. instance-only classes without a class decorator).
+ *
+ * Reflectors are cached per constructor, so repeated calls reuse the same
+ * instance (and its internal caches).
  */
 export function reflect(target: object): Reflector {
-	return new ReflectorImpl(resolveReflectTarget(target));
+	const ctor = resolveReflectTarget(target);
+	const cached = reflectorCache.get(ctor);
+	if (cached) {
+		return cached;
+	}
+	const impl = new ReflectorImpl(ctor);
+	reflectorCache.set(ctor, impl);
+	return impl;
 }
