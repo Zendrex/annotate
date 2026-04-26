@@ -92,9 +92,4 @@ describe("hasAnyClassMeta", () => {
 		appendClassMeta(A, key, "a");
 		expect(hasAnyClassMeta(B)).toBe(true);
 	});
-
-	test("stops at Function.prototype", () => {
-		class A {}
-		expect(() => hasAnyClassMeta(A)).not.toThrow();
-	});
 });

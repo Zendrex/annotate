@@ -20,6 +20,11 @@ describe("intercept.accessor", () => {
 		const b = new Box();
 		expect(b.value).toBe("[a]:v");
 		expect(Trace.first(Box, "value")).toBe("a");
+		expect(
+			Trace.reader(Box)
+				.properties()
+				.find((p) => p.name === "value")?.metadata
+		).toBe("a");
 	});
 
 	test("intercepts setter side", () => {

@@ -51,9 +51,6 @@ export function createMethodDecorator<
  * `key`, reader helpers, and `derive` (reuses `hookRefs` and merges child options;
  * see inline note on `TNewMethod` narrowing).
  *
- * Accepts both `UniqueMetadataKey` and `ListMetadataKey` via the wider `MetadataKey` bound.
- * Cardinality enforcement is delegated to the store layer.
- *
  * @param key - Fixed metadata key for this family of decorators.
  * @param options - Factory options; merged into derived factories by `derive`.
  * @param hookRefs - When present, enables intercept-based method replacement

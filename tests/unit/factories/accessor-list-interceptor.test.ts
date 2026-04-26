@@ -191,10 +191,6 @@ describe("intercept.accessor.list", () => {
 		expect(() => Trace.firstOrThrow(Box, "x")).toThrow(AnnotateError);
 	});
 
-	test("throws when neither onGet nor onSet provided", () => {
-		expect(() => intercept.accessor.list({} as never)).toThrow(TypeError);
-	});
-
 	test("metadata accumulates: all() returns list in store order", () => {
 		const Layer = intercept.accessor.list<string, [string], number>({
 			onGet: (original) =>

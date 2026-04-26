@@ -1,12 +1,3 @@
-/**
- * Compile-time type tests for `createScopedReflector` brand inference.
- *
- * Per spec §3 Data flow and §4: `createScopedReflector` infers `ScopedReflector<T, TCard>`
- * from the key brand, and each query method narrows its return shape accordingly.
- *
- * This file intentionally has no runtime assertions — TypeScript errors are the test
- * signal. A `@ts-expect-error` that does NOT produce an error means type narrowing broke.
- */
 /** biome-ignore-all lint/complexity/noVoid: discard references to avoid unused-variable warnings in type tests */
 /** biome-ignore-all lint/suspicious/noEmptyBlockStatements: test fixture classes */
 

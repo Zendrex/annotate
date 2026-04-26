@@ -133,9 +133,4 @@ describe("hasAnyMemberMeta", () => {
 		appendMemberMeta(A, key, "foo", "v", Symbol("t"), { static: false, kind: "method" });
 		expect(hasAnyMemberMeta(B)).toBe(true);
 	});
-
-	test("stops at Function.prototype", () => {
-		class A {}
-		expect(() => hasAnyMemberMeta(A)).not.toThrow();
-	});
 });

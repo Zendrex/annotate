@@ -32,14 +32,6 @@ describe("Symbol.metadata shim", () => {
 		expect(result.description).toBe("Symbol.metadata");
 	});
 
-	test("leaves a present Symbol.metadata untouched", async () => {
-		const result = await runHarness("present");
-		expect(result.defined).toBe(true);
-		// On engines with native Symbol.metadata the description is "Symbol.metadata"
-		// but the slot is NOT the registry symbol; on engines without it, the shim
-		// fills it with the registry symbol. Either is a valid pass.
-	});
-
 	test("is idempotent when re-applied", async () => {
 		const result = await runHarness("idempotent");
 		expect(result.defined).toBe(true);

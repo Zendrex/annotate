@@ -25,18 +25,21 @@ import { createMethodDecorator, createMethodListDecorator } from "./factories/me
 import { createMethodInterceptor, createMethodListInterceptor } from "./factories/method-interceptor";
 import { createPropertyDecorator, createPropertyListDecorator } from "./factories/property-decorator";
 
+const withList = <U extends object, L>(unique: U, list: L): U & { list: L } => Object.assign(unique, { list });
+
 /**
  * Version-stable registry of decorator factories (class, method, property). Each
  * member is callable as the unique factory and exposes a `.list` sibling for
  * list-cardinality metadata. Prefer this object over deep imports.
  *
- * - `decorate.class(opts)` — unique-cardinality class decorator factory
- * - `decorate.class.list(opts)` — list-cardinality class decorator factory
+ * - `decorate.class(opts)` / `decorate.class.list(opts)` — class decorator factories
+ * - `decorate.method(opts)` / `decorate.method.list(opts)` — method decorator factories
+ * - `decorate.property(opts)` / `decorate.property.list(opts)` — property decorator factories
  */
 export const decorate = Object.freeze({
-	class: Object.assign(createClassDecorator, { list: createClassListDecorator }),
-	method: Object.assign(createMethodDecorator, { list: createMethodListDecorator }),
-	property: Object.assign(createPropertyDecorator, { list: createPropertyListDecorator }),
+	class: withList(createClassDecorator, createClassListDecorator),
+	method: withList(createMethodDecorator, createMethodListDecorator),
+	property: withList(createPropertyDecorator, createPropertyListDecorator),
 } as const);
 
 /**
@@ -44,12 +47,12 @@ export const decorate = Object.freeze({
  * member exposes a `.list` sibling for list-cardinality metadata. Prefer this
  * object over deep imports.
  *
- * - `intercept.method(opts)` — unique-cardinality method interceptor factory
- * - `intercept.method.list(opts)` — list-cardinality method interceptor factory
+ * - `intercept.method(opts)` / `intercept.method.list(opts)` — method interceptor factories
+ * - `intercept.accessor(opts)` / `intercept.accessor.list(opts)` — accessor interceptor factories
  */
 export const intercept = Object.freeze({
-	method: Object.assign(createMethodInterceptor, { list: createMethodListInterceptor }),
-	accessor: Object.assign(createAccessorInterceptor, { list: createAccessorListInterceptor }),
+	method: withList(createMethodInterceptor, createMethodListInterceptor),
+	accessor: withList(createAccessorInterceptor, createAccessorListInterceptor),
 } as const);
 
 export { mintListKey, mintUniqueKey } from "./metadata/cardinality-registry";
@@ -75,15 +78,12 @@ export type {
 export type { ListMetadataKey, MetadataArray, MetadataKey, UniqueMetadataKey } from "./metadata/types";
 export type { Reflector } from "./reflector/reflector";
 export type {
-	DecoratedClass,
 	DecoratedClassList,
 	DecoratedClassUnique,
 	DecoratedItem,
 	DecoratedKind,
-	DecoratedMethod,
 	DecoratedMethodList,
 	DecoratedMethodUnique,
-	DecoratedProperty,
 	DecoratedPropertyList,
 	DecoratedPropertyUnique,
 	ScopedReflector,

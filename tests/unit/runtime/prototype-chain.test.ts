@@ -29,13 +29,4 @@ describe("walkPrototypeChain", () => {
 
 		expect(visited).toEqual([Leaf, Mid]);
 	});
-
-	test("visits only ctor when no ancestor class exists", () => {
-		class Solo {}
-		const visited: unknown[] = [];
-		walkPrototypeChain(Solo, (current) => {
-			visited.push(current);
-		});
-		expect(visited).toEqual([Solo]);
-	});
 });

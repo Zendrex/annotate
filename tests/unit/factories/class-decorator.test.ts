@@ -25,17 +25,6 @@ describe("decorate.class", () => {
 		expect(Component.first(Root)).toEqual({ selector: "app-root", scoped: true });
 	});
 
-	test("single application; first returns the stored value", () => {
-		const Tag = decorate.class<string>();
-
-		@Tag("value")
-		class X {}
-
-		// Unique-cardinality key: reader metadata is a scalar string, not an array.
-		expect(Tag.reader(X).class()?.metadata).toBe("value");
-		expect(Tag.first(X)).toBe("value");
-	});
-
 	test("inheritance: subclass and base each hold one value; all() collects both", () => {
 		const Tag = decorate.class<string>();
 

@@ -34,9 +34,6 @@ export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta], T
  * The object also exposes `key`, `reader`, `first`, `has`, `all`, and `derive`
  * (child options merged via `mergeExtendedOptions` while preserving the key).
  *
- * Accepts both `UniqueMetadataKey` and `ListMetadataKey` via the wider `MetadataKey` bound.
- * Cardinality enforcement is delegated to `appendClassMeta` / the store layer.
- *
  * @param key - Metadata key this factory reads and writes.
  * @param options - Optional compose/validation and display `name` for labels.
  */

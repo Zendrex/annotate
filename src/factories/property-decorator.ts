@@ -31,9 +31,6 @@ export function createPropertyDecorator<
  * composed metadata, and optional validator chain. `derive` reuses the key and merges
  * options via `mergeExtendedOptions`.
  *
- * Accepts both `UniqueMetadataKey` and `ListMetadataKey` via the wider `MetadataKey` bound.
- * Cardinality enforcement is delegated to the store layer.
- *
  * @param key - Metadata key this factory reads and writes.
  * @param options - Optional compose/validation and display `name` for labels.
  */

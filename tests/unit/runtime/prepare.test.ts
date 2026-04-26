@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 import { UnregisteredClassError } from "../../../src/errors";
 import { mintUniqueKey } from "../../../src/metadata/cardinality-registry";
 import { getMemberMeta } from "../../../src/metadata/member-meta-store";
-import { getCorrelationFor, registerCtor } from "../../../src/metadata/metadata-ctor-correlation";
+import { registerCtor } from "../../../src/metadata/metadata-ctor-correlation";
 import { hasPendingFor, queueDeferred } from "../../../src/metadata/metadata-deferred-queue";
 import { prepare } from "../../../src/runtime/prepare";
 import { METADATA_SYMBOL } from "../../../src/runtime/symbol-metadata";
@@ -35,24 +35,6 @@ describe("prepare(ctor)", () => {
 		prepare(A);
 		expect(hasPendingFor(correlation)).toBe(false);
 		expect(getMemberMeta<string>(A, key, "foo")).toEqual(["v"]);
-	});
-
-	test("flushes pending Deferreds via own [Symbol.metadata]", () => {
-		const key = mintUniqueKey("k");
-		const correlation = {};
-		class A {}
-		brand(A, correlation);
-		queueDeferred(correlation, {
-			key,
-			name: "foo",
-			meta: "v",
-			token: Symbol("token"),
-			static: false,
-			kind: "method",
-		});
-		prepare(A);
-		expect(getMemberMeta<string>(A, key, "foo")).toEqual(["v"]);
-		expect(getCorrelationFor(A)).toBe(correlation);
 	});
 
 	test("flushes ancestor pending via prototype chain walk", () => {

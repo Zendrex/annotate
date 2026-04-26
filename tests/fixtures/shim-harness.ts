@@ -1,11 +1,4 @@
-/**
- * Subprocess harness for `src/shim.ts`. Run as `bun tests/fixtures/shim-harness.ts <mode>`
- * with `mode` ∈ `present` | `absent` | `idempotent`. Writes a single JSON line to
- * stdout describing the post-import state of `Symbol.metadata`.
- *
- * Used by `tests/unit/shim.test.ts` so each scenario starts with a clean
- * module cache and global symbol slot.
- */
+// Subprocess harness for shim tests: `bun tests/fixtures/shim-harness.ts <present|absent|idempotent>`
 
 type SymbolWithMetadata = SymbolConstructor & { metadata: symbol | undefined };
 

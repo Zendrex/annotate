@@ -21,6 +21,11 @@ describe("decorate.property", () => {
 		new User();
 		expect(Column.hasOwn(User, "name")).toBe(true);
 		expect(Column.first(User, "name")).toBe("varchar");
+		expect(
+			Column.reader(User)
+				.properties()
+				.find((p) => p.name === "name")?.metadata
+		).toBe("varchar");
 	});
 
 	test("eager flush via prepare() makes pre-instantiation reflection work", () => {

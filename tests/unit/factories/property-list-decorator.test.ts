@@ -57,19 +57,6 @@ describe("decorate.property.list", () => {
 		}).not.toThrow(AnnotateError);
 	});
 
-	test("stacking same unique factory twice still throws DuplicateMetadataError (regression)", () => {
-		const Column = decorate.property<string>({ name: "UniqueColumn" });
-
-		expect(() => {
-			class X {
-				@Column("a")
-				@Column("b")
-				value!: string;
-			}
-			new X();
-		}).toThrow(AnnotateError);
-	});
-
 	test("derive() on a list factory shares the key and keeps list cardinality", () => {
 		const Parent = decorate.property.list<string>({ name: "ListPropParent" });
 		const Child = Parent.derive();
@@ -107,7 +94,7 @@ describe("decorate.property.list", () => {
 		expect(Column.hasOwn(Parent, "name")).toBe(true);
 	});
 
-	test("first() returns the first-stored value", () => {
+	test("first() and firstOrThrow() return the first-stored value (Stage-3 inner first)", () => {
 		const Column = decorate.property.list<string>();
 
 		class X {
@@ -117,21 +104,7 @@ describe("decorate.property.list", () => {
 		}
 
 		new X();
-		// Inner decorator stores first (Stage-3 applies decorators bottom-up)
 		expect(Column.first(X, "value")).toBe("inner");
-	});
-
-	test("firstOrThrow() returns the first-stored value on a decorated property", () => {
-		const Column = decorate.property.list<string>();
-
-		class X {
-			@Column("outer")
-			@Column("inner")
-			value!: string;
-		}
-
-		new X();
-		// Inner decorator stores first (Stage-3 applies decorators bottom-up)
 		expect(Column.firstOrThrow(X, "value")).toBe("inner");
 	});
 

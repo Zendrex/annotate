@@ -15,6 +15,11 @@ describe("decorate.method", () => {
 		new Api();
 		expect(Route.first(Api, "ping")).toBe("/ping");
 		expect(Route.hasOwn(Api, "ping")).toBe(true);
+		expect(
+			Route.reader(Api)
+				.methods()
+				.find((m) => m.name === "ping")?.metadata
+		).toBe("/ping");
 	});
 
 	test("static methods are eagerly registered (no instantiation needed)", () => {

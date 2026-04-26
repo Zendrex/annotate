@@ -55,17 +55,6 @@ describe("decorate.class.list", () => {
 		expect(reflectedMeta).toContain(2);
 	});
 
-	test("first() returns the first-stored value", () => {
-		const Tag = decorate.class.list<string>();
-
-		// Stage-3: decorators run inner-to-outer at definition, so "inner" stores first
-		@Tag("outer")
-		@Tag("inner")
-		class X {}
-
-		expect(Tag.first(X)).toBe("inner");
-	});
-
 	test("does NOT throw DuplicateMetadataError on second application (unlike unique factory)", () => {
 		const Tag = decorate.class.list<string>({ name: "ListTag" });
 
@@ -117,14 +106,14 @@ describe("decorate.class.list", () => {
 		expect(Tag.all(Sub)).toEqual(["sub", "base"]);
 	});
 
-	test("firstOrThrow() returns the first-stored value on a decorated class", () => {
+	test("first() and firstOrThrow() return the first-stored value (Stage-3 inner first)", () => {
 		const Tag = decorate.class.list<string>();
 
-		// Stage-3: inner decorator stores first (bottom-up application)
 		@Tag("outer")
 		@Tag("inner")
 		class X {}
 
+		expect(Tag.first(X)).toBe("inner");
 		expect(Tag.firstOrThrow(X)).toBe("inner");
 	});
 

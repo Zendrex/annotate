@@ -25,12 +25,6 @@ describe("Factory.derive() — shared-key semantics", () => {
 		const names = entries.map((entry) => entry.name).sort();
 		expect(names).toEqual(["one", "two"]);
 	});
-
-	test("parent and derive() child share the same metadata key", () => {
-		const Parent = decorate.class<string>({ name: "P" });
-		const Child = Parent.derive();
-		expect(Parent.key).toBe(Child.key);
-	});
 });
 
 describe("Factory.derive() — chained validators", () => {

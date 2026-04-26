@@ -46,8 +46,7 @@ export function appendClassMeta<T>(ctor: Ctor, key: symbol, value: T): void {
 		bucket.set(key, list);
 	}
 	if (cardinality === "unique" && list.length > 0) {
-		// key is plain symbol here; cast to MetadataKey for the structured error (brand is phantom-only).
-		throw new DuplicateMetadataError(ctor as AnyConstructor, key as MetadataKey, "class");
+		throw new DuplicateMetadataError(ctor as AnyConstructor, key as MetadataKey, cardinality, "class");
 	}
 	list.push(value);
 }

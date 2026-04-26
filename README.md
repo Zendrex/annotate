@@ -8,7 +8,9 @@ Define a decorator factory and get back a decorator that knows its arguments, it
 bun add @zendrex/annotate
 ```
 
-Works with npm, pnpm, yarn. Requires TypeScript 5.2+ and Node ≥ 20.4 (or any runtime with `Symbol.metadata`). Built on TC39 Stage-3 decorators. No `experimentalDecorators`, no `reflect-metadata` shim.
+Works with npm, pnpm, yarn. Requires TypeScript 5.2+ and Node ≥ 20.4 (or any runtime with `Symbol.metadata`). Built on TC39 Stage-3 decorators. No `experimentalDecorators`, no `reflect-metadata` shim, no `emitDecoratorMetadata`.
+
+**Stage-3 note:** the standard has no parameter decorator. If you rely on that from the legacy world, you will need a different design or the old compiler flags. Annotate only targets Stage-3.
 
 On older runtimes that lack `Symbol.metadata` (Node < 22.3, some browsers, embedded engines) import the shim once at your application entry, before any decorated class loads:
 
@@ -34,7 +36,7 @@ The shim installs `Symbol.for("Symbol.metadata")` onto the `Symbol` global so th
 
 If you have built a controller framework, ORM, DI container, or validator, you have probably hit these problems:
 
-- **`reflect-metadata` is a global string-keyed bag.** Two libraries that pick the same key clobber each other. No scoping, no isolation, no compile-time check.
+- `**reflect-metadata` is a global string-keyed bag.** Two libraries that pick the same key clobber each other. No scoping, no isolation, no compile-time check.
 - **Decorator arguments are untyped at the read site.** You store `{ path: "/" }` and read it back as `any`. The type checker does not help.
 - **Validation is your problem.** Want to reject a bad shape at decoration time? Write the throw yourself. Require a base class? Same.
 - **Stage-2 vs Stage-3 split the ecosystem.** Most existing libraries assume the legacy `experimentalDecorators` ABI and break under the standard one.
@@ -42,7 +44,7 @@ If you have built a controller framework, ORM, DI container, or validator, you h
 
 Annotate gives every factory its own metadata key. Arguments, stored value, target class, and `this` inside methods all flow through generics. Reading metadata returns typed entries. Validation, scoping, and reflection are first-class.
 
-## A decorator in three lines
+## A decorator in three lines (sort of)
 
 ```typescript
 import { decorate } from "@zendrex/annotate";
@@ -79,8 +81,8 @@ const Route = decorate.method({
 });
 
 const Log = intercept.method<string>({
-  intercept: (fn, tag, ctx) => function (this: any, ...args: any[]) {
-    console.log(`→ ${tag(this)[0]}/${String(ctx.name)}`);
+  intercept: (fn, readMetadata, ctx) => function (this: any, ...args: any[]) {
+    console.log(`→ ${readMetadata(this)[0]}/${String(ctx.name)}`);
     return fn.apply(this, args);
   },
 });
@@ -130,10 +132,10 @@ Interceptors do not snapshot at decoration time. They read fresh, so an intercep
 
 ```typescript
 const Audit = intercept.method<string>({
-  intercept: (original, readMetadata) => function (this: unknown, ...args: unknown[]) {
-    const tags = readMetadata(this as object); // current, accurate, typed
+  intercept: (original, readMetadata) => function (this: any, ...args: any[]) {
+    const tags = readMetadata(this);
     log(tags, args);
-    return original.call(this, ...args);
+    return original.apply(this, args);
   },
 });
 ```
@@ -183,13 +185,15 @@ Validation, base-class requirement, and uniqueness checks all run at decoration 
 
 ### Factories
 
-| Factory | Decorates |
-|---|---|
-| `decorate.class<TMeta>` | classes |
-| `decorate.method<TMeta>` | methods |
-| `decorate.property<TMeta>` | class fields |
-| `intercept.method<TMeta>` | methods (wraps the implementation) |
-| `intercept.accessor<TMeta>` | `accessor` fields (wraps get/set) |
+
+| Factory                     | Decorates                          |
+| --------------------------- | ---------------------------------- |
+| `decorate.class<TMeta>`     | classes                            |
+| `decorate.method<TMeta>`    | methods                            |
+| `decorate.property<TMeta>`  | class fields                       |
+| `intercept.method<TMeta>`   | methods (wraps the implementation) |
+| `intercept.accessor<TMeta>` | `accessor` fields (wraps get/set)  |
+
 
 Every factory accepts trailing generics to constrain the target: method signature, field type, `this` shape, or `instanceof` bound. Mismatches fail at compile time.
 
@@ -223,15 +227,17 @@ Class factories drop the `name` argument. Interceptors expose the same surface.
 
 Every factory defaults to **unique** cardinality: at most one metadata value per decoration site. A second application of the same factory to the same method or class throws `DuplicateMetadataError` at decoration time. The `.key` on a unique factory is typed `UniqueMetadataKey<TMeta>`, and the reader's `methods()` / `properties()` / `class()` return entries where `metadata` is `TMeta` directly.
 
+Each factory's `.key` is branded with its cardinality (`UniqueMetadataKey<TMeta>` or `ListMetadataKey<TMeta>`). Branded keys flow through every read API and select the matching return shape automatically, there is no untyped fallback.
+
 Use the `.list` sibling on the factory namespace when multiple values must stack on the same site:
 
 ```typescript
 import { decorate } from "@zendrex/annotate";
 
-// unique (default) — at most one value per method
+// unique (default): at most one value per method
 const Role = decorate.method<string>();
 
-// list — many values per method, accumulated in application order
+// list: many values per method, accumulated in application order
 const Tag = decorate.method.list<string>();
 
 class Api {
@@ -261,6 +267,16 @@ reflect(Users).methods(Route.key);
 
 Pass keys per call. Useful when a consumer holds many factories and wants to traverse them generically.
 
+Keys must be branded: pass a factory's `.key`, or a symbol minted via `mintUniqueKey<TMeta>(name?)` / `mintListKey<TMeta>(name?)`. The cardinality brand on the key narrows the result; `methods(uniqueKey)` returns `DecoratedMethodUnique<TMeta>[]` (scalar `metadata`); `methods(listKey)` returns `DecoratedMethodList<TMeta>[]` (`readonly TMeta[]`). Raw `Symbol(...)` is rejected at compile time and at runtime with `UnregisteredMetadataKeyError`.
+
+```typescript
+import { mintListKey, reflect } from "@zendrex/annotate";
+
+const TAGS = mintListKey<string>("tags");
+// ... append values via a custom store / decorator that uses TAGS ...
+reflect(Users).methods(TAGS); // metadata: readonly string[]
+```
+
 ### Type helpers
 
 ```typescript
@@ -278,20 +294,22 @@ Instance metadata commits on first `new`. Reader helpers auto-prepare. Call `pre
 
 Every domain error extends `AnnotateError` and carries `code`, `target`, `kind?`, `memberName?`.
 
-| Class | `code` | When |
-|---|---|---|
-| `DuplicateMetadataError` | `"duplicate"` | unique factory applied twice to the same slot |
-| `UnregisteredClassError` | `"unregistered"` | `reflect()` called on a class with no annotate metadata anywhere on its prototype chain |
+
+| Class                          | `code`              | When                                                                                                                 |
+| ------------------------------ | ------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `DuplicateMetadataError`       | `"duplicate"`       | unique factory applied twice to the same slot                                                                        |
+| `UnregisteredClassError`       | `"unregistered"`    | `reflect()` called on a class with no annotate metadata anywhere on its prototype chain                              |
 | `UnregisteredMetadataKeyError` | `"unregisteredKey"` | store append targets a key absent from the cardinality registry (key minted outside `mintUniqueKey` / `mintListKey`) |
-| `InvalidDecorationTargetError` | `"invalidTarget"` | `requireInstanceOf` rejects the host class; carries `requiredBase` |
-| `ValidationError` | `"validation"` | a `validate` hook threw; original error attached as `Error.cause` |
-| `MissingMetadataError` | `"missing"` | `firstOrThrow` found nothing |
+| `InvalidDecorationTargetError` | `"invalidTarget"`   | `requireInstanceOf` rejects the host class; carries `requiredBase`                                                   |
+| `ValidationError`              | `"validation"`      | a `validate` hook threw; original error attached as `Error.cause`                                                    |
+| `MissingMetadataError`         | `"missing"`         | `firstOrThrow` found nothing                                                                                         |
+
 
 Invalid factory configuration (e.g. `intercept.accessor` with neither `onGet` nor `onSet`) throws plain `TypeError`.
 
 ## Status
 
-v1.0 alpha. Rewritten on Stage-3 decorators. The public API is stable in shape but may change in detail before 1.0.0. Breaking changes will be called out in changesets.
+v1.0 alpha. Rewritten on Stage-3 decorators. The public API is stable in shape but may change in detail before 1.0.0.
 
 ## License
 

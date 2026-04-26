@@ -1,10 +1,3 @@
-/**
- * Compile-time type tests for list-cardinality factory shapes.
- *
- * This file intentionally has no runtime assertions. TypeScript errors are the
- * test signal — a `@ts-expect-error` that does NOT produce an error means the
- * type narrowing broke.
- */
 /** biome-ignore-all lint/complexity/noVoid: discard class references to avoid unused-variable warnings */
 /** biome-ignore-all lint/suspicious/noEmptyBlockStatements: test stub methods and classes */
 

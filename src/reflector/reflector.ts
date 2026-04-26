@@ -29,20 +29,19 @@ import type {
  * Read view over all decoration for a class constructor. Queries are lazy:
  * the first call runs {@link prepare} and fails with {@link UnregisteredClassError}
  * if no metadata is registered for the class.
+ *
+ * All key parameters must be branded: minted via `mintUniqueKey` or `mintListKey`.
+ * Bare `symbol` and unbranded `MetadataKey<T>` are no longer accepted.
  */
 export interface Reflector {
 	all<T>(key: UniqueMetadataKey<T>): DecoratedItem<T, "unique">[];
 	all<T>(key: ListMetadataKey<T>): DecoratedItem<T, "list">[];
-	all<T>(key: MetadataKey<T>): DecoratedItem<T>[];
 	class<T>(key: UniqueMetadataKey<T>): DecoratedClassUnique<T> | undefined;
 	class<T>(key: ListMetadataKey<T>): DecoratedClassList<T> | undefined;
-	class<T>(key: MetadataKey<T>): DecoratedClass<T> | undefined;
 	methods<T>(key: UniqueMetadataKey<T>): DecoratedMethodUnique<T>[];
 	methods<T>(key: ListMetadataKey<T>): DecoratedMethodList<T>[];
-	methods<T>(key: MetadataKey<T>): DecoratedMethod<T>[];
 	properties<T>(key: UniqueMetadataKey<T>): DecoratedPropertyUnique<T>[];
 	properties<T>(key: ListMetadataKey<T>): DecoratedPropertyList<T>[];
-	properties<T>(key: MetadataKey<T>): DecoratedProperty<T>[];
 }
 
 function isMethodLike(ctor: Ctor, name: string | symbol, isStatic: boolean): boolean {
@@ -65,7 +64,6 @@ export class ReflectorImpl implements Reflector {
 
 	all<T>(key: UniqueMetadataKey<T>): DecoratedItem<T, "unique">[];
 	all<T>(key: ListMetadataKey<T>): DecoratedItem<T, "list">[];
-	all<T>(key: MetadataKey<T>): DecoratedItem<T>[];
 	all<T>(key: MetadataKey<T>): DecoratedItem<T>[] {
 		this.ensureRegistered();
 		const c = this.collectClass<T>(key);
@@ -76,7 +74,6 @@ export class ReflectorImpl implements Reflector {
 
 	class<T>(key: UniqueMetadataKey<T>): DecoratedClassUnique<T> | undefined;
 	class<T>(key: ListMetadataKey<T>): DecoratedClassList<T> | undefined;
-	class<T>(key: MetadataKey<T>): DecoratedClass<T> | undefined;
 	class<T>(key: MetadataKey<T>): DecoratedClass<T> | undefined {
 		this.ensureRegistered();
 		return this.collectClass<T>(key);
@@ -84,7 +81,6 @@ export class ReflectorImpl implements Reflector {
 
 	methods<T>(key: UniqueMetadataKey<T>): DecoratedMethodUnique<T>[];
 	methods<T>(key: ListMetadataKey<T>): DecoratedMethodList<T>[];
-	methods<T>(key: MetadataKey<T>): DecoratedMethod<T>[];
 	methods<T>(key: MetadataKey<T>): DecoratedMethod<T>[] {
 		this.ensureRegistered();
 		return this.collectMethods<T>(key);
@@ -92,7 +88,6 @@ export class ReflectorImpl implements Reflector {
 
 	properties<T>(key: UniqueMetadataKey<T>): DecoratedPropertyUnique<T>[];
 	properties<T>(key: ListMetadataKey<T>): DecoratedPropertyList<T>[];
-	properties<T>(key: MetadataKey<T>): DecoratedProperty<T>[];
 	properties<T>(key: MetadataKey<T>): DecoratedProperty<T>[] {
 		this.ensureRegistered();
 		return this.collectProperties<T>(key);
@@ -143,22 +138,12 @@ export class ReflectorImpl implements Reflector {
 				continue;
 			}
 			const raw = collectMemberMeta<T>(this.ctor, key, name);
-			if (cardinality === "unique") {
-				out.push({
-					kind,
-					name,
-					static: isStatic,
-					// Store invariant: unique sites hold at most one value; take [0].
-					metadata: raw[0] as T,
-				} as unknown as R);
-			} else {
-				out.push({
-					kind,
-					name,
-					static: isStatic,
-					metadata: raw,
-				} as unknown as R);
-			}
+			out.push({
+				kind,
+				name,
+				static: isStatic,
+				metadata: cardinality === "unique" ? (raw[0] as T) : raw,
+			} as unknown as R);
 		}
 		return out;
 	}

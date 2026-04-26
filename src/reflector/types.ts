@@ -34,10 +34,7 @@ export interface DecoratedClassList<TMeta> {
 	target: AnyConstructor;
 }
 
-/**
- * Class-level decoration: union of unique and list flavors.
- * Use for backwards-compatible call sites that do not narrow on cardinality.
- */
+/** Internal alias used by impl signatures; consumers receive `DecoratedClassUnique` or `DecoratedClassList` via the branded key overloads. */
 export type DecoratedClass<TMeta> = DecoratedClassUnique<TMeta> | DecoratedClassList<TMeta>;
 
 // ── Method ────────────────────────────────────────────────────────────────────
@@ -64,10 +61,7 @@ export interface DecoratedMethodList<TMeta> {
 	static: boolean;
 }
 
-/**
- * Method-level decoration: union of unique and list flavors.
- * Use for backwards-compatible call sites that do not narrow on cardinality.
- */
+/** Internal alias used by impl signatures; consumers receive `DecoratedMethodUnique` or `DecoratedMethodList` via the branded key overloads. */
 export type DecoratedMethod<TMeta> = DecoratedMethodUnique<TMeta> | DecoratedMethodList<TMeta>;
 
 // ── Property ──────────────────────────────────────────────────────────────────
@@ -94,10 +88,7 @@ export interface DecoratedPropertyList<TMeta> {
 	static: boolean;
 }
 
-/**
- * Property- or field-level decoration: union of unique and list flavors.
- * Use for backwards-compatible call sites that do not narrow on cardinality.
- */
+/** Internal alias used by impl signatures; consumers receive `DecoratedPropertyUnique` or `DecoratedPropertyList` via the branded key overloads. */
 export type DecoratedProperty<TMeta> = DecoratedPropertyUnique<TMeta> | DecoratedPropertyList<TMeta>;
 
 // ── DecoratedItem ─────────────────────────────────────────────────────────────
@@ -107,13 +98,11 @@ export type DecoratedProperty<TMeta> = DecoratedPropertyUnique<TMeta> | Decorate
  *
  * - `DecoratedItem<T, "unique">` — every `metadata` field is a scalar `T`.
  * - `DecoratedItem<T, "list">` — every `metadata` field is `readonly T[]`.
- * - `DecoratedItem<T>` (no second param) — union of both (backwards-compatible).
+ * - `DecoratedItem<T>` (no second param) — distributes to the union of both.
  */
 export type DecoratedItem<TMeta, TCard extends Cardinality = Cardinality> = TCard extends "unique"
 	? DecoratedClassUnique<TMeta> | DecoratedMethodUnique<TMeta> | DecoratedPropertyUnique<TMeta>
-	: TCard extends "list"
-		? DecoratedClassList<TMeta> | DecoratedMethodList<TMeta> | DecoratedPropertyList<TMeta>
-		: DecoratedClass<TMeta> | DecoratedMethod<TMeta> | DecoratedProperty<TMeta>;
+	: DecoratedClassList<TMeta> | DecoratedMethodList<TMeta> | DecoratedPropertyList<TMeta>;
 
 // ── ScopedReflector ───────────────────────────────────────────────────────────
 

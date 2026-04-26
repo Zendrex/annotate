@@ -1,6 +1,5 @@
-import { getKeyCardinality } from "./metadata/cardinality-registry";
 import { targetDisplayName } from "./reflector/class-name";
-import type { MetadataKey } from "./metadata/types";
+import type { Cardinality, MetadataKey } from "./metadata/types";
 import type { AnyConstructor, DecoratedKind } from "./reflector/types";
 
 /**
@@ -25,7 +24,7 @@ export type AnnotateErrorCode = (typeof AnnotateErrorCode)[keyof typeof Annotate
  * back to `String(key)` (e.g. `"Symbol()"`) when the description is missing.
  */
 export function keyDisplayName(key: MetadataKey): string {
-	return String(key.description ?? key);
+	return key.description ?? String(key);
 }
 
 /**
@@ -87,16 +86,21 @@ export class DuplicateMetadataError extends AnnotateError {
 	/**
 	 * @param ctor - The decorated class
 	 * @param key - Metadata key in conflict
+	 * @param cardinality - Resolved cardinality of `key` (caller already looked it up)
 	 * @param kind - Decoration kind (class vs member, etc.)
 	 * @param memberName - Set for member-level duplicate; omit for class-level
 	 */
-	constructor(ctor: AnyConstructor, key: MetadataKey, kind: DecoratedKind, memberName?: string | symbol) {
+	constructor(
+		ctor: AnyConstructor,
+		key: MetadataKey,
+		cardinality: Cardinality,
+		kind: DecoratedKind,
+		memberName?: string | symbol
+	) {
 		const slot = memberName
 			? `"${String(memberName)}" on "${targetDisplayName(ctor)}"`
 			: `"${targetDisplayName(ctor)}"`;
 		const keyLabel = keyDisplayName(key);
-		// Cardinality drives the message wording; registry guarantees registration before this point.
-		const cardinality = getKeyCardinality(key) ?? "unique";
 		super({
 			code: AnnotateErrorCode.DUPLICATE,
 			key,

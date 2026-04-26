@@ -115,10 +115,8 @@ export type DecoratedClassFactory<
 
 /**
  * Method decorator plus metadata readers scoped to `(target, name)` and `derive`
- * for alternate method/this types with the same storage key.
- *
- * `TCard` carries the cardinality brand; the `reader` return type narrows on `TCard`
- * so callers get scalar `metadata` for unique keys and array `metadata` for list keys.
+ * for alternate method/this types with the same storage key. See
+ * {@link DecoratedClassFactory} for `TCard` semantics.
  */
 export type DecoratedMethodFactory<
 	TMeta,
@@ -142,9 +140,7 @@ export type DecoratedMethodFactory<
 
 /**
  * Field (Stage 3) decorator with the same reader/derive pattern as method factories.
- *
- * `TCard` carries the cardinality brand; the `reader` return type narrows on `TCard`
- * so callers get scalar `metadata` for unique keys and array `metadata` for list keys.
+ * See {@link DecoratedClassFactory} for `TCard` semantics.
  */
 export type DecoratedPropertyFactory<
 	TMeta,
@@ -168,10 +164,8 @@ export type DecoratedPropertyFactory<
 
 /**
  * Class accessor decorator (auto-accessor) with reader APIs; metadata is stored
- * as property-scoped for reflection parity.
- *
- * `TCard` carries the cardinality brand; the `reader` return type narrows on `TCard`
- * so callers get scalar `metadata` for unique keys and array `metadata` for list keys.
+ * as property-scoped for reflection parity. See {@link DecoratedClassFactory}
+ * for `TCard` semantics.
  */
 export type DecoratedAccessorFactory<
 	TMeta,

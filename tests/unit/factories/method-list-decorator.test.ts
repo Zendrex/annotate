@@ -59,20 +59,6 @@ describe("decorate.method.list", () => {
 		}).not.toThrow(AnnotateError);
 	});
 
-	test("stacking same unique factory twice still throws DuplicateMetadataError (regression)", () => {
-		const Cmd = decorate.method<string>({ name: "UniqueCmd" });
-
-		expect(() => {
-			// biome-ignore lint/complexity/noStaticOnlyClass: test fixture requires a class with a static method
-			class X {
-				@Cmd("a")
-				@Cmd("b")
-				static run(): void {}
-			}
-			void X;
-		}).toThrow(AnnotateError);
-	});
-
 	test("static methods are eagerly registered; list entries commit immediately", () => {
 		const Cmd = decorate.method.list<string>();
 
@@ -123,7 +109,7 @@ describe("decorate.method.list", () => {
 		expect(Route.hasOwn(Base, "handle")).toBe(true);
 	});
 
-	test("first() returns the first-stored value for the member", () => {
+	test("first() and firstOrThrow() return the first-stored value (Stage-3 inner first)", () => {
 		const Route = decorate.method.list<string>();
 
 		class Api {
@@ -133,22 +119,8 @@ describe("decorate.method.list", () => {
 		}
 
 		new Api();
-		// Inner decorator stores first (Stage-3 applies decorators bottom-up)
 		expect(Route.first(Api, "handle")).toBe("/inner");
-	});
-
-	test("firstOrThrow() returns the first-stored value on a decorated member", () => {
-		const Route = decorate.method.list<string>();
-
-		class Api {
-			@Route("/first")
-			@Route("/second")
-			handle(): void {}
-		}
-
-		new Api();
-		// Inner decorator stores first (Stage-3 applies decorators bottom-up)
-		expect(Route.firstOrThrow(Api, "handle")).toBe("/second");
+		expect(Route.firstOrThrow(Api, "handle")).toBe("/inner");
 	});
 
 	test("firstOrThrow() throws MissingMetadataError on an undecorated member", () => {

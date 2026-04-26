@@ -1,7 +1,5 @@
 import type { Cardinality, ListMetadataKey, UniqueMetadataKey } from "./types";
 
-// Branded key aliases are imported for return types only; they are exported from types.ts directly.
-
 /**
  * Module-level registry mapping every minted `MetadataKey` symbol to its cardinality.
  *

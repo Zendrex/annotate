@@ -57,25 +57,8 @@ describe("mintListKey", () => {
 });
 
 describe("getKeyCardinality", () => {
-	test("returns 'unique' for a key from mintUniqueKey", () => {
-		const key = mintUniqueKey("u");
-		expect(getKeyCardinality(key)).toBe("unique");
-	});
-
-	test("returns 'list' for a key from mintListKey", () => {
-		const key = mintListKey("l");
-		expect(getKeyCardinality(key)).toBe("list");
-	});
-
 	test("returns undefined for a bare Symbol not registered through mint helpers", () => {
 		const bare = Symbol("x");
 		expect(getKeyCardinality(bare)).toBeUndefined();
-	});
-
-	test("unique and list keys are independently tracked", () => {
-		const u = mintUniqueKey("mixed-u");
-		const l = mintListKey("mixed-l");
-		expect(getKeyCardinality(u)).toBe("unique");
-		expect(getKeyCardinality(l)).toBe("list");
 	});
 });

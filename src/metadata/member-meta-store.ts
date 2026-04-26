@@ -41,6 +41,11 @@ export function appendMemberMeta<T>(
 	token: symbol,
 	options: { static: boolean; kind: MemberKind }
 ): void {
+	const cardinality = getKeyCardinality(key);
+	if (cardinality === undefined) {
+		throw new UnregisteredMetadataKeyError(ctor as AnyConstructor, key as MetadataKey);
+	}
+
 	let tokens = committedTokens.get(ctor);
 	if (!tokens) {
 		tokens = new Set();
@@ -48,11 +53,6 @@ export function appendMemberMeta<T>(
 	}
 	if (tokens.has(token)) {
 		return;
-	}
-
-	const cardinality = getKeyCardinality(key);
-	if (cardinality === undefined) {
-		throw new UnregisteredMetadataKeyError(ctor as AnyConstructor, key as MetadataKey);
 	}
 
 	let outer = memberMetaStore.get(ctor);
@@ -71,8 +71,7 @@ export function appendMemberMeta<T>(
 		inner.set(name, list);
 	}
 	if (cardinality === "unique" && list.length > 0) {
-		// key is plain symbol here; cast to MetadataKey for the structured error (brand is phantom-only).
-		throw new DuplicateMetadataError(ctor as AnyConstructor, key as MetadataKey, options.kind, name);
+		throw new DuplicateMetadataError(ctor as AnyConstructor, key as MetadataKey, cardinality, options.kind, name);
 	}
 	list.push(meta);
 	tokens.add(token);

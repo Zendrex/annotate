@@ -48,9 +48,7 @@ export function createAccessorInterceptor<
 	// biome-ignore lint/suspicious/noExplicitAny: default TThis for Stage 3 `this:` typing
 	TThis = any,
 >(options: AccessorInterceptorOptions<TMeta, TArgs, TValue>): DecoratedAccessorFactory<TMeta, TArgs, TValue, TThis> {
-	if (!(options.onGet || options.onSet)) {
-		throw new TypeError("intercept.accessor: provide at least one of onGet or onSet");
-	}
+	requireAccessorHook(options, "intercept.accessor");
 
 	const key = mintUniqueKey<TMeta>(options.name);
 	const { onGet, onSet, ...rest } = options;
@@ -64,9 +62,6 @@ export function createAccessorInterceptor<
  * Low-level accessor interceptor factory: emits metadata through the same path
  * as `createAccessorInterceptor` but accepts a precomputed key and optional
  * `derive` merging. Exposed for advanced composition; prefer `createAccessorInterceptor`.
- *
- * Accepts both `UniqueMetadataKey` and `ListMetadataKey` via the wider `MetadataKey` bound.
- * Cardinality enforcement is delegated to the store layer.
  */
 export function buildAccessorFactory<
 	TMeta,
@@ -153,9 +148,7 @@ export function createAccessorListInterceptor<
 >(
 	options: AccessorInterceptorOptions<TMeta, TArgs, TValue>
 ): DecoratedAccessorFactory<TMeta, TArgs, TValue, TThis, "list"> {
-	if (!(options.onGet || options.onSet)) {
-		throw new TypeError("intercept.accessor.list: provide at least one of onGet or onSet");
-	}
+	requireAccessorHook(options, "intercept.accessor.list");
 
 	const key = mintListKey<TMeta>(options.name);
 	const { onGet, onSet, ...rest } = options;
@@ -163,4 +156,10 @@ export function createAccessorListInterceptor<
 		onGet,
 		onSet,
 	});
+}
+
+function requireAccessorHook(options: { onGet?: unknown; onSet?: unknown }, label: string): void {
+	if (!(options.onGet || options.onSet)) {
+		throw new TypeError(`${label}: provide at least one of onGet or onSet`);
+	}
 }

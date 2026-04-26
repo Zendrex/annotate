@@ -1,10 +1,3 @@
-/**
- * Compile-time type tests for T4 brand-driven reflector narrowing.
- *
- * This file intentionally has no runtime assertions. TypeScript errors are the
- * test signal — a `@ts-expect-error` that does NOT produce an error means the
- * type narrowing broke.
- */
 /** biome-ignore-all lint/complexity/noVoid: discard references to avoid unused-variable warnings in type tests */
 /** biome-ignore-all lint/suspicious/noEmptyBlockStatements: test fixture classes */
 

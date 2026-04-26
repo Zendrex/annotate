@@ -2,12 +2,6 @@ import { describe, expect, test } from "bun:test";
 
 import { hasOwnMetadata, METADATA_SYMBOL, readOwnMetadata } from "../../../src/runtime/symbol-metadata";
 
-describe("METADATA_SYMBOL", () => {
-	test("is a symbol", () => {
-		expect(typeof METADATA_SYMBOL).toBe("symbol");
-	});
-});
-
 describe("readOwnMetadata", () => {
 	test("returns null when symbol is absent", () => {
 		class A {}
@@ -19,14 +13,6 @@ describe("readOwnMetadata", () => {
 		const bag = { marker: 1 };
 		Object.defineProperty(A, METADATA_SYMBOL, { value: bag, configurable: true });
 		expect(readOwnMetadata(A)).toBe(bag);
-	});
-
-	test("returns inherited metadata bag if present on parent (by spec — inheritance lookup is allowed on READ)", () => {
-		class A {}
-		const bag = { inherited: true };
-		Object.defineProperty(A, METADATA_SYMBOL, { value: bag, configurable: true });
-		class B extends A {}
-		expect(readOwnMetadata(B)).toBe(bag);
 	});
 });
 

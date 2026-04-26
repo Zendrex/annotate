@@ -1,8 +1,3 @@
-/**
- * Integration test: one class with mixed unique + list decorators read through a
- * single `Reflector`. Exercises every decorator and interceptor factory kind,
- * then asserts the shape contracts of `Reflector` and `createScopedReflector`.
- */
 /** biome-ignore-all lint/suspicious/noEmptyBlockStatements: test stub methods and accessors */
 /** biome-ignore-all lint/suspicious/noUnusedExpressions: accessor reads are side effects under test */
 import { describe, expect, it } from "bun:test";
@@ -99,19 +94,6 @@ const ListAccessorInterceptor = intercept.accessor.list<string, [string], number
 
 // ── Fixture class ─────────────────────────────────────────────────────────────
 
-/**
- * One class that uses ALL decorator / interceptor factory kinds on distinct members.
- *
- * Members:
- *   A — unique method meta (@UniqueMethodMeta)
- *   B — list method meta   (@ListMethodMeta ×2 — two stacked)
- *   C — unique property meta
- *   D — list property meta ×2
- *   E — unique method interceptor
- *   F — list method interceptor ×2
- *   G — unique accessor interceptor
- *   H — list accessor interceptor ×2
- */
 @ListClassMeta("list-outer")
 @ListClassMeta("list-inner")
 @UniqueClassMeta("unique-class")
@@ -183,11 +165,6 @@ describe("mixed-cardinality integration", () => {
 			// Stage-3: decorators apply bottom-up — inner runs first, outer second
 			expect(result?.metadata).toEqual(["list-inner", "list-outer"]);
 		});
-
-		it("list class key metadata has length 2", () => {
-			const result = r.class(ListClassMeta.key);
-			expect(result?.metadata).toHaveLength(2);
-		});
 	});
 
 	describe("r.methods() — method meta shapes", () => {
@@ -199,34 +176,12 @@ describe("mixed-cardinality integration", () => {
 			expect(results[0]?.kind).toBe("method");
 		});
 
-		it("unique method key does NOT include member B", () => {
-			const results = r.methods(UniqueMethodMeta.key);
-			const names = results.map((m) => m.name);
-			expect(names).not.toContain("memberB");
-		});
-
-		it("list method key returns DecoratedMethodList for member B with length 2", () => {
+		it("list method key: member B, array metadata in Stage-3 order (inner first)", () => {
 			const results = r.methods(ListMethodMeta.key);
 			expect(results).toHaveLength(1);
 			const entry = results[0];
 			expect(entry?.name).toBe("memberB");
-			expect(Array.isArray(entry?.metadata)).toBe(true);
-			expect(entry?.metadata).toHaveLength(2);
-			expect(entry?.metadata).toContain("method-B-outer");
-			expect(entry?.metadata).toContain("method-B-inner");
-		});
-
-		it("list method key does NOT include member A", () => {
-			const results = r.methods(ListMethodMeta.key);
-			const names = results.map((m) => m.name);
-			expect(names).not.toContain("memberA");
-		});
-
-		it("list method metadata is in Stage-3 application order (inner first)", () => {
-			const results = r.methods(ListMethodMeta.key);
-			const meta = results[0]?.metadata as readonly string[];
-			expect(meta[0]).toBe("method-B-inner");
-			expect(meta[1]).toBe("method-B-outer");
+			expect(entry?.metadata).toEqual(["method-B-inner", "method-B-outer"]);
 		});
 	});
 
@@ -239,28 +194,12 @@ describe("mixed-cardinality integration", () => {
 			expect(results[0]?.kind).toBe("property");
 		});
 
-		it("unique property key does NOT include field D", () => {
-			const results = r.properties(UniquePropertyMeta.key);
-			const names = results.map((p) => p.name);
-			expect(names).not.toContain("fieldD");
-		});
-
-		it("list property key returns DecoratedPropertyList for field D with length 2", () => {
+		it("list property key: field D, array metadata in Stage-3 order (inner first)", () => {
 			const results = r.properties(ListPropertyMeta.key);
 			expect(results).toHaveLength(1);
 			const entry = results[0];
 			expect(entry?.name).toBe("fieldD");
-			expect(Array.isArray(entry?.metadata)).toBe(true);
-			expect(entry?.metadata).toHaveLength(2);
-			expect(entry?.metadata).toContain("property-D-outer");
-			expect(entry?.metadata).toContain("property-D-inner");
-		});
-
-		it("list property metadata is in Stage-3 application order (inner first)", () => {
-			const results = r.properties(ListPropertyMeta.key);
-			const meta = results[0]?.metadata as readonly string[];
-			expect(meta[0]).toBe("property-D-inner");
-			expect(meta[1]).toBe("property-D-outer");
+			expect(entry?.metadata).toEqual(["property-D-inner", "property-D-outer"]);
 		});
 	});
 
@@ -358,32 +297,15 @@ describe("mixed-cardinality integration", () => {
 			expect(methodInterceptCalls).toEqual(["intercept-E"]);
 		});
 
-		it("list method interceptor: both wrappers run on member F invocation (outermost first)", () => {
+		it("list method interceptor: outermost-first call order; readMetadata is full list in each wrapper", () => {
 			listMethodCallOrder.length = 0;
 			listMethodMetaSeen.length = 0;
 			instance.memberF();
 
-			// Two wrappers ran
-			expect(listMethodCallOrder).toHaveLength(2);
-
-			// Stage-3 application order: inner decorator runs first at definition time and
-			// builds wrapper #1; outer runs second and builds wrapper #2. At call time the
-			// outermost (last-built, id=2) fires first; innermost (id=1) fires last.
-			// Positional assertion fails if call order ever inverts.
-			expect(listMethodCallOrder[0]).toBe("wrapper-2");
-			expect(listMethodCallOrder[1]).toBe("wrapper-1");
-		});
-
-		it("list method interceptor: readMetadata inside each wrapper returns full list of length 2", () => {
-			listMethodCallOrder.length = 0;
-			listMethodMetaSeen.length = 0;
-			instance.memberF();
-
+			expect(listMethodCallOrder).toEqual(["wrapper-2", "wrapper-1"]);
 			expect(listMethodMetaSeen).toHaveLength(2);
 			for (const seenMeta of listMethodMetaSeen) {
-				expect(seenMeta).toHaveLength(2);
-				expect(seenMeta).toContain("intercept-F-inner");
-				expect(seenMeta).toContain("intercept-F-outer");
+				expect(seenMeta).toEqual(["intercept-F-inner", "intercept-F-outer"]);
 			}
 		});
 
