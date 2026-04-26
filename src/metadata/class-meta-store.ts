@@ -1,6 +1,7 @@
 import { DuplicateMetadataError, UnregisteredMetadataKeyError } from "../errors";
 import { walkPrototypeChain } from "../runtime/prototype-chain";
 import { getKeyCardinality } from "./cardinality-registry";
+import { getOrCreate } from "./get-or-create";
 import type { AnyConstructor } from "../reflector/types";
 import type { ClassBucket, Ctor, MetadataKey } from "./types";
 
@@ -35,16 +36,8 @@ export function appendClassMeta<T>(ctor: Ctor, key: symbol, value: T): void {
 		throw new UnregisteredMetadataKeyError(ctor as AnyConstructor, key as MetadataKey);
 	}
 
-	let bucket = classMetaStore.get(ctor);
-	if (!bucket) {
-		bucket = new Map();
-		classMetaStore.set(ctor, bucket);
-	}
-	let list = bucket.get(key);
-	if (!list) {
-		list = [];
-		bucket.set(key, list);
-	}
+	const bucket = getOrCreate(classMetaStore, ctor, () => new Map());
+	const list = getOrCreate(bucket, key, () => []);
 	if (cardinality === "unique" && list.length > 0) {
 		throw new DuplicateMetadataError(ctor as AnyConstructor, key as MetadataKey, cardinality, "class");
 	}

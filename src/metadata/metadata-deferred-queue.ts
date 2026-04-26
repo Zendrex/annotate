@@ -1,3 +1,4 @@
+import { getOrCreate } from "./get-or-create";
 import { appendMemberMeta } from "./member-meta-store";
 import type { Ctor, Deferred, DeferredValidateContext } from "./types";
 
@@ -14,11 +15,7 @@ export function queueDeferred(correlation: object | null, deferred: Deferred): v
 	if (!correlation) {
 		return;
 	}
-	let list = pendingByMetadata.get(correlation);
-	if (!list) {
-		list = [];
-		pendingByMetadata.set(correlation, list);
-	}
+	const list = getOrCreate(pendingByMetadata, correlation, () => []);
 	list.push(deferred);
 }
 

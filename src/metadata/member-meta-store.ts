@@ -1,6 +1,7 @@
 import { DuplicateMetadataError, UnregisteredMetadataKeyError } from "../errors";
 import { walkPrototypeChain } from "../runtime/prototype-chain";
 import { getKeyCardinality } from "./cardinality-registry";
+import { getOrCreate } from "./get-or-create";
 import type { AnyConstructor } from "../reflector/types";
 import type { Ctor, MemberBucket, MemberKind, MetadataKey } from "./types";
 
@@ -46,41 +47,21 @@ export function appendMemberMeta<T>(
 		throw new UnregisteredMetadataKeyError(ctor as AnyConstructor, key as MetadataKey);
 	}
 
-	let tokens = committedTokens.get(ctor);
-	if (!tokens) {
-		tokens = new Set();
-		committedTokens.set(ctor, tokens);
-	}
+	const tokens = getOrCreate(committedTokens, ctor, () => new Set());
 	if (tokens.has(token)) {
 		return;
 	}
 
-	let outer = memberMetaStore.get(ctor);
-	if (!outer) {
-		outer = new Map();
-		memberMetaStore.set(ctor, outer);
-	}
-	let inner = outer.get(key);
-	if (!inner) {
-		inner = new Map();
-		outer.set(key, inner);
-	}
-	let list = inner.get(name);
-	if (!list) {
-		list = [];
-		inner.set(name, list);
-	}
+	const outer = getOrCreate(memberMetaStore, ctor, () => new Map());
+	const inner = getOrCreate(outer, key, () => new Map());
+	const list: unknown[] = getOrCreate(inner, name, () => []);
 	if (cardinality === "unique" && list.length > 0) {
 		throw new DuplicateMetadataError(ctor as AnyConstructor, key as MetadataKey, cardinality, options.kind, name);
 	}
 	list.push(meta);
 	tokens.add(token);
 
-	let staticMap = memberStaticStore.get(ctor);
-	if (!staticMap) {
-		staticMap = new Map();
-		memberStaticStore.set(ctor, staticMap);
-	}
+	const staticMap = getOrCreate(memberStaticStore, ctor, () => new Map());
 	staticMap.set(name, options.static);
 }
 
