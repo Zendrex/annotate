@@ -4,6 +4,11 @@ import type { ValidatorFn } from "./validator-types";
 
 export type { ValidateContext, ValidatorFn } from "./validator-types";
 
+/**
+ * Loose function brand used as the default for `TMethod` slots on method
+ * factories and interceptors. Deliberately bivariant so consumers can narrow
+ * to concrete signatures at the call site without fighting variance.
+ */
 // biome-ignore lint/suspicious/noExplicitAny: required for variance on TMethod
 export type AnyFn = (...args: any[]) => any;
 
@@ -107,6 +112,12 @@ export type AccessorDecoratorFn<TThis, TValue, TArgs extends unknown[]> = (
  * `TCard` is the cardinality brand carried by `.key`; the `reader` return
  * type narrows on `TCard` so unique keys yield scalar `metadata` and list
  * keys yield array `metadata`.
+ *
+ * Read helpers (`first`, `firstOrThrow`, `all`) throw
+ * {@link UnregisteredClassError} when `target` has no metadata of any kind;
+ * `firstOrThrow` additionally throws {@link MissingMetadataError} when the
+ * class has metadata but none for this key. `has` and `hasOwn` never throw.
+ * `all` returns a frozen array.
  */
 export type DecoratedClassFactory<
 	TMeta,
@@ -129,7 +140,8 @@ export type DecoratedClassFactory<
 /**
  * Method decorator factory with `(target, name)`-scoped read helpers and
  * `derive` for alternate `this`/method shapes against the same storage key.
- * See {@link DecoratedClassFactory} for `TCard` semantics.
+ * See {@link DecoratedClassFactory} for `TCard` semantics and the read-helper
+ * throw contract.
  */
 export type DecoratedMethodFactory<
 	TMeta,
@@ -153,7 +165,8 @@ export type DecoratedMethodFactory<
 
 /**
  * Stage 3 field decorator factory; mirrors the method factory's reader and
- * `derive` shape. See {@link DecoratedClassFactory} for `TCard` semantics.
+ * `derive` shape. See {@link DecoratedClassFactory} for `TCard` semantics and
+ * the read-helper throw contract.
  */
 export type DecoratedPropertyFactory<
 	TMeta,
@@ -178,7 +191,7 @@ export type DecoratedPropertyFactory<
 /**
  * Auto-accessor decorator factory. Metadata is stored property-scoped to keep
  * reflection parity with field decorators. See {@link DecoratedClassFactory}
- * for `TCard` semantics.
+ * for `TCard` semantics and the read-helper throw contract.
  */
 export type DecoratedAccessorFactory<
 	TMeta,

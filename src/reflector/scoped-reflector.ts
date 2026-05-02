@@ -13,7 +13,9 @@ import type {
 /**
  * Binds a minted metadata key to a class so reads need not pass the key. The
  * key's cardinality brand narrows reflected `metadata` fields to scalar or
- * list shapes.
+ * list shapes. Errors propagate from the underlying {@link Reflector}.
+ *
+ * @internal
  */
 export function createScopedReflector<TMeta, TCard extends Cardinality>(
 	ctor: AnyConstructor,
@@ -22,8 +24,6 @@ export function createScopedReflector<TMeta, TCard extends Cardinality>(
 	return new ScopedReflectorImpl<TMeta, TCard>(ctor, key);
 }
 
-// Delegates to ReflectorImpl; cardinality comes from the registry at runtime,
-// so the `unique` overload is selected only to satisfy the typed dispatch.
 class ScopedReflectorImpl<TMeta, TCard extends Cardinality = Cardinality> implements ScopedReflector<TMeta, TCard> {
 	private readonly reflector: Reflector;
 	private readonly key: MetadataKey<TMeta, TCard>;
@@ -49,9 +49,8 @@ class ScopedReflectorImpl<TMeta, TCard extends Cardinality = Cardinality> implem
 		return this.reflector.properties<TMeta>(this.uniqueKey) as DecoratedPropertyFor<TMeta, TCard>[];
 	}
 
-	// Cast once: ReflectorImpl resolves cardinality from the registry at runtime, so the
-	// narrow overload signature is irrelevant. Picking `UniqueMetadataKey` is arbitrary —
-	// the result is re-narrowed via `DecoratedXFor<TMeta, TCard>` at each return.
+	// ReflectorImpl resolves cardinality from the registry at runtime; the static
+	// overload picked here is arbitrary and re-narrowed via `DecoratedXFor` at returns.
 	private get uniqueKey(): UniqueMetadataKey<TMeta> {
 		return this.key as UniqueMetadataKey<TMeta>;
 	}

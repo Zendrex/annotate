@@ -21,15 +21,22 @@ import type {
 } from "./types";
 
 /**
- * Read API for a single class. Query keys must be minted via `mintUniqueKey`
- * or `mintListKey`; bare symbols are rejected.
+ * Read API for a single class. Query keys are minted via {@link mintUniqueKey}
+ * or {@link mintListKey}; unminted symbols yield no results at read time
+ * (rejection of unminted keys happens at decoration time inside
+ * `appendClassMeta` / `appendMemberMeta`).
  *
- * The first query triggers {@link prepare}; if no metadata is registered
- * afterward, {@link UnregisteredClassError} is thrown.
+ * Each query ensures the class is prepared via {@link prepare}; if no metadata
+ * is registered afterward, {@link UnregisteredClassError} is thrown.
  *
- * @throws {UnregisteredClassError} When the class has no metadata at first query.
+ * @throws {UnregisteredClassError} When the class has no registered metadata after preparation.
  */
 export interface Reflector {
+	/**
+	 * Returns every decorated item for `key`: the class entry first (if
+	 * present), then methods, then properties. Within methods and properties,
+	 * order follows {@link snapshotMembers} (subclass-first across the chain).
+	 */
 	all<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedItem<T, C>[];
 	class<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedClassFor<T, C> | undefined;
 	methods<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedMethodFor<T, C>[];
@@ -45,6 +52,12 @@ function isMethodLike(ctor: Ctor, name: string | symbol, isStatic: boolean): boo
 	return typeof desc.value === "function";
 }
 
+/**
+ * Concrete {@link Reflector}: lazily prepares the class on first successful
+ * query and caches member-shape lookups across reads.
+ *
+ * @internal
+ */
 export class ReflectorImpl implements Reflector {
 	private readonly ctor: AnyConstructor;
 	private registered = false;
@@ -160,8 +173,8 @@ const reflectorCache = new WeakMap<AnyConstructor, ReflectorImpl>();
 /**
  * Returns a {@link Reflector} bound to the resolved class. Accepts a
  * constructor or instance; instances are normalised via
- * {@link resolveReflectTarget}. The reflector is cached per constructor and
- * lazily invokes {@link prepare} on its first query.
+ * {@link resolveReflectTarget}. The reflector is cached per constructor;
+ * queries lazily invoke {@link prepare} until registration succeeds.
  *
  * @throws {TypeError} If `target` does not resolve to a usable constructor.
  */

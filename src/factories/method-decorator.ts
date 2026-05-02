@@ -10,19 +10,14 @@ import {
 import type { Cardinality, MetadataKey } from "../metadata/types";
 import type { AnyFn, DecoratedMethodFactory, DecoratorOptions, DeriveOptions, InterceptorContext } from "./types";
 
-/**
- * Hook bundle for {@link buildMethodFactory}. The `intercept` callback receives
- * the original method, a per-member `readMetadata` reader, and an
- * {@link InterceptorContext}; its return value replaces the method.
- */
+/** @internal Hook bundle preserved by `derive` across factory rebuilds. */
 export interface MethodHookRefs<TMeta, TMethod extends AnyFn> {
 	intercept: (original: TMethod, readMetadata: (instance: object) => TMeta[], context: InterceptorContext) => TMethod;
 }
 
 /**
- * Builds a method decorator factory using the shared member metadata path.
- * Pair with {@link MethodHookRefs} via {@link buildMethodFactory} to add
- * method interception.
+ * Builds a method decorator factory backed by a unique-cardinality metadata
+ * key. For interception, use {@link createMethodInterceptor}.
  */
 export function createMethodDecorator<
 	TMeta,
@@ -36,11 +31,8 @@ export function createMethodDecorator<
 }
 
 /**
- * Lower-level form of {@link createMethodDecorator} that accepts a pre-minted
- * key and optional {@link MethodHookRefs}. The intercept return value (if any)
- * replaces the original method; storage uses a distinct token per decoration
- * to keep ordering consistent with non-intercepting variants. `derive` reuses
- * `hookRefs` and merges options.
+ * @internal Builds the factory against a pre-minted key; the intercept return
+ *   value (if any) replaces the original method.
  */
 export function buildMethodFactory<
 	TMeta,

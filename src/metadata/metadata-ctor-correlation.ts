@@ -40,15 +40,12 @@ export function registerCtor(ctor: Ctor, correlation: object | null): void {
 	}
 }
 
-/**
- * Constructor last registered for this correlation, if any. Used when flushing
- * deferred member metadata to find the `Ctor` to store under.
- */
+/** Constructor last registered for this correlation, if any. */
 export function resolveCtorFromMetadata(correlation: object): Ctor | undefined {
 	return metadataToCtor.get(correlation);
 }
 
-/** Inverse of `resolveCtorFromMetadata` for code that has the `Ctor` and needs the deferred-time id. */
+/** Inverse of `resolveCtorFromMetadata`. */
 export function getCorrelationFor(ctor: Ctor): object | undefined {
 	return ctorToMetadata.get(ctor);
 }

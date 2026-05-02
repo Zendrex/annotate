@@ -9,11 +9,7 @@ import {
 import type { Cardinality, MetadataKey } from "../metadata/types";
 import type { DecoratedPropertyFactory, DecoratorOptions, DeriveOptions } from "./types";
 
-/**
- * Class field decorator factory. Stage 3 always passes `undefined` for the
- * field value; metadata commits via the shared member path with no value
- * replacement. Reader and `derive` shape match the other member factories.
- */
+/** Builds a class-field decorator factory backed by a unique-cardinality metadata key. */
 export function createPropertyDecorator<
 	TMeta,
 	TArgs extends unknown[] = [TMeta],
@@ -25,11 +21,7 @@ export function createPropertyDecorator<
 	return buildPropertyFactory<TMeta, TArgs, TField, TThis>(key, options);
 }
 
-/**
- * Lower-level form of {@link createPropertyDecorator} that accepts a
- * pre-minted key. `derive` reuses the key and merges options via
- * {@link mergeExtendedOptions}.
- */
+/** @internal Builds the factory against a pre-minted key; reused by `derive`. */
 export function buildPropertyFactory<
 	TMeta,
 	TArgs extends unknown[],

@@ -8,7 +8,7 @@ const memberMetaStore = new WeakMap<Ctor, MemberBucket>();
 
 const committedTokens = new WeakMap<Ctor, Set<symbol>>();
 
-/** Any own member metadata on this ctor (no chain walk). Used by `hasAnyMeta`. */
+/** Any own member metadata on this ctor (no chain walk). */
 export function hasOwnAnyMemberMeta(ctor: Ctor): boolean {
 	const bucket = memberMetaStore.get(ctor);
 	return !!bucket && bucket.size > 0;

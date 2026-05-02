@@ -49,9 +49,8 @@ function wrapUserValidate<TMeta>(fn: ValidatorFn<TMeta>, label: string, key: Met
 }
 
 /**
- * Composes `requireInstanceOf` and `validate` from decorator options into an
- * ordered chain. The instance check runs first; the user `validate` is
- * wrapped so non-Error throws are surfaced as {@link ValidationError}.
+ * @internal Chains `requireInstanceOf` (first) before user `validate`;
+ *   non-Error throws from user `validate` surface as {@link ValidationError}.
  */
 export function buildValidatorChain<TMeta>(
 	options: { validate?: ValidatorFn<TMeta>; requireInstanceOf?: AnyConstructor } | undefined,
@@ -85,7 +84,7 @@ export function buildValidatorChain<TMeta>(
 	return chain;
 }
 
-/** Runs validators sequentially; the first throw aborts the rest of the chain. */
+/** @internal Runs validators sequentially; first throw aborts the chain. */
 export function runValidatorChain<TMeta>(
 	chain: readonly ValidatorFn<TMeta>[],
 	meta: TMeta,
@@ -96,16 +95,12 @@ export function runValidatorChain<TMeta>(
 	}
 }
 
-/** Adapts a typed validator chain to the deferred-queue storage shape. */
+/** @internal Adapts a typed validator chain to the deferred-queue storage shape. */
 export function asDeferredValidators<TMeta>(chain: readonly ValidatorFn<TMeta>[]): readonly DeferredValidatorFn[] {
 	return chain as unknown as readonly DeferredValidatorFn[];
 }
 
-/**
- * Combines two optional validators into one that runs `parent` then `child`,
- * or returns whichever side is defined. Used when merging base and derived
- * decorator validation.
- */
+/** @internal Sequences parent-then-child validators; returns whichever side is defined. */
 export function chainValidators<TMeta>(
 	parent: ValidatorFn<TMeta> | undefined,
 	child: ValidatorFn<TMeta> | undefined

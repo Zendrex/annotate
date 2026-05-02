@@ -4,10 +4,16 @@ import type { Cardinality } from "../metadata/types";
 // biome-ignore lint/complexity/noBannedTypes: needed for constructor type
 export type AnyConstructor = Function & { prototype: object };
 
+/** Discriminator for {@link DecoratedItem} variants — class, method, or property decoration. */
 export type DecoratedKind = "class" | "method" | "property";
 
 // ── Class ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Class-level decoration with a unique-cardinality key. `metadata` is a scalar
+ * `TMeta`; `name` is the constructor's display name and `target` is the
+ * constructor itself.
+ */
 export interface DecoratedClassUnique<TMeta> {
 	kind: "class";
 	metadata: TMeta;
@@ -15,6 +21,10 @@ export interface DecoratedClassUnique<TMeta> {
 	target: AnyConstructor;
 }
 
+/**
+ * Class-level decoration with a list-cardinality key. `metadata` preserves
+ * decoration order across the prototype chain (subclass-first).
+ */
 export interface DecoratedClassList<TMeta> {
 	kind: "class";
 	metadata: readonly TMeta[];
@@ -22,6 +32,12 @@ export interface DecoratedClassList<TMeta> {
 	target: AnyConstructor;
 }
 
+/**
+ * Union of unique/list class shapes; cardinality-branded keys narrow to one
+ * via {@link DecoratedClassFor} at the call site.
+ *
+ * @internal
+ */
 export type DecoratedClass<TMeta> = DecoratedClassUnique<TMeta> | DecoratedClassList<TMeta>;
 
 // ── Method ────────────────────────────────────────────────────────────────────
@@ -47,7 +63,12 @@ export interface DecoratedMethodList<TMeta> {
 	static: boolean;
 }
 
-/** Internal union; branded keys narrow to one method shape on the public API. */
+/**
+ * Union of unique/list method shapes; cardinality-branded keys narrow to one
+ * via {@link DecoratedMethodFor} at the call site.
+ *
+ * @internal
+ */
 export type DecoratedMethod<TMeta> = DecoratedMethodUnique<TMeta> | DecoratedMethodList<TMeta>;
 
 // ── Property ──────────────────────────────────────────────────────────────────
@@ -62,7 +83,8 @@ export interface DecoratedPropertyUnique<TMeta> {
 
 /**
  * Property/field decoration with a list-cardinality key. `metadata` preserves
- * decoration order. `static` as for {@link DecoratedMethodUnique}.
+ * decoration order across the prototype chain (subclass-first). `static` as
+ * for {@link DecoratedMethodUnique}.
  */
 export interface DecoratedPropertyList<TMeta> {
 	kind: "property";
@@ -71,7 +93,12 @@ export interface DecoratedPropertyList<TMeta> {
 	static: boolean;
 }
 
-/** Internal union; consumers receive a narrowed shape via branded key overloads. */
+/**
+ * Union of unique/list property shapes; cardinality-branded keys narrow to one
+ * via {@link DecoratedPropertyFor} at the call site.
+ *
+ * @internal
+ */
 export type DecoratedProperty<TMeta> = DecoratedPropertyUnique<TMeta> | DecoratedPropertyList<TMeta>;
 
 // ── DecoratedItem ─────────────────────────────────────────────────────────────
@@ -108,7 +135,8 @@ export type DecoratedItem<TMeta, TCard extends Cardinality = Cardinality> =
 /**
  * Read API for a single key bound to a fixed class. Same queries as
  * {@link Reflector}, with the key elided. `TCard` narrows `metadata` to scalar
- * (`"unique"`) or array (`"list"`) form.
+ * (`"unique"`) or array (`"list"`) form. Errors propagate from the underlying
+ * {@link Reflector}.
  */
 export interface ScopedReflector<TMeta, TCard extends Cardinality = Cardinality> {
 	all(): DecoratedItem<TMeta, TCard>[];

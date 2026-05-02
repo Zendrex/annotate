@@ -16,10 +16,7 @@ import type {
 	InterceptorContext,
 } from "./types";
 
-/**
- * Get/set hooks split from {@link AccessorInterceptorOptions} so `derive` can
- * preserve the original hook references across re-builds.
- */
+/** @internal Hook bundle preserved by `derive` across factory rebuilds. */
 export interface AccessorHookRefs<TMeta, TValue> {
 	onGet?: (
 		original: () => TValue,
@@ -55,11 +52,7 @@ export function createAccessorInterceptor<
 	});
 }
 
-/**
- * Lower-level form of {@link createAccessorInterceptor} that accepts a
- * pre-minted key. Prefer the public entry unless composing multiple factories
- * on a single shared key.
- */
+/** @internal Builds the factory against a pre-minted key; reused by `derive`. */
 export function buildAccessorFactory<
 	TMeta,
 	TArgs extends unknown[],

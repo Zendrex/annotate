@@ -5,7 +5,7 @@ import type { ClassBucket, Ctor, MetadataKey } from "./types";
 
 const classMetaStore = new WeakMap<Ctor, ClassBucket>();
 
-/** Any own class metadata on this ctor (no chain walk). Used by `hasAnyMeta`. */
+/** Any own class metadata on this ctor (no chain walk). */
 export function hasOwnAnyClassMeta(ctor: Ctor): boolean {
 	const bucket = classMetaStore.get(ctor);
 	return !!bucket && bucket.size > 0;

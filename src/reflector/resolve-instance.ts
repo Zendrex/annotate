@@ -2,12 +2,12 @@ import type { AnyConstructor } from "./types";
 
 /**
  * Reads `instance.constructor` and validates it is a real class-shaped
- * constructor. Plain `Object`, missing constructors, and non-object prototypes
- * are rejected so reflection only runs against user-defined classes.
+ * constructor. Rejects non-object inputs, missing/undefined constructors,
+ * non-function constructors, the bare `Object` constructor, and constructors
+ * whose `prototype` is not an object — so reflection only runs against
+ * user-defined classes.
  *
- * @throws {TypeError} If `instance` is not a non-null object, has no usable
- *   `constructor`, the constructor is `Object`, or its `prototype` is not an
- *   object.
+ * @throws {TypeError} When `instance` fails any of those checks.
  */
 export function resolveConstructorFromInstance(instance: object): AnyConstructor {
 	if (instance === null || typeof instance !== "object") {
@@ -31,8 +31,9 @@ export function resolveConstructorFromInstance(instance: object): AnyConstructor
 }
 
 /**
- * Normalises a reflect target to a class constructor: passes constructors
- * through after the same shape checks, and delegates instance values to
+ * Normalises a reflect target to a class constructor. For function values,
+ * applies the constructor-shape checks (rejects `Object`, requires an object
+ * prototype) and returns it; otherwise delegates to
  * {@link resolveConstructorFromInstance}.
  *
  * @throws {TypeError} If `target` is not a class-shaped constructor or a

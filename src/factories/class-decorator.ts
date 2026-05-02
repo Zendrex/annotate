@@ -11,11 +11,7 @@ import type { Cardinality, Ctor, MetadataKey } from "../metadata/types";
 import type { AnyConstructor } from "../reflector/types";
 import type { AnyClass, DecoratedClassFactory, DecoratorOptions, DeriveOptions } from "./types";
 
-/**
- * Builds a class decorator factory. Composed metadata is appended via
- * {@link commitDecoration}, which validates, registers the constructor, and
- * flushes any deferred work pending on the decorator-context bag.
- */
+/** Builds a class decorator factory backed by a unique-cardinality metadata key. */
 export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta], TInstance = unknown>(
 	options?: DecoratorOptions<TMeta, TArgs>
 ): DecoratedClassFactory<TMeta, TArgs, TInstance> {
@@ -23,11 +19,7 @@ export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta], T
 	return buildClassFactory<TMeta, TArgs, TInstance>(key, options);
 }
 
-/**
- * Lower-level form of {@link createClassDecorator} that accepts a pre-minted
- * key. `derive` rebuilds against the same key with options merged via
- * {@link mergeExtendedOptions}.
- */
+/** @internal Builds the factory against a pre-minted key; reused by `derive`. */
 export function buildClassFactory<TMeta, TArgs extends unknown[], TInstance, TCard extends Cardinality = "unique">(
 	key: MetadataKey<TMeta, TCard>,
 	options: DecoratorOptions<TMeta, TArgs> | undefined
