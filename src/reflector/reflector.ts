@@ -52,6 +52,10 @@ function isMethodLike(ctor: Ctor, name: string | symbol, isStatic: boolean): boo
 	return typeof desc.value === "function";
 }
 
+// Per-ctor cache keeps the registration short-circuit and methodLikeCache warm
+// across repeated reflect() calls; without it, every call rebuilds both.
+const reflectorCache = new WeakMap<AnyConstructor, ReflectorImpl>();
+
 /**
  * Concrete {@link Reflector}: lazily prepares the class on first successful
  * query and caches member-shape lookups across reads.
@@ -165,10 +169,6 @@ export class ReflectorImpl implements Reflector {
 		this.registered = true;
 	}
 }
-
-// Per-ctor cache keeps the registration short-circuit and methodLikeCache warm
-// across repeated reflect() calls; without it, every call rebuilds both.
-const reflectorCache = new WeakMap<AnyConstructor, ReflectorImpl>();
 
 /**
  * Returns a {@link Reflector} bound to the resolved class. Accepts a
