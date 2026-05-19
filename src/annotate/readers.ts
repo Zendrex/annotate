@@ -7,9 +7,9 @@ import type { AnyConstructor } from "../reflector/types";
 import type {
 	Cardinality,
 	ClassAnnotationEntry,
-	IClassAnnotationReader,
-	IMemberAnnotationReader,
+	ClassAnnotationReader,
 	MemberAnnotationEntry,
+	MemberAnnotationReader,
 	PublicInterceptorContext,
 	ReadResult,
 } from "./types";
@@ -76,7 +76,7 @@ export function createClassReader<TMeta, TCard extends Cardinality>(
 	key: MetadataKey<TMeta>,
 	cardinality: TCard,
 	target: object
-): IClassAnnotationReader<TMeta, TCard> {
+): ClassAnnotationReader<TMeta, TCard> {
 	const ctor = prepareTarget(target);
 	return {
 		entries: () => {
@@ -104,7 +104,7 @@ export function createMemberReader<TMeta, TCard extends Cardinality, TThis>(
 	key: MetadataKey<TMeta>,
 	cardinality: TCard,
 	target: object
-): IMemberAnnotationReader<TMeta, TCard, TThis, AnyConstructor> {
+): MemberAnnotationReader<TMeta, TCard, TThis, AnyConstructor> {
 	const ctor = prepareTarget(target);
 
 	const entriesFor = (kind?: Extract<MemberKind, "method" | "field" | "accessor">) => {
@@ -151,7 +151,7 @@ export function attachClassRead<TFactory extends object, TMeta, TCard extends Ca
 	factory: TFactory,
 	key: MetadataKey<TMeta>,
 	cardinality: TCard
-): TFactory & { read(target: object): IClassAnnotationReader<TMeta, TCard> } {
+): TFactory & { read(target: object): ClassAnnotationReader<TMeta, TCard> } {
 	return Object.assign(factory, {
 		read: (target: object) => createClassReader<TMeta, TCard>(key, cardinality, target),
 	});
@@ -161,7 +161,7 @@ export function attachMemberRead<TFactory extends object, TMeta, TCard extends C
 	factory: TFactory,
 	key: MetadataKey<TMeta>,
 	cardinality: TCard
-): TFactory & { read(target: object): IMemberAnnotationReader<TMeta, TCard, TThis, AnyConstructor> } {
+): TFactory & { read(target: object): MemberAnnotationReader<TMeta, TCard, TThis, AnyConstructor> } {
 	return Object.assign(factory, {
 		read: (target: object) => createMemberReader<TMeta, TCard, TThis>(key, cardinality, target),
 	});

@@ -33,22 +33,22 @@ export interface MemberAnnotationEntry<TMeta, TCard extends Cardinality = Cardin
 	static: boolean;
 }
 
-export interface IClassAnnotationReader<TMeta, TCard extends Cardinality> {
+export interface ClassAnnotationReader<TMeta, TCard extends Cardinality> {
 	entries(): ClassAnnotationEntry<TMeta, TCard>[];
 	get(): ReadResult<TMeta, TCard>;
 }
 
-export interface IStaticMemberAnnotationReader<TMeta, TCard extends Cardinality, TStatic> {
+export interface StaticMemberAnnotationReader<TMeta, TCard extends Cardinality, TStatic> {
 	get(selector: (target: TStatic) => unknown): ReadResult<TMeta, TCard>;
 }
 
-export interface IMemberAnnotationReader<TMeta, TCard extends Cardinality, TThis, TStatic = unknown> {
+export interface MemberAnnotationReader<TMeta, TCard extends Cardinality, TThis, TStatic = unknown> {
 	accessors(): MemberAnnotationEntry<TMeta, TCard>[];
 	entries(): MemberAnnotationEntry<TMeta, TCard>[];
 	fields(): MemberAnnotationEntry<TMeta, TCard>[];
 	get(selector: (target: TThis) => unknown): ReadResult<TMeta, TCard>;
 	methods(): MemberAnnotationEntry<TMeta, TCard>[];
-	readonly static: IStaticMemberAnnotationReader<TMeta, TCard, TStatic>;
+	readonly static: StaticMemberAnnotationReader<TMeta, TCard, TStatic>;
 }
 
 export interface PublicInterceptorContext<TMeta, TCard extends Cardinality> {
@@ -61,7 +61,7 @@ export interface PublicInterceptorContext<TMeta, TCard extends Cardinality> {
 export type ClassAnnotation<TMeta, TArgs extends unknown[], TInstance, TCard extends Cardinality> = ((
 	...args: TArgs
 ) => <T extends abstract new (...args: never[]) => TInstance>(value: T, context: ClassDecoratorContext<T>) => void) & {
-	read(target: object): IClassAnnotationReader<TMeta, TCard>;
+	read(target: object): ClassAnnotationReader<TMeta, TCard>;
 };
 
 export type MethodAnnotation<
@@ -73,7 +73,7 @@ export type MethodAnnotation<
 > = ((
 	...args: TArgs
 ) => (value: TMethod, context: ClassMethodDecoratorContext<TThis, TMethod>) => TMethod | undefined) & {
-	read<TTarget extends object>(target: TTarget): IMemberAnnotationReader<TMeta, TCard, TThis, TTarget>;
+	read<TTarget extends object>(target: TTarget): MemberAnnotationReader<TMeta, TCard, TThis, TTarget>;
 };
 
 export type FieldAnnotation<TMeta, TArgs extends unknown[], TField, TThis, TCard extends Cardinality> = ((
@@ -82,7 +82,7 @@ export type FieldAnnotation<TMeta, TArgs extends unknown[], TField, TThis, TCard
 	value: undefined,
 	context: ClassFieldDecoratorContext<TThis, TField>
 ) => ((this: TThis, initial: any) => any) | undefined) & {
-	read<TTarget extends object>(target: TTarget): IMemberAnnotationReader<TMeta, TCard, TThis, TTarget>;
+	read<TTarget extends object>(target: TTarget): MemberAnnotationReader<TMeta, TCard, TThis, TTarget>;
 };
 
 export type AccessorAnnotation<TMeta, TArgs extends unknown[], TValue, TThis, TCard extends Cardinality> = ((
@@ -91,7 +91,7 @@ export type AccessorAnnotation<TMeta, TArgs extends unknown[], TValue, TThis, TC
 	value: ClassAccessorDecoratorTarget<TThis, TValue>,
 	context: ClassAccessorDecoratorContext<TThis, TValue>
 ) => ClassAccessorDecoratorResult<TThis, TValue> | undefined) & {
-	read<TTarget extends object>(target: TTarget): IMemberAnnotationReader<TMeta, TCard, TThis, TTarget>;
+	read<TTarget extends object>(target: TTarget): MemberAnnotationReader<TMeta, TCard, TThis, TTarget>;
 };
 
 interface BuilderOptionsInputBase<TMeta, TArgs extends unknown[], TCard extends Cardinality>

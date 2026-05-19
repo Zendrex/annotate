@@ -22,7 +22,7 @@ import type {
 	MethodInterceptorOptions,
 } from "./types";
 
-interface IAnnotate {
+interface AnnotateApi {
 	accessor<TMeta>(options?: AnnotationOptions<TMeta, "one">): AccessorAnnotation<TMeta, [TMeta], any, any, "one">;
 	accessor<TMeta>(options: AnnotationOptions<TMeta, "many">): AccessorAnnotation<TMeta, [TMeta], any, any, "many">;
 	accessor<TArgs extends unknown[], TMeta>(
@@ -102,7 +102,7 @@ interface IAnnotate {
 	): MethodAnnotation<TMeta, TArgs, AnyFn, any, TCard>;
 }
 
-export const Annotate: IAnnotate = Object.freeze({
+export const Annotate: AnnotateApi = Object.freeze({
 	accessor: accessorAnnotation,
 	class: classAnnotation,
 	field: fieldAnnotation,
@@ -112,7 +112,7 @@ export const Annotate: IAnnotate = Object.freeze({
 		method: methodInterceptor,
 	}),
 	method: methodAnnotation,
-} as IAnnotate);
+} as AnnotateApi);
 
 export type {
 	AccessorAnnotation,
@@ -122,11 +122,11 @@ export type {
 	Cardinality,
 	ClassAnnotation,
 	ClassAnnotationEntry,
+	ClassAnnotationReader,
 	FieldAnnotation,
 	FieldInterceptorOptions,
-	IClassAnnotationReader,
-	IMemberAnnotationReader,
 	MemberAnnotationEntry,
+	MemberAnnotationReader,
 	MethodAnnotation,
 	MethodInterceptorOptions,
 	PublicInterceptorContext,
