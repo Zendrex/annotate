@@ -1,4 +1,4 @@
-import { formatSlot, targetDisplayName } from "./reflector/class-name";
+import { formatSlot, targetDisplayName } from "./reflector/target";
 import type { Cardinality, MetadataKey } from "./metadata/types";
 import type { AnyConstructor, DecoratedKind } from "./reflector/types";
 

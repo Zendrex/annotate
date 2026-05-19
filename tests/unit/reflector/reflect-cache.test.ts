@@ -2,9 +2,8 @@
 import { describe, expect, test } from "bun:test";
 
 import { mintUniqueKey, reflect, UnregisteredClassError } from "../../../src";
-import { registerCtor } from "../../../src/metadata/pipeline/ctor-correlation";
-import { appendClassMeta } from "../../../src/metadata/stores/class-meta-store";
-import { appendMemberMeta } from "../../../src/metadata/stores/member-meta-store";
+import { registerCtor } from "../../../src/metadata/pipeline";
+import { appendClassMeta, appendMemberMeta } from "../../../src/metadata/store";
 import type { Ctor, MetadataKey } from "../../../src/metadata/types";
 
 function classTag<T>(key: MetadataKey<T>, value: T) {

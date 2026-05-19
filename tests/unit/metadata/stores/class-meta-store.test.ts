@@ -8,7 +8,7 @@ import {
 	getClassMeta,
 	hasOwnAnyClassMeta,
 	hasOwnClassMeta,
-} from "../../../../src/metadata/stores/class-meta-store";
+} from "../../../../src/metadata/store";
 import type { MetadataKey } from "../../../../src/metadata/types";
 
 describe("class metadata store", () => {

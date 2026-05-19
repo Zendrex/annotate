@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { getOrCreate } from "../../../../src/metadata/stores/get-or-create";
+import { getOrCreate } from "../../../../src/metadata/store";
 
 describe("getOrCreate with Map", () => {
 	it("returns existing value without calling factory", () => {

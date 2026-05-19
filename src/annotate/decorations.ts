@@ -1,50 +1,10 @@
-import { keyDisplayName } from "../errors";
-import { registerCtor } from "../metadata/pipeline/ctor-correlation";
-import { flushFor, queueDeferred } from "../metadata/pipeline/deferred-queue";
-import { appendMemberMeta, collectMemberMeta } from "../metadata/stores/member-meta-store";
-import { prepare } from "../runtime/prepare";
+import { flushFor, prepare, queueDeferred, registerCtor } from "../metadata/pipeline";
+import { appendMemberMeta } from "../metadata/store";
 import { walkPrototypeChain } from "../runtime/prototype-chain";
-import { asDeferredValidators, buildValidatorChain, runValidatorChain } from "./validation";
+import { asDeferredValidators, runValidatorChain } from "./validation";
 import type { Ctor, Deferred, MemberKind, MetadataKey } from "../metadata/types";
 import type { AnyConstructor } from "../reflector/types";
-import type { InternalAnnotationOptions } from "./internal-types";
-import type { ValidateContext, ValidatorFn } from "./validation-types";
-
-export function mapArgs<TMeta>(args: [TMeta]): TMeta;
-export function mapArgs<TMeta, TArgs extends unknown[]>(
-	args: TArgs,
-	mapper: ((...args: TArgs) => TMeta) | undefined
-): TMeta;
-export function mapArgs<TMeta, TArgs extends unknown[]>(args: TArgs, mapper?: (...args: TArgs) => TMeta): TMeta {
-	return mapper ? mapper(...args) : (args[0] as TMeta);
-}
-
-function labelFor(label: string | undefined, key: MetadataKey): string {
-	return label ?? keyDisplayName(key);
-}
-
-export function prepareTargetBuilder<TMeta, TArgs extends unknown[]>(
-	key: MetadataKey<TMeta>,
-	options: InternalAnnotationOptions<TMeta, TArgs> | undefined
-): {
-	argsMapper: ((...args: TArgs) => TMeta) | undefined;
-	validators: ValidatorFn<TMeta>[] | undefined;
-} {
-	const { args: argsMapper, label } = options ?? {};
-	const validators = buildValidatorChain<TMeta>(options, labelFor(label, key), key);
-	return { argsMapper, validators };
-}
-
-export function createMemberMetadataReader<TMeta>(
-	key: MetadataKey<TMeta>,
-	memberName: string | symbol,
-	isStatic: boolean
-): (instance: object) => TMeta[] {
-	return (instance: object): TMeta[] => {
-		const ctor = isStatic ? (instance as unknown as Ctor) : (instance as { constructor: Ctor }).constructor;
-		return collectMemberMeta<TMeta>(ctor, key, memberName);
-	};
-}
+import type { ValidateContext, ValidatorFn } from "./validation";
 
 interface MemberEmitContext {
 	addInitializer(initializer: (this: unknown) => void): void;

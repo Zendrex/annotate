@@ -1,10 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-	getCorrelationFor,
-	registerCtor,
-	resolveCtorFromMetadata,
-} from "../../../../src/metadata/pipeline/ctor-correlation";
+import { getCorrelationFor, registerCtor, resolveCtorFromMetadata } from "../../../../src/metadata/pipeline";
 
 const DIFFERENT_CTOR_PATTERN = /different constructor/;
 const DIFFERENT_CORRELATION_PATTERN = /different correlation/;

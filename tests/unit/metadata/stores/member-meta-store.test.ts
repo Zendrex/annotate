@@ -11,7 +11,7 @@ import {
 	hasOwnAnyMemberMeta,
 	hasOwnMemberMeta,
 	snapshotMembers,
-} from "../../../../src/metadata/stores/member-meta-store";
+} from "../../../../src/metadata/store";
 import type { MetadataKey } from "../../../../src/metadata/types";
 
 describe("member metadata store", () => {

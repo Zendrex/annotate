@@ -71,7 +71,7 @@ export type DecoratedItem<TMeta, TCard extends Cardinality = Cardinality> =
 	| DecoratedPropertyFor<TMeta, TCard>;
 
 /** Reflector queries with the key elided. */
-export interface ScopedReflector<TMeta, TCard extends Cardinality = Cardinality> {
+export interface IScopedReflector<TMeta, TCard extends Cardinality = Cardinality> {
 	all(): DecoratedItem<TMeta, TCard>[];
 	class(): DecoratedClassFor<TMeta, TCard> | undefined;
 	methods(): DecoratedMethodFor<TMeta, TCard>[];

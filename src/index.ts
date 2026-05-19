@@ -13,8 +13,8 @@ export {
 	ValidationError,
 } from "./errors";
 export { mintListKey, mintUniqueKey } from "./metadata/cardinality";
+export { prepare } from "./metadata/pipeline";
 export { reflect } from "./reflector/reflector";
-export { prepare } from "./runtime/prepare";
 export type {
 	AccessorAnnotation,
 	AccessorInterceptorOptions as AnnotateAccessorInterceptorOptions,
@@ -23,18 +23,18 @@ export type {
 	Cardinality,
 	ClassAnnotation,
 	ClassAnnotationEntry,
-	ClassAnnotationReader,
 	FieldAnnotation,
 	FieldInterceptorOptions as AnnotateFieldInterceptorOptions,
+	IClassAnnotationReader,
+	IMemberAnnotationReader,
 	MemberAnnotationEntry,
-	MemberAnnotationReader,
 	MethodAnnotation,
 	MethodInterceptorOptions as AnnotateMethodInterceptorOptions,
 	PublicInterceptorContext,
 	ValidateContext,
 } from "./annotate";
 export type { ListMetadataKey, MetadataArray, MetadataKey, UniqueMetadataKey } from "./metadata/types";
-export type { Reflector } from "./reflector/reflector";
+export type { IReflector } from "./reflector/reflector";
 export type {
 	DecoratedClassList,
 	DecoratedClassUnique,
@@ -44,5 +44,5 @@ export type {
 	DecoratedMethodUnique,
 	DecoratedPropertyList,
 	DecoratedPropertyUnique,
-	ScopedReflector,
+	IScopedReflector,
 } from "./reflector/types";

@@ -1,17 +1,11 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: field decorator initializer return types must remain assignable to literal field initializers */
-import { collectMemberNames, getMemberStatic } from "../../metadata/stores/member-meta-store";
-import { prepare } from "../../runtime/prepare";
+import { prepare } from "../../metadata/pipeline";
+import { collectMemberNames, getMemberStatic } from "../../metadata/store";
 import { walkPrototypeChain } from "../../runtime/prototype-chain";
-import { createMemberMetadataReader, emitMemberDecoration, mapArgs, prepareTargetBuilder } from "../target-shared";
+import { emitMemberDecoration } from "../decorations";
+import { createMemberMetadataReader, mapArgs, prepareTargetBuilder } from "./shared";
 import type { Cardinality, Ctor, MemberKind, MetadataKey } from "../../metadata/types";
 import type { FieldHookRefs, InternalAnnotationOptions, InternalInterceptorContext } from "../internal-types";
-
-export type FieldTargetDecorator<_TMeta, TArgs extends unknown[], TField, TThis> = (
-	...args: TArgs
-) => (
-	value: undefined,
-	context: ClassFieldDecoratorContext<TThis, TField>
-) => ((this: TThis, initial: any) => any) | undefined;
 
 const fieldInterceptors = new Map<MetadataKey, FieldHookRefs<unknown, unknown>>();
 const initializedFields = new WeakMap<object, Set<string | symbol>>();
@@ -25,7 +19,14 @@ interface IndexedFieldEntry {
 
 const ctorFieldIndex = new WeakMap<Ctor, readonly IndexedFieldEntry[]>();
 
-function markInitialized(target: object, name: string | symbol): void {
+function registerFieldInterceptor<TMeta, TField>(
+	key: MetadataKey<TMeta>,
+	hookRefs: FieldHookRefs<TMeta, TField>
+): void {
+	fieldInterceptors.set(key, hookRefs as FieldHookRefs<unknown, unknown>);
+}
+
+function markFieldInitialized(target: object, name: string | symbol): void {
 	let names = initializedFields.get(target);
 	if (!names) {
 		names = new Set();
@@ -34,7 +35,7 @@ function markInitialized(target: object, name: string | symbol): void {
 	names.add(name);
 }
 
-function isInitialized(target: object, name: string | symbol): boolean {
+function isFieldInitialized(target: object, name: string | symbol): boolean {
 	return initializedFields.get(target)?.has(name) ?? false;
 }
 
@@ -55,6 +56,40 @@ function buildFieldEntries(ctor: Ctor): IndexedFieldEntry[] {
 	}
 	return entries;
 }
+
+function applyAllFieldInterceptors(this: unknown): void {
+	const ctor = (this as { constructor: Ctor }).constructor;
+	const target = this as Record<string | symbol, unknown>;
+
+	walkPrototypeChain(ctor, (link) => {
+		prepare(link);
+	});
+
+	let entries = ctorFieldIndex.get(ctor);
+	if (!entries) {
+		entries = buildFieldEntries(ctor);
+		ctorFieldIndex.set(ctor, entries);
+	}
+
+	for (const entry of entries) {
+		if (isFieldInitialized(target, entry.name)) {
+			continue;
+		}
+		target[entry.name] = entry.init.call(target, target[entry.name], entry.reader, entry.context);
+		markFieldInitialized(target, entry.name);
+	}
+}
+
+export function applyFieldInterceptors(instance: object): void {
+	applyAllFieldInterceptors.call(instance);
+}
+
+export type FieldTargetDecorator<_TMeta, TArgs extends unknown[], TField, TThis> = (
+	...args: TArgs
+) => (
+	value: undefined,
+	context: ClassFieldDecoratorContext<TThis, TField>
+) => ((this: TThis, initial: any) => any) | undefined;
 
 export function buildFieldTarget<TMeta, TArgs extends unknown[], TField, TThis, TCard extends Cardinality = "unique">(
 	key: MetadataKey<TMeta, TCard>,
@@ -92,7 +127,7 @@ export function buildFieldInterceptorTarget<
 	const { argsMapper, validators } = prepareTargetBuilder<TMeta, TArgs>(key, options);
 	const { init } = hookRefs;
 
-	fieldInterceptors.set(key, hookRefs as FieldHookRefs<unknown, unknown>);
+	registerFieldInterceptor(key, hookRefs);
 
 	return (...args: TArgs) =>
 		(
@@ -137,35 +172,8 @@ export function buildFieldInterceptorTarget<
 					prepare(link);
 				});
 				const next = init.call(this, initial, readMetadata, interceptorContext);
-				markInitialized(this as object, memberName);
+				markFieldInitialized(this as object, memberName);
 				return next;
 			};
 		};
-}
-
-function applyAllFieldInterceptors(this: unknown): void {
-	const ctor = (this as { constructor: Ctor }).constructor;
-	const target = this as Record<string | symbol, unknown>;
-
-	walkPrototypeChain(ctor, (link) => {
-		prepare(link);
-	});
-
-	let entries = ctorFieldIndex.get(ctor);
-	if (!entries) {
-		entries = buildFieldEntries(ctor);
-		ctorFieldIndex.set(ctor, entries);
-	}
-
-	for (const entry of entries) {
-		if (isInitialized(target, entry.name)) {
-			continue;
-		}
-		target[entry.name] = entry.init.call(target, target[entry.name], entry.reader, entry.context);
-		markInitialized(target, entry.name);
-	}
-}
-
-export function applyFieldInterceptors(instance: object): void {
-	applyAllFieldInterceptors.call(instance);
 }

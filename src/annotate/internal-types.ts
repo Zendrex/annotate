@@ -1,6 +1,6 @@
 import type { AnyConstructor } from "../reflector/types";
 import type { Cardinality } from "./types";
-import type { ValidatorFn } from "./validation-types";
+import type { ValidatorFn } from "./validation";
 
 // biome-ignore lint/suspicious/noExplicitAny: public method decorators must preserve arbitrary function signatures
 export type AnyFn = (...args: any[]) => any;

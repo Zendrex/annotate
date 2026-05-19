@@ -1,10 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-	invalidatePrepared,
-	isFullyPrepared,
-	markFullyPrepared,
-} from "../../../../src/metadata/pipeline/prepared-sentinel";
+import { invalidatePrepared, isFullyPrepared, markFullyPrepared } from "../../../../src/metadata/pipeline";
 
 describe("prepared-sentinel", () => {
 	test("isFullyPrepared returns false by default", () => {

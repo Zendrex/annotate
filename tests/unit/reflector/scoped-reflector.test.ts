@@ -2,8 +2,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { mintListKey, mintUniqueKey } from "../../../src";
-import { appendClassMeta } from "../../../src/metadata/stores/class-meta-store";
-import { appendMemberMeta } from "../../../src/metadata/stores/member-meta-store";
+import { appendClassMeta, appendMemberMeta } from "../../../src/metadata/store";
 import { createScopedReflector } from "../../../src/reflector/scoped-reflector";
 import type { Ctor, MetadataKey } from "../../../src/metadata/types";
 

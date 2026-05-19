@@ -22,7 +22,7 @@ import type {
 	MethodInterceptorOptions,
 } from "./types";
 
-interface AnnotateNamespace {
+interface IAnnotate {
 	accessor<TMeta>(options?: AnnotationOptions<TMeta, "one">): AccessorAnnotation<TMeta, [TMeta], any, any, "one">;
 	accessor<TMeta>(options: AnnotationOptions<TMeta, "many">): AccessorAnnotation<TMeta, [TMeta], any, any, "many">;
 	accessor<TArgs extends unknown[], TMeta>(
@@ -102,7 +102,7 @@ interface AnnotateNamespace {
 	): MethodAnnotation<TMeta, TArgs, AnyFn, any, TCard>;
 }
 
-export const Annotate: AnnotateNamespace = Object.freeze({
+export const Annotate: IAnnotate = Object.freeze({
 	accessor: accessorAnnotation,
 	class: classAnnotation,
 	field: fieldAnnotation,
@@ -112,7 +112,7 @@ export const Annotate: AnnotateNamespace = Object.freeze({
 		method: methodInterceptor,
 	}),
 	method: methodAnnotation,
-} as AnnotateNamespace);
+} as IAnnotate);
 
 export type {
 	AccessorAnnotation,
@@ -122,13 +122,13 @@ export type {
 	Cardinality,
 	ClassAnnotation,
 	ClassAnnotationEntry,
-	ClassAnnotationReader,
 	FieldAnnotation,
 	FieldInterceptorOptions,
+	IClassAnnotationReader,
+	IMemberAnnotationReader,
 	MemberAnnotationEntry,
-	MemberAnnotationReader,
 	MethodAnnotation,
 	MethodInterceptorOptions,
 	PublicInterceptorContext,
 } from "./types";
-export type { ValidateContext } from "./validation-types";
+export type { ValidateContext } from "./validation";

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { formatSlot } from "../../../src/reflector/class-name";
+import { formatSlot } from "../../../src/reflector/target";
 
 describe("formatSlot", () => {
 	test("returns the class display name when memberName is undefined", () => {

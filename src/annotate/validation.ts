@@ -1,7 +1,15 @@
 import { InvalidDecorationTargetError, ValidationError } from "../errors";
 import type { DeferredValidatorFn, MetadataKey } from "../metadata/types";
-import type { AnyConstructor } from "../reflector/types";
-import type { ValidateContext, ValidatorFn } from "./validation-types";
+import type { AnyConstructor, DecoratedKind } from "../reflector/types";
+
+export interface ValidateContext {
+	kind: DecoratedKind;
+	memberName?: string | symbol;
+	static: boolean;
+	target: AnyConstructor;
+}
+
+export type ValidatorFn<TMeta> = (meta: TMeta, context: ValidateContext) => void;
 
 function extractReason(error: unknown): string {
 	if (error === null || error === undefined) {

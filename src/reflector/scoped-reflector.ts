@@ -1,28 +1,28 @@
-import { ReflectorImpl } from "./reflector";
+import { Reflector } from "./reflector";
 import type { Cardinality, MetadataKey, UniqueMetadataKey } from "../metadata/types";
-import type { Reflector } from "./reflector";
+import type { IReflector } from "./reflector";
 import type {
 	AnyConstructor,
 	DecoratedClassFor,
 	DecoratedItem,
 	DecoratedMethodFor,
 	DecoratedPropertyFor,
-	ScopedReflector,
+	IScopedReflector,
 } from "./types";
 
 export function createScopedReflector<TMeta, TCard extends Cardinality>(
 	ctor: AnyConstructor,
 	key: MetadataKey<TMeta, TCard>
-): ScopedReflector<TMeta, TCard> {
-	return new ScopedReflectorImpl<TMeta, TCard>(ctor, key);
+): IScopedReflector<TMeta, TCard> {
+	return new ScopedReflector<TMeta, TCard>(ctor, key);
 }
 
-class ScopedReflectorImpl<TMeta, TCard extends Cardinality = Cardinality> implements ScopedReflector<TMeta, TCard> {
-	private readonly reflector: Reflector;
+class ScopedReflector<TMeta, TCard extends Cardinality = Cardinality> implements IScopedReflector<TMeta, TCard> {
+	private readonly reflector: IReflector;
 	private readonly key: MetadataKey<TMeta, TCard>;
 
 	constructor(ctor: AnyConstructor, key: MetadataKey<TMeta, TCard>) {
-		this.reflector = new ReflectorImpl(ctor);
+		this.reflector = new Reflector(ctor);
 		this.key = key;
 	}
 
@@ -42,7 +42,7 @@ class ScopedReflectorImpl<TMeta, TCard extends Cardinality = Cardinality> implem
 		return this.reflector.properties<TMeta>(this.uniqueKey) as DecoratedPropertyFor<TMeta, TCard>[];
 	}
 
-	// ReflectorImpl resolves cardinality from the registry at runtime; the static
+	// Reflector resolves cardinality from the registry at runtime; the static
 	// overload picked here is arbitrary and re-narrowed via `DecoratedXFor` at returns.
 	private get uniqueKey(): UniqueMetadataKey<TMeta> {
 		return this.key as UniqueMetadataKey<TMeta>;

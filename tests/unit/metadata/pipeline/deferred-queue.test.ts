@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
 import { mintUniqueKey } from "../../../../src/metadata/cardinality";
-import { flushFor, hasPendingFor, queueDeferred } from "../../../../src/metadata/pipeline/deferred-queue";
-import { getMemberMeta } from "../../../../src/metadata/stores/member-meta-store";
+import { flushFor, hasPendingFor, queueDeferred } from "../../../../src/metadata/pipeline";
+import { getMemberMeta } from "../../../../src/metadata/store";
 
 describe("metadata deferred queue", () => {
 	test("queueDeferred + flushFor commits pending entries", () => {

@@ -1,5 +1,6 @@
-import { appendClassMeta } from "../../metadata/stores/class-meta-store";
-import { commitDecoration, mapArgs, prepareTargetBuilder } from "../target-shared";
+import { appendClassMeta } from "../../metadata/store";
+import { commitDecoration } from "../decorations";
+import { mapArgs, prepareTargetBuilder } from "./shared";
 import type { Cardinality, Ctor, MetadataKey } from "../../metadata/types";
 import type { AnyConstructor } from "../../reflector/types";
 import type { AnyClass, InternalAnnotationOptions } from "../internal-types";

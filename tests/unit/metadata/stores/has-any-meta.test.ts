@@ -1,9 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { mintUniqueKey } from "../../../../src/metadata/cardinality";
-import { appendClassMeta } from "../../../../src/metadata/stores/class-meta-store";
-import { hasAnyMeta } from "../../../../src/metadata/stores/has-any-meta";
-import { appendMemberMeta } from "../../../../src/metadata/stores/member-meta-store";
+import { appendClassMeta, appendMemberMeta, hasAnyMeta } from "../../../../src/metadata/store";
 
 describe("hasAnyMeta", () => {
 	test("false when neither store has data for the chain", () => {

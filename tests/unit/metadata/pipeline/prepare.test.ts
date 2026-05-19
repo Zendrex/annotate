@@ -1,13 +1,16 @@
 import { describe, expect, test } from "bun:test";
 
-import { UnregisteredClassError } from "../../../src/errors";
-import { mintListKey, mintUniqueKey } from "../../../src/metadata/cardinality";
-import { registerCtor } from "../../../src/metadata/pipeline/ctor-correlation";
-import { hasPendingFor, queueDeferred } from "../../../src/metadata/pipeline/deferred-queue";
-import { isFullyPrepared } from "../../../src/metadata/pipeline/prepared-sentinel";
-import { getMemberMeta } from "../../../src/metadata/stores/member-meta-store";
-import { prepare } from "../../../src/runtime/prepare";
-import { METADATA_SYMBOL } from "../../../src/runtime/symbol-metadata";
+import { UnregisteredClassError } from "../../../../src/errors";
+import { mintListKey, mintUniqueKey } from "../../../../src/metadata/cardinality";
+import {
+	hasPendingFor,
+	isFullyPrepared,
+	prepare,
+	queueDeferred,
+	registerCtor,
+} from "../../../../src/metadata/pipeline";
+import { getMemberMeta } from "../../../../src/metadata/store";
+import { METADATA_SYMBOL } from "../../../../src/runtime/symbol-metadata";
 
 // biome-ignore lint/complexity/noBannedTypes: test helper.
 function brand<T extends Function>(ctor: T, correlation: object): void {

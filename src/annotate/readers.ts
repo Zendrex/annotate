@@ -1,20 +1,69 @@
-import { collectClassMeta } from "../metadata/stores/class-meta-store";
-import { collectMemberMeta, snapshotMembers } from "../metadata/stores/member-meta-store";
-import { targetDisplayName } from "../reflector/class-name";
-import { resolveReflectTarget } from "../reflector/resolve-instance";
-import { prepare } from "../runtime/prepare";
-import { formatMetadata, formatRead } from "./format";
-import { resolveSelector } from "./selector";
+import { InvalidSelectorError } from "../errors";
+import { prepare } from "../metadata/pipeline";
+import { collectClassMeta, collectMemberMeta, snapshotMembers } from "../metadata/store";
+import { resolveReflectTarget, targetDisplayName } from "../reflector/target";
 import type { MemberKind, MetadataKey } from "../metadata/types";
 import type { AnyConstructor } from "../reflector/types";
 import type {
 	Cardinality,
 	ClassAnnotationEntry,
-	ClassAnnotationReader,
+	IClassAnnotationReader,
+	IMemberAnnotationReader,
 	MemberAnnotationEntry,
-	MemberAnnotationReader,
 	PublicInterceptorContext,
+	ReadResult,
 } from "./types";
+
+function formatRead<TMeta, TCard extends Cardinality>(
+	values: readonly TMeta[],
+	cardinality: TCard
+): ReadResult<TMeta, TCard> {
+	if (cardinality === "many") {
+		return Object.freeze([...values]) as ReadResult<TMeta, TCard>;
+	}
+	return values[0] as ReadResult<TMeta, TCard>;
+}
+
+function formatMetadata<TMeta, TCard extends Cardinality>(
+	values: readonly unknown[],
+	cardinality: TCard
+): TCard extends "many" ? readonly TMeta[] : TMeta {
+	if (cardinality === "many") {
+		return Object.freeze([...values]) as TCard extends "many" ? readonly TMeta[] : TMeta;
+	}
+	return values[0] as TCard extends "many" ? readonly TMeta[] : TMeta;
+}
+
+function resolveSelector(target: AnyConstructor, selector: (target: never) => unknown): string | symbol {
+	const reads: (string | symbol)[] = [];
+	let invoked = false;
+	const memberProxy = new Proxy(() => undefined, {
+		apply() {
+			invoked = true;
+			return;
+		},
+		get(_target, property) {
+			reads.push(property);
+			return memberProxy;
+		},
+	});
+	const root = new Proxy(Object.create(null), {
+		get(_target, property) {
+			reads.push(property);
+			return memberProxy;
+		},
+	});
+
+	selector(root as never);
+
+	if (invoked) {
+		throw new InvalidSelectorError(target, "selectors must read a member, not invoke it");
+	}
+	if (reads.length !== 1) {
+		throw new InvalidSelectorError(target, "selectors must read exactly one member");
+	}
+	return reads[0] as string | symbol;
+}
 
 function prepareTarget(target: object): AnyConstructor {
 	const ctor = resolveReflectTarget(target);
@@ -37,7 +86,7 @@ export function createClassReader<TMeta, TCard extends Cardinality>(
 	key: MetadataKey<TMeta>,
 	cardinality: TCard,
 	target: object
-): ClassAnnotationReader<TMeta, TCard> {
+): IClassAnnotationReader<TMeta, TCard> {
 	const ctor = prepareTarget(target);
 	return {
 		entries: () => {
@@ -62,7 +111,7 @@ export function createMemberReader<TMeta, TCard extends Cardinality, TThis>(
 	key: MetadataKey<TMeta>,
 	cardinality: TCard,
 	target: object
-): MemberAnnotationReader<TMeta, TCard, TThis, AnyConstructor> {
+): IMemberAnnotationReader<TMeta, TCard, TThis, AnyConstructor> {
 	const ctor = prepareTarget(target);
 
 	const entriesFor = (kind?: Extract<MemberKind, "method" | "field" | "accessor">) => {
@@ -106,7 +155,7 @@ export function attachClassRead<TFactory extends object, TMeta, TCard extends Ca
 	factory: TFactory,
 	key: MetadataKey<TMeta>,
 	cardinality: TCard
-): TFactory & { read(target: object): ClassAnnotationReader<TMeta, TCard> } {
+): TFactory & { read(target: object): IClassAnnotationReader<TMeta, TCard> } {
 	return Object.assign(factory, {
 		read: (target: object) => createClassReader<TMeta, TCard>(key, cardinality, target),
 	});
@@ -116,7 +165,7 @@ export function attachMemberRead<TFactory extends object, TMeta, TCard extends C
 	factory: TFactory,
 	key: MetadataKey<TMeta>,
 	cardinality: TCard
-): TFactory & { read(target: object): MemberAnnotationReader<TMeta, TCard, TThis, AnyConstructor> } {
+): TFactory & { read(target: object): IMemberAnnotationReader<TMeta, TCard, TThis, AnyConstructor> } {
 	return Object.assign(factory, {
 		read: (target: object) => createMemberReader<TMeta, TCard, TThis>(key, cardinality, target),
 	});

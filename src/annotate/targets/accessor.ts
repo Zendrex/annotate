@@ -1,4 +1,5 @@
-import { createMemberMetadataReader, emitMemberDecoration, mapArgs, prepareTargetBuilder } from "../target-shared";
+import { emitMemberDecoration } from "../decorations";
+import { createMemberMetadataReader, mapArgs, prepareTargetBuilder } from "./shared";
 import type { Cardinality, MemberKind, MetadataKey } from "../../metadata/types";
 import type { AccessorHookRefs, InternalAnnotationOptions, InternalInterceptorContext } from "../internal-types";
 

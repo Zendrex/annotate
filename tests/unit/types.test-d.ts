@@ -16,9 +16,9 @@ import type {
 	DecoratedPropertyList,
 	DecoratedPropertyUnique,
 	FieldAnnotation,
+	IScopedReflector,
 	ListMetadataKey,
 	MethodAnnotation,
-	ScopedReflector,
 	UniqueMetadataKey,
 } from "../../src";
 
@@ -322,10 +322,10 @@ void _listAllAsUnique;
 const ctor = Fixture;
 
 const scopedFor = createScopedReflector;
-const scopedUnique: ScopedReflector<string, "unique"> = scopedFor(ctor, UniqueMethodKey);
+const scopedUnique: IScopedReflector<string, "unique"> = scopedFor(ctor, UniqueMethodKey);
 void scopedUnique;
 
-const scopedList: ScopedReflector<string, "list"> = scopedFor(ctor, ListMethodKey);
+const scopedList: IScopedReflector<string, "list"> = scopedFor(ctor, ListMethodKey);
 void scopedList;
 
 const scopedUniqueMethodEntries: DecoratedMethodUnique<string>[] = scopedUnique.methods();

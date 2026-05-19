@@ -1,11 +1,8 @@
 import { UnregisteredClassError } from "../errors";
 import { getKeyCardinality } from "../metadata/cardinality";
-import { collectClassMeta } from "../metadata/stores/class-meta-store";
-import { hasAnyMeta } from "../metadata/stores/has-any-meta";
-import { snapshotMembers } from "../metadata/stores/member-meta-store";
-import { prepare } from "../runtime/prepare";
-import { targetDisplayName } from "./class-name";
-import { resolveReflectTarget } from "./resolve-instance";
+import { prepare } from "../metadata/pipeline";
+import { collectClassMeta, hasAnyMeta, snapshotMembers } from "../metadata/store";
+import { resolveReflectTarget, targetDisplayName } from "./target";
 import type { Cardinality, Ctor, MetadataKey } from "../metadata/types";
 import type {
 	AnyConstructor,
@@ -25,7 +22,7 @@ import type {
  * `prepare` first; `all()` returns class, then methods, then properties
  * (subclass-first member order).
  */
-export interface Reflector {
+export interface IReflector {
 	all<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedItem<T, C>[];
 	class<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedClassFor<T, C> | undefined;
 	methods<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedMethodFor<T, C>[];
@@ -43,9 +40,9 @@ function isMethodLike(ctor: Ctor, name: string | symbol, isStatic: boolean): boo
 
 // Per-ctor cache keeps the registration short-circuit and methodLikeCache warm
 // across repeated reflect() calls; without it, every call rebuilds both.
-const reflectorCache = new WeakMap<AnyConstructor, ReflectorImpl>();
+const reflectorCache = new WeakMap<AnyConstructor, Reflector>();
 
-export class ReflectorImpl implements Reflector {
+export class Reflector implements IReflector {
 	private readonly ctor: AnyConstructor;
 	private registered = false;
 	private readonly methodLikeCache = new Map<string | symbol, boolean>();
@@ -154,13 +151,13 @@ export class ReflectorImpl implements Reflector {
 }
 
 /** Cached per constructor; queries run `prepare` until registration succeeds. */
-export function reflect(target: object): Reflector {
+export function reflect(target: object): IReflector {
 	const ctor = resolveReflectTarget(target);
 	const cached = reflectorCache.get(ctor);
 	if (cached) {
 		return cached;
 	}
-	const impl = new ReflectorImpl(ctor);
+	const impl = new Reflector(ctor);
 	reflectorCache.set(ctor, impl);
 	return impl;
 }
