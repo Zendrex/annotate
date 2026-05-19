@@ -2,7 +2,7 @@
 "@zendrex/annotate": major
 ---
 
-# v1.0.0-alpha.0 — Stage-3 rework
+# Stage-3 decorators rework
 
 Hard replace of the v0.x experimental-decorator surface. v0.x callers do not
 continue to work.
