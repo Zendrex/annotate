@@ -18,13 +18,13 @@ export type BuilderInput<TMeta, TArgs extends unknown[], TCard extends Cardinali
 	| BuilderOptionsInput<TMeta, TArgs, TCard>
 	| undefined;
 
-export function resolveCardinality<TMeta, TArgs extends unknown[], TCard extends Cardinality>(
+function resolveCardinality<TMeta, TArgs extends unknown[], TCard extends Cardinality>(
 	input: BuilderInput<TMeta, TArgs, TCard>
 ): TCard {
 	return (typeof input === "object" && input?.cardinality ? input.cardinality : "one") as TCard;
 }
 
-export function toAnnotationOptions<TMeta, TArgs extends unknown[], TCard extends Cardinality>(
+function toAnnotationOptions<TMeta, TArgs extends unknown[], TCard extends Cardinality>(
 	input: BuilderInput<TMeta, TArgs, TCard>
 ): InternalAnnotationOptions<TMeta, TArgs> | undefined {
 	if (typeof input === "function") {
@@ -54,7 +54,7 @@ export function toAnnotationOptions<TMeta, TArgs extends unknown[], TCard extend
 	return options as InternalAnnotationOptions<TMeta, TArgs>;
 }
 
-export function mintKey<TMeta, TCard extends Cardinality>(
+function mintKey<TMeta, TCard extends Cardinality>(
 	cardinality: TCard,
 	label?: string
 ): MetadataKey<TMeta, InternalCardinalityOf<TCard>> {

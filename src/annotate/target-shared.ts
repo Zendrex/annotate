@@ -19,7 +19,7 @@ export function mapArgs<TMeta, TArgs extends unknown[]>(args: TArgs, mapper?: (.
 	return mapper ? mapper(...args) : (args[0] as TMeta);
 }
 
-export function labelFor(label: string | undefined, key: MetadataKey): string {
+function labelFor(label: string | undefined, key: MetadataKey): string {
 	return label ?? keyDisplayName(key);
 }
 
@@ -28,13 +28,11 @@ export function prepareTargetBuilder<TMeta, TArgs extends unknown[]>(
 	options: InternalAnnotationOptions<TMeta, TArgs> | undefined
 ): {
 	argsMapper: ((...args: TArgs) => TMeta) | undefined;
-	label: string;
 	validators: ValidatorFn<TMeta>[] | undefined;
 } {
 	const { args: argsMapper, label } = options ?? {};
-	const displayLabel = labelFor(label, key);
-	const validators = buildValidatorChain<TMeta>(options, displayLabel, key);
-	return { argsMapper, label: displayLabel, validators };
+	const validators = buildValidatorChain<TMeta>(options, labelFor(label, key), key);
+	return { argsMapper, validators };
 }
 
 export function createMemberMetadataReader<TMeta>(

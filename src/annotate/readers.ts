@@ -16,7 +16,7 @@ import type {
 	PublicInterceptorContext,
 } from "./types";
 
-export function prepareTarget(target: object): AnyConstructor {
+function prepareTarget(target: object): AnyConstructor {
 	const ctor = resolveReflectTarget(target);
 	prepare(ctor);
 	return ctor;

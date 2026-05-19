@@ -1,4 +1,3 @@
-import type { Cardinality as StorageCardinality } from "../metadata/types";
 import type { AnyConstructor } from "../reflector/types";
 import type { Cardinality } from "./types";
 import type { ValidatorFn } from "./validation-types";
@@ -25,7 +24,6 @@ export type InternalAnnotationOptions<TMeta, TArgs extends unknown[] = [TMeta]> 
 } & ArgsRequirement<TMeta, TArgs>;
 
 export type InternalCardinalityOf<TCard extends Cardinality> = TCard extends "many" ? "list" : "unique";
-export type PublicCardinalityOf<TCard extends StorageCardinality> = TCard extends "list" ? "many" : "one";
 
 export interface MethodHookRefs<TMeta, TMethod extends AnyFn> {
 	wrap: (

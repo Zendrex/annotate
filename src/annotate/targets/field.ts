@@ -1,6 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: field decorator initializer return types must remain assignable to literal field initializers */
 import { collectMemberNames, getMemberStatic } from "../../metadata/stores/member-meta-store";
 import { prepare } from "../../runtime/prepare";
+import { walkPrototypeChain } from "../../runtime/prototype-chain";
 import { createMemberMetadataReader, emitMemberDecoration, mapArgs, prepareTargetBuilder } from "../target-shared";
 import type { Cardinality, Ctor, MemberKind, MetadataKey } from "../../metadata/types";
 import type { FieldHookRefs, InternalAnnotationOptions, InternalInterceptorContext } from "../internal-types";
@@ -132,11 +133,9 @@ export function buildFieldInterceptorTarget<
 			const readMetadata = createMemberMetadataReader<TMeta>(key, memberName, false);
 			const interceptorContext: InternalInterceptorContext = { name: memberName, static: false, kind: "field" };
 			return function (this: TThis, initial: TField): TField {
-				let link: Ctor | null = (this as { constructor: Ctor }).constructor;
-				while (link && link !== Function.prototype) {
+				walkPrototypeChain((this as { constructor: Ctor }).constructor, (link) => {
 					prepare(link);
-					link = Object.getPrototypeOf(link) as Ctor | null;
-				}
+				});
 				const next = init.call(this, initial, readMetadata, interceptorContext);
 				markInitialized(this as object, memberName);
 				return next;
@@ -148,11 +147,9 @@ function applyAllFieldInterceptors(this: unknown): void {
 	const ctor = (this as { constructor: Ctor }).constructor;
 	const target = this as Record<string | symbol, unknown>;
 
-	let link: Ctor | null = ctor;
-	while (link && link !== Function.prototype) {
+	walkPrototypeChain(ctor, (link) => {
 		prepare(link);
-		link = Object.getPrototypeOf(link) as Ctor | null;
-	}
+	});
 
 	let entries = ctorFieldIndex.get(ctor);
 	if (!entries) {
