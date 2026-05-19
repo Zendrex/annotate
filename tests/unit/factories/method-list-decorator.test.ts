@@ -2,7 +2,8 @@
 /** biome-ignore-all lint/complexity/noVoid: discard class references to avoid unused-variable warnings */
 import { describe, expect, test } from "bun:test";
 
-import { AnnotateError, decorate, MissingMetadataError } from "../../../src";
+import { AnnotateError, MissingMetadataError } from "../../../src";
+import { decorate } from "../../../src/legacy";
 
 describe("decorate.method.list", () => {
 	test("two methods decorated with the same .list factory each have 1 entry", () => {

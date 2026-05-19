@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { decorate, intercept } from "../../src";
+import { decorate, intercept } from "../../src/legacy";
 
 describe("interceptor decoration-order independence", () => {
 	test("interceptor at the bottom observes sibling decorators applied above", () => {

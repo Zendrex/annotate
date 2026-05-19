@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/complexity/noVoid: discard class references to avoid unused-variable warnings in test */
 import { describe, expect, test } from "bun:test";
 
-import { decorate } from "../../../src";
+import { decorate } from "../../../src/legacy";
 
 describe("reader prepares deferred instance-member metadata (asymmetry fix)", () => {
 	test("reader flushes pending deferred instance members like sibling helpers do", () => {

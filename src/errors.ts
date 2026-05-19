@@ -13,6 +13,7 @@ export const AnnotateErrorCode = {
 	UNREGISTERED: "unregistered",
 	UNREGISTERED_KEY: "unregisteredKey",
 	INVALID_TARGET: "invalidTarget",
+	INVALID_SELECTOR: "invalidSelector",
 	VALIDATION: "validation",
 } as const;
 
@@ -196,6 +197,22 @@ export class InvalidDecorationTargetError extends defineAnnotateError<InvalidDec
 	constructor(args: InvalidDecorationTargetArgs) {
 		super(args);
 		this.requiredBase = args.requiredBase;
+	}
+}
+
+/**
+ * Thrown when a selector passed to `Annotate.*.read(...).get(...)` does not
+ * synchronously read exactly one public member. `code` is
+ * {@link AnnotateErrorCode.INVALID_SELECTOR}.
+ */
+export class InvalidSelectorError extends defineAnnotateError<{ reason: string; target: AnyConstructor }>({
+	name: "InvalidSelectorError",
+	code: AnnotateErrorCode.INVALID_SELECTOR,
+	format: ({ reason, target }) => `invalid Annotate selector for "${targetDisplayName(target)}": ${reason}`,
+	toContext: ({ target }) => ({ target }),
+}) {
+	constructor(target: AnyConstructor, reason: string) {
+		super({ target, reason });
 	}
 }
 

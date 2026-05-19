@@ -3,10 +3,12 @@
 /** biome-ignore-all lint/suspicious/useAwait: async keyword is the constraint under test — no real await needed */
 /** biome-ignore-all lint/suspicious/noExplicitAny: ThisOf for unconstrained factories is intentionally any */
 
-import { decorate, intercept, reflect } from "../../src";
+import { Annotate, reflect } from "../../src";
+import { decorate, intercept } from "../../src/legacy";
 import { mintListKey, mintUniqueKey } from "../../src/metadata/cardinality-registry";
 import { createScopedReflector } from "../../src/reflector/scoped-reflector";
 import type {
+	Cardinality as AnnotateCardinality,
 	ArgsOf,
 	CardinalityOf,
 	DecoratedClassList,
@@ -49,7 +51,49 @@ class BaseInstance {
 class Fixture {
 	method(): void {}
 	field!: string;
+	static health(): void {}
 }
+
+// =============================================================================
+// Annotate public API — handles, mapper inference, selector reads
+// =============================================================================
+
+const _annotateCardinality: AnnotateCardinality = "many";
+void _annotateCardinality;
+
+const AnnotateRoute = Annotate.method((method: "GET" | "POST", path: string) => ({ method, path }));
+class A_PublicMethodApi {
+	@AnnotateRoute("GET", "/")
+	index(): void {}
+
+	// @ts-expect-error: mapper-inferred decorator args reject invalid methods
+	@AnnotateRoute("DELETE", "/")
+	delete(): void {}
+}
+void A_PublicMethodApi;
+
+const AnnotateRole = Annotate.method<string>();
+const _annotateOneRead: string | undefined = AnnotateRole.read(Fixture).get((fixture) => fixture.method);
+void _annotateOneRead;
+
+const AnnotateTags = Annotate.method<string>({ cardinality: "many" });
+const _annotateManyRead: readonly string[] = AnnotateTags.read(Fixture).get((fixture) => fixture.method);
+void _annotateManyRead;
+// @ts-expect-error: many-cardinality reads return arrays, not scalar metadata
+const _annotateManyAsOne: string | undefined = AnnotateTags.read(Fixture).get((fixture) => fixture.method);
+void _annotateManyAsOne;
+
+const AnnotateStatic = Annotate.method<string>();
+const _annotateStaticRead: string | undefined = AnnotateStatic.read(Fixture).static.get((fixture) => fixture.health);
+void _annotateStaticRead;
+
+const AnnotateClassMeta = Annotate.class<string>({ label: "ClassMeta" });
+const _annotateClassRead: string | undefined = AnnotateClassMeta.read(Fixture).get();
+void _annotateClassRead;
+
+const AnnotateFieldMeta = Annotate.field<string>();
+const _annotateFieldRead: string | undefined = AnnotateFieldMeta.read(Fixture).get((fixture) => fixture.field);
+void _annotateFieldRead;
 
 // Cross-section factories used by the list-brand and reflector sections.
 const UniqueMethod = decorate.method<string>();

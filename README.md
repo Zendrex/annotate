@@ -1,316 +1,209 @@
 # @zendrex/annotate
 
-**Typed decorators with built-in reflection. Zero dependencies. No `reflect-metadata`.**
+**Typed Stage-3 decorators with scoped metadata reads. Zero dependencies. No `reflect-metadata`.**
 
-Define a decorator factory and get back a decorator that knows its arguments, its target, its metadata, and how to reflect over the classes that use it. Arguments and metadata flow through generics, so reads return typed values instead of `any`.
+`@zendrex/annotate` gives decorator authors one handle that creates the decorator and reads the metadata back with the right type.
 
 ```bash
 bun add @zendrex/annotate
 ```
 
-Works with npm, pnpm, yarn. Requires TypeScript 5.2+ and Node ≥ 20.4 (or any runtime with `Symbol.metadata`). Built on TC39 Stage-3 decorators. No `experimentalDecorators`, no `reflect-metadata` shim, no `emitDecoratorMetadata`.
+Requires TypeScript 5.2+ and a Stage-3 decorator transform. Use `experimentalDecorators: false`; legacy TypeScript decorators and parameter decorators are not supported.
 
-**Stage-3 note:** the standard has no parameter decorator. If you rely on that from the legacy world, you will need a different design or the old compiler flags. Annotate only targets Stage-3.
-
-On older runtimes that lack `Symbol.metadata` (Node < 22.3, some browsers, embedded engines) import the shim once at your application entry, before any decorated class loads:
+On runtimes without native `Symbol.metadata`, import the shim once before decorated classes load:
 
 ```ts
 import "@zendrex/annotate/shim";
 ```
 
-The shim installs `Symbol.for("Symbol.metadata")` onto the `Symbol` global so the decorator transformer and Annotate's runtime agree on the slot. It is a no-op when the engine already provides `Symbol.metadata`. Most modern transformers (TS ≥5.2, esbuild ≥0.21 with `target: esnext`, swc with `decoratorVersion: "2022-03"`, Babel with `@babel/plugin-proposal-decorators` `version: "2023-05"`) write to the same slot.
+## Basic Use
 
-```jsonc
-// tsconfig.json
-{
-  "compilerOptions": {
-    "target": "ES2022",
-    "useDefineForClassFields": true,
-    "experimentalDecorators": false,
-    "emitDecoratorMetadata": false
-  }
-}
-```
+```ts
+import { Annotate } from "@zendrex/annotate";
 
-## Why this exists
-
-If you have built a controller framework, ORM, DI container, or validator, you have probably hit these problems:
-
-- `**reflect-metadata` is a global string-keyed bag.** Two libraries that pick the same key clobber each other. No scoping, no isolation, no compile-time check.
-- **Decorator arguments are untyped at the read site.** You store `{ path: "/" }` and read it back as `any`. The type checker does not help.
-- **Validation is your problem.** Want to reject a bad shape at decoration time? Write the throw yourself. Require a base class? Same.
-- **Stage-2 vs Stage-3 split the ecosystem.** Most existing libraries assume the legacy `experimentalDecorators` ABI and break under the standard one.
-- **Reading metadata is awkward.** `Reflect.getMetadata("custom:route", target, "list")` uses a string key with no autocomplete, no type, and no scope.
-
-Annotate gives every factory its own metadata key. Arguments, stored value, target class, and `this` inside methods all flow through generics. Reading metadata returns typed entries. Validation, scoping, and reflection are first-class.
-
-## A decorator in three lines (sort of)
-
-```typescript
-import { decorate } from "@zendrex/annotate";
-
-const Get = decorate.method<string>();
+const Route = Annotate.method((method: "GET" | "POST", path: string) => ({ method, path }));
 
 class Users {
-  @Get("/")      list() {}
-  @Get("/:id")   show() {}
+  @Route("GET", "/")
+  list() {}
 }
 
-for (const { name, metadata } of Get.reader(Users).methods()) {
-  console.log(metadata, "→", name);
-}
-// "/"     → list
-// "/:id"  → show
+Route.read(Users).get((users) => users.list);
+// { method: "GET", path: "/" }
+
+Route.read(Users).methods();
+// [{ kind: "method", name: "list", static: false, metadata: { method: "GET", path: "/" } }]
 ```
 
-Three pieces: factory, decorator, reflect. The factory generates a typed key. The decorator stores values under that key. The reader returns them, scoped and typed, on demand.
+Every annotation handle owns an internal collision-proof symbol key. String labels are optional diagnostics, not identity:
 
-## What you can build
-
-### An HTTP router
-
-Class metadata, method metadata, composed arguments, a wrapping interceptor, and reflection wiring it up:
-
-```typescript
-import { decorate, intercept } from "@zendrex/annotate";
-
-const Controller = decorate.class<string>();
-
-const Route = decorate.method({
-  compose: (method: "GET" | "POST", path: string) => ({ method, path }),
-});
-
-const Log = intercept.method<string>({
-  intercept: (fn, readMetadata, ctx) => function (this: any, ...args: any[]) {
-    console.log(`→ ${readMetadata(this)[0]}/${String(ctx.name)}`);
-    return fn.apply(this, args);
-  },
-});
-
-@Controller("/users")
-class Users {
-  @Route("GET",  "/")     @Log("users") list()   {}
-  @Route("POST", "/")     @Log("users") create() {}
-  @Route("GET",  "/:id")  @Log("users") show()   {}
-}
-
-const prefix = Controller.firstOrThrow(Users);
-for (const { name, metadata } of Route.reader(Users).methods()) {
-  app.on(metadata.method, prefix + metadata.path, name);
-}
+```ts
+const Role = Annotate.method<string>({ label: "Role" });
 ```
 
-### Schema-validated entity fields
+## Builders
 
-Validators run early. For class and static-member decorators they fire during class evaluation; for instance fields and methods they run on the first `new` (or first reflective read), well before any traffic. `requireInstanceOf` is part of the same chain, so non-conforming hosts are rejected on the same path.
+```ts
+Annotate.class(...)
+Annotate.method(...)
+Annotate.field(...)
+Annotate.accessor(...)
+```
 
-```typescript
-class Entity {}
+Direct metadata form:
 
-const Field = decorate.property<{ type: "string" | "int"; min?: number }>({
-  requireInstanceOf: Entity,
-  validate: ({ type, min }, { memberName }) => {
-    if (type === "int" && min !== undefined && !Number.isInteger(min)) {
-      throw new Error(`${String(memberName)}: min must be an integer`);
+```ts
+const Controller = Annotate.class<string>();
+const Column = Annotate.field<{ type: "text" | "int" }>();
+```
+
+Argument mapper form:
+
+```ts
+const Route = Annotate.method((method: "GET" | "POST", path: string) => ({ method, path }));
+```
+
+Options form:
+
+```ts
+const Route = Annotate.method({
+  label: "Route",
+  args: (method: "GET" | "POST", path: string) => ({ method, path }),
+  validate: (route) => {
+    if (!route.path.startsWith("/")) {
+      throw new Error("path must start with /");
     }
   },
 });
-
-class User extends Entity {
-  @Field({ type: "string" })       name!: string;
-  @Field({ type: "int", min: 0 })  age!: number;
-}
-
-Field.reader(User).properties();
 ```
 
-Apply `@Field` to a non-`Entity` class and you get `InvalidDecorationTargetError` on the first `new` (or the first reflective read) — well before the property is actually used.
+Use `requires` to restrict the host class:
 
-### Method interceptors read metadata fresh at call time
+```ts
+class ControllerBase {}
 
-An interceptor's `readMetadata(instance)` returns the values stored under its own factory's key. The read happens at invocation time, not decoration time, so the interceptor always sees the fully committed list — independent of where the interceptor sits in a decorator stack.
-
-```typescript
-const Audit = intercept.method<string>({
-  intercept: (original, readMetadata) => function (this: any, ...args: any[]) {
-    const tags = readMetadata(this);
-    log(tags, args);
-    return original.apply(this, args);
-  },
+const Route = Annotate.method({
+  requires: ControllerBase,
+  args: (method: "GET" | "POST", path: string) => ({ method, path }),
 });
 ```
 
-### Specialized factories that share a key
+## Reading
 
-`.derive()` returns a child factory writing to the same metadata key as the parent. Narrow the target type, chain another validator, or relabel for clearer errors. Reflection through the parent still sees every child entry.
+Class annotations read without selectors:
 
-```typescript
-const IntField = Field.derive({
-  name: "IntField",
-  validate: ({ type }, { memberName }) => {
-    if (type !== "int") {
-      throw new Error(`${String(memberName)}: IntField requires type "int"`);
-    }
-  },
-});
+```ts
+const Controller = Annotate.class<string>();
 
-class Account extends Entity {
-  @IntField({ type: "int", min: 0 }) balance!: number;
-}
+@Controller("users")
+class Users {}
 
-// Same key: Field.reader() sees every @IntField entry too.
-// The parent validator runs first, then the child.
-Field.reader(Account).properties();
+Controller.read(Users).get(); // string | undefined
 ```
 
-## Core ideas
+Member annotations use typed selectors instead of string names:
 
-### Factories own their keys
-
-A factory bundles a decorator, a `MetadataKey`, and a typed reader. No string keys. No collisions. Two libraries can both define a `Route` factory and they will never see each other's data.
-
-### Reflection is scoped
-
-`factory.reader(ClassOrInstance)` returns a reader bound to that factory's key. You ask the reader questions; the factory's storage answers. There is also an unscoped `reflect()` for tools that hold many keys at once.
-
-### Metadata is lazy
-
-Instance metadata commits on first `new`. Statics commit during class evaluation. Read helpers call `prepare()` automatically, so you only invoke it manually when an external tool walks `Object.getOwnPropertyNames` before any instance exists.
-
-### Failures are typed and early
-
-Validation, base-class requirement, and uniqueness checks all fire well before runtime use: class- and static-member decorators check during class evaluation; instance-member decorators check on the first `new` or reflective read. The errors are domain types you can branch on.
-
-## API surface
-
-### Factories
-
-
-| Factory                     | Decorates                          |
-| --------------------------- | ---------------------------------- |
-| `decorate.class<TMeta>`     | classes                            |
-| `decorate.method<TMeta>`    | methods                            |
-| `decorate.property<TMeta>`  | class fields                       |
-| `intercept.method<TMeta>`   | methods (wraps the implementation) |
-| `intercept.accessor<TMeta>` | `accessor` fields (wraps get/set)  |
-
-
-Every factory accepts trailing generics to constrain the target: method signature, field type, `this` shape, or `instanceof` bound. Mismatches fail at compile time.
-
-### Shared options
-
-```typescript
-{
-  compose?:           (...args) => TMeta,  // fold arguments into stored value
-  validate?:          (meta, ctx) => void, // throw to reject at decoration
-  requireInstanceOf?: AnyConstructor,      // enclosing class must extend this
-  name?:              string,              // label in error messages
-}
+```ts
+Route.read(Users).get((users) => users.list);
+Route.read(Users).static.get((users) => users.health);
 ```
 
-### Factory surface
+Selectors must synchronously read exactly one public member. Calling a method, reading no member, or reading multiple members throws `InvalidSelectorError`.
 
-```typescript
-Route.key                                  // UniqueMetadataKey<TMeta> (branded symbol)
-Route.reader(target).methods()             // DecoratedMethodUnique<TMeta>[]
-Route.first(target, name)                  // TMeta | undefined
-Route.firstOrThrow(target, name)           // TMeta, throws on missing
-Route.all(target, name)                    // MetadataArray<TMeta>, capped at length ≤ 1
-Route.has(target, name)                    // boolean, never throws
-Route.hasOwn(target, name)                 // ignores inherited
-Route.derive({ ... })                      // child factory, same key, narrowed
+Collection helpers return inherited metadata most-derived-first:
+
+```ts
+Route.read(Users).entries();
+Route.read(Users).methods();
+Column.read(Users).fields();
+Watched.read(Users).accessors();
 ```
 
-Class factories drop the `name` argument. Interceptors expose the same surface.
+Entries include `kind`, `name`, `static`, and `metadata`, so framework code can use ordinary array operations:
 
-### Unique vs list cardinality
+```ts
+const staticRoutes = Route.read(Users)
+  .methods()
+  .filter((route) => route.static);
+```
 
-Every factory defaults to **unique** cardinality: at most one metadata value per decoration site. A second application of the same factory to the same method or class throws `DuplicateMetadataError` at decoration time. The `.key` on a unique factory is typed `UniqueMetadataKey<TMeta>`, and the reader's `methods()` / `properties()` / `class()` return entries where `metadata` is `TMeta` directly.
+## Cardinality
 
-Each factory's `.key` is branded with its cardinality (`UniqueMetadataKey<TMeta>` or `ListMetadataKey<TMeta>`). Branded keys flow through every read API and select the matching return shape automatically, there is no untyped fallback.
+Annotations default to one value per decoration site:
 
-Use the `.list` sibling on the factory namespace when multiple values must stack on the same site:
+```ts
+const Role = Annotate.method<string>();
+Role.read(Users).get((users) => users.list); // string | undefined
+```
 
-```typescript
-import { decorate } from "@zendrex/annotate";
+Use `cardinality: "many"` for repeatable decorators:
 
-// unique (default): at most one value per method
-const Role = decorate.method<string>();
-
-// list: many values per method, accumulated in application order
-const Tag = decorate.method.list<string>();
+```ts
+const Tag = Annotate.method<string>({ cardinality: "many" });
 
 class Api {
-  @Role("admin") @Tag("public") @Tag("internal") get() {}
+  @Tag("public")
+  @Tag("internal")
+  list() {}
 }
 
-// Role.key is UniqueMetadataKey<string> → metadata: string
-for (const { name, metadata } of Role.reader(Api).methods()) {
-  console.log(name, metadata); // "get", "admin"
-}
-
-// Tag.key is ListMetadataKey<string> → metadata: readonly string[]
-// Stage-3 applies decorators inner-first, so the closest @Tag stores first.
-for (const { name, metadata } of Tag.reader(Api).methods()) {
-  console.log(name, metadata); // "get", ["internal", "public"]
-}
+Tag.read(Api).get((api) => api.list); // readonly string[]
 ```
 
-The same `.list` sibling is available on every namespace entry: `decorate.class.list`, `decorate.property.list`, `intercept.method.list`, `intercept.accessor.list`.
+Stage-3 decorators apply inner-first, so repeated metadata is stored in application order.
 
-### Unscoped reflect
+## Interceptors
 
-```typescript
-import { reflect } from "@zendrex/annotate";
+Interceptors live under `Annotate.intercept`:
 
-reflect(Users).methods(Route.key);
+```ts
+const Log = Annotate.intercept.method<string>({
+  label: "Log",
+  wrap:
+    (original, ctx) =>
+    function (this: object, ...args: unknown[]) {
+      console.log(ctx.name, ctx.get(this));
+      return original.apply(this, args as never);
+    },
+});
 ```
 
-Pass keys per call. Useful when a consumer holds many factories and wants to traverse them generically.
+Available hooks:
 
-Keys must be branded: pass a factory's `.key`, or a symbol minted via `mintUniqueKey<TMeta>(name?)` / `mintListKey<TMeta>(name?)`. The cardinality brand on the key narrows the result; `methods(uniqueKey)` returns `DecoratedMethodUnique<TMeta>[]` (scalar `metadata`); `methods(listKey)` returns `DecoratedMethodList<TMeta>[]` (`readonly TMeta[]`). Raw `Symbol(...)` is rejected at compile time and at runtime with `UnregisteredMetadataKeyError`.
+```ts
+Annotate.intercept.method({ wrap: (original, ctx) => original });
+Annotate.intercept.accessor({ get: (original, ctx) => original, set: (original, ctx) => original });
+Annotate.intercept.field({ init: (initial, ctx) => initial });
+```
 
-```typescript
+`ctx.get(instance)` reads this interceptor's metadata on the current member. Its return type follows cardinality: `T | undefined` for `"one"`, `readonly T[]` for `"many"`.
+
+## Low-Level Reflection
+
+The high-level API does not expose metadata keys. The package still exports `reflect`, `prepare`, and branded key helpers for low-level tooling that deliberately manages keys.
+
+```ts
 import { mintListKey, reflect } from "@zendrex/annotate";
 
-const TAGS = mintListKey<string>("tags");
-// ... append values via a custom store / decorator that uses TAGS ...
-reflect(Users).methods(TAGS); // metadata: readonly string[]
+const Tags = mintListKey<string>("tags");
+reflect(Users).methods(Tags);
 ```
 
-### Type helpers
-
-```typescript
-import type { MetadataOf, ArgsOf, ThisOf } from "@zendrex/annotate";
-
-type M = MetadataOf<typeof Route>;  // { method: "GET" | "POST"; path: string }
-type A = ArgsOf<typeof Route>;      // ["GET" | "POST", string]
-```
-
-### prepare
-
-Instance metadata commits on first `new`. Statics commit during class evaluation. Reader helpers auto-prepare. Call `prepare(Ctor)` manually only when an external tool needs the flush before any instance exists.
+Most applications should prefer `Annotate.*.read(...)`.
 
 ## Errors
 
-Every domain error extends `AnnotateError` and carries `code`, `target`, `key?`, `kind?`, `memberName?`.
+Every domain error extends `AnnotateError` and carries a stable `code`.
 
-
-| Class                          | `code`              | When                                                                                                                 |
-| ------------------------------ | ------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `DuplicateMetadataError`       | `"duplicate"`       | unique factory applied twice to the same slot                                                                        |
-| `UnregisteredClassError`       | `"unregistered"`    | `reflect()` called on a class with no annotate metadata anywhere on its prototype chain                              |
-| `UnregisteredMetadataKeyError` | `"unregisteredKey"` | store append targets a key absent from the cardinality registry (key minted outside `mintUniqueKey` / `mintListKey`) |
-| `InvalidDecorationTargetError` | `"invalidTarget"`   | `requireInstanceOf` rejects the host class; carries `requiredBase`                                                   |
-| `ValidationError`              | `"validation"`      | a `validate` hook threw; original error attached as `Error.cause`                                                    |
-| `MissingMetadataError`         | `"missing"`         | `firstOrThrow` found nothing                                                                                         |
-
-
-Invalid factory configuration (e.g. `intercept.accessor` with neither `onGet` nor `onSet`) throws plain `TypeError`.
-
-## Status
-
-v1.0 alpha. Rewritten on Stage-3 decorators. The public API is stable in shape but may change in detail before 1.0.0.
+| Class | Code | When |
+| --- | --- | --- |
+| `DuplicateMetadataError` | `"duplicate"` | one-cardinality annotation applied twice to the same site |
+| `InvalidDecorationTargetError` | `"invalidTarget"` | `requires` rejects the host class |
+| `InvalidSelectorError` | `"invalidSelector"` | selector does not read exactly one public member |
+| `MissingMetadataError` | `"missing"` | low-level throw-on-missing read found nothing |
+| `UnregisteredClassError` | `"unregistered"` | low-level `reflect()` query sees no registered metadata |
+| `UnregisteredMetadataKeyError` | `"unregisteredKey"` | low-level store receives an unregistered symbol key |
+| `ValidationError` | `"validation"` | a `validate` hook threw |
 
 ## License
 

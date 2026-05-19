@@ -2,7 +2,7 @@
 /** biome-ignore-all lint/complexity/noVoid: type-only variable bindings discarded to prevent unused-variable errors */
 import { describe, expect, test } from "bun:test";
 
-import { intercept } from "../../../src";
+import { intercept } from "../../../src/legacy";
 
 describe("intercept.method.list", () => {
 	test("wraps a method, records metadata, and readMetadata returns the list", () => {

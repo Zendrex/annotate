@@ -3,7 +3,8 @@
 /** biome-ignore-all lint/style/useThrowOnlyError: exercising non-Error throw paths is the point of these tests */
 import { describe, expect, test } from "bun:test";
 
-import { AnnotateErrorCode, decorate, InvalidDecorationTargetError, ValidationError } from "../../../src";
+import { AnnotateErrorCode, InvalidDecorationTargetError, ValidationError } from "../../../src";
+import { decorate } from "../../../src/legacy";
 import type { ValidateContext } from "../../../src";
 
 const BAD_PING_RE = /bad: ping/;

@@ -49,7 +49,11 @@ export function appendMemberMeta<TMeta>(
 
 	const outer = getOrCreate(memberMetaStore, ctor, () => new Map());
 	const inner = getOrCreate(outer, key, () => new Map());
-	const entry: MemberEntry = getOrCreate(inner, name, () => ({ values: [], static: options.static }));
+	const entry: MemberEntry = getOrCreate(inner, name, () => ({
+		kind: options.kind,
+		static: options.static,
+		values: [],
+	}));
 	assertNotDuplicate(ctor, key, cardinality, entry.values.length, options.kind, name);
 	entry.values.push(meta);
 	tokens.add(token);
@@ -106,12 +110,12 @@ export function snapshotMembers(ctor: Ctor, key: MetadataKey): Map<string | symb
 		for (const [name, entry] of inner) {
 			const existing = out.get(name);
 			if (existing) {
-				// Subclass-first: `static` from existing wins; superclass values appended after.
+				// Subclass-first: `kind` and `static` from existing win; superclass values append after.
 				for (const value of entry.values) {
 					existing.values.push(value);
 				}
 			} else {
-				out.set(name, { static: entry.static, values: [...entry.values] });
+				out.set(name, { kind: entry.kind, static: entry.static, values: [...entry.values] });
 			}
 		}
 	});

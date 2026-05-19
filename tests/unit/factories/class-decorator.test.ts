@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import { AnnotateError, decorate, MissingMetadataError, UnregisteredClassError } from "../../../src";
+import { AnnotateError, MissingMetadataError, UnregisteredClassError } from "../../../src";
+import { decorate } from "../../../src/legacy";
 
 describe("decorate.class", () => {
 	test("stores metadata via class decorator application", () => {

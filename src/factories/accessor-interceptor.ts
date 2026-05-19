@@ -7,7 +7,7 @@ import {
 	mergeExtendedOptions,
 	prepareFactoryShell,
 } from "./shared";
-import type { Cardinality, MetadataKey } from "../metadata/types";
+import type { Cardinality, MemberKind, MetadataKey } from "../metadata/types";
 import type {
 	AccessorInterceptorOptions,
 	DecoratedAccessorFactory,
@@ -62,7 +62,8 @@ export function buildAccessorFactory<
 >(
 	key: MetadataKey<TMeta, TCard>,
 	options: DecoratorOptions<TMeta, TArgs> | undefined,
-	hookRefs: AccessorHookRefs<TMeta, TValue>
+	hookRefs: AccessorHookRefs<TMeta, TValue>,
+	storedKind: Extract<MemberKind, "property" | "accessor"> = "property"
 ): DecoratedAccessorFactory<TMeta, TArgs, TValue, TThis, TCard> {
 	const { composeFn, label, validators } = prepareFactoryShell<TMeta, TArgs>(key, options);
 	const { onGet, onSet } = hookRefs;
@@ -95,7 +96,7 @@ export function buildAccessorFactory<
 			emitMemberDecoration({
 				context,
 				key,
-				kind: "property",
+				kind: storedKind,
 				meta: compose(args, composeFn),
 				token: Symbol("accessorIntercept"),
 				validators,
@@ -110,7 +111,8 @@ export function buildAccessorFactory<
 		buildAccessorFactory<TMeta, TArgs, TValue, TNewThis, TCard>(
 			key,
 			mergeExtendedOptions(options, childOptions),
-			hookRefs
+			hookRefs,
+			storedKind
 		);
 
 	return Object.assign(decoratorFn, {

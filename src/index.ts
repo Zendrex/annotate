@@ -1,64 +1,41 @@
 /** biome-ignore-all lint/performance/noBarrelFile: main index file */
 
+export { Annotate } from "./annotate";
 /**
- * Public API barrel for `@zendrex/annotate`: errors, `reflect`, `prepare`, key
- * helpers, and shared types. Prefer the frozen `decorate` and `intercept`
- * registries over deep imports — same factories, version-stable surface.
+ * Public API barrel for `@zendrex/annotate`: the `Annotate` namespace, errors,
+ * `reflect`, `prepare`, key helpers, and shared types.
  */
 export {
 	AnnotateError,
 	AnnotateErrorCode,
 	DuplicateMetadataError,
 	InvalidDecorationTargetError,
+	InvalidSelectorError,
 	MissingMetadataError,
 	UnregisteredClassError,
 	UnregisteredMetadataKeyError,
 	ValidationError,
 } from "./errors";
-
-import { createAccessorInterceptor, createAccessorListInterceptor } from "./factories/accessor-interceptor";
-import { createClassDecorator, createClassListDecorator } from "./factories/class-decorator";
-import {
-	applyFieldInterceptors,
-	createFieldInterceptor,
-	createFieldListInterceptor,
-} from "./factories/field-interceptor";
-import { createMethodDecorator, createMethodListDecorator } from "./factories/method-decorator";
-import { createMethodInterceptor, createMethodListInterceptor } from "./factories/method-interceptor";
-import { createPropertyDecorator, createPropertyListDecorator } from "./factories/property-decorator";
-
-const withList = <U extends object, L>(unique: U, list: L): U & { list: L } => Object.assign(unique, { list });
-
-/**
- * Frozen registry of decorator factories. Each `class`, `method`, and
- * `property` entry exposes the unique-cardinality factory directly and a
- * `.list` sibling for list-cardinality metadata. Prefer this over deep
- * imports.
- */
-export const decorate = Object.freeze({
-	class: withList(createClassDecorator, createClassListDecorator),
-	method: withList(createMethodDecorator, createMethodListDecorator),
-	property: withList(createPropertyDecorator, createPropertyListDecorator),
-} as const);
-
-/**
- * Frozen registry of interceptor factories. `method`, `accessor`, and `field`
- * each expose the unique-cardinality factory and a `.list` sibling for
- * list-cardinality metadata. `field.apply(instance)` is the post-construction
- * recovery path; see {@link createFieldInterceptor}. Prefer this over deep
- * imports.
- */
-export const intercept = Object.freeze({
-	method: withList(createMethodInterceptor, createMethodListInterceptor),
-	accessor: withList(createAccessorInterceptor, createAccessorListInterceptor),
-	field: Object.assign(withList(createFieldInterceptor, createFieldListInterceptor), {
-		apply: applyFieldInterceptors,
-	}),
-} as const);
-
 export { mintListKey, mintUniqueKey } from "./metadata/cardinality-registry";
 export { reflect } from "./reflector/reflector";
 export { prepare } from "./runtime/prepare";
+export type {
+	AccessorAnnotation,
+	AccessorInterceptorOptions as AnnotateAccessorInterceptorOptions,
+	AnnotationArgsOptions,
+	AnnotationOptions,
+	Cardinality,
+	ClassAnnotation,
+	ClassAnnotationEntry,
+	ClassAnnotationReader,
+	FieldAnnotation,
+	FieldInterceptorOptions as AnnotateFieldInterceptorOptions,
+	MemberAnnotationEntry,
+	MemberAnnotationReader,
+	MethodAnnotation,
+	MethodInterceptorOptions as AnnotateMethodInterceptorOptions,
+	PublicInterceptorContext,
+} from "./annotate";
 export type {
 	AccessorInterceptorOptions,
 	AnyFn,

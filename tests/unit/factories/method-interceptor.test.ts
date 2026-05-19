@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { intercept } from "../../../src";
+import { intercept } from "../../../src/legacy";
 
 describe("intercept.method", () => {
 	test("wraps a method and records metadata", () => {

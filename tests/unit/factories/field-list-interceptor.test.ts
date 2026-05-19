@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { intercept } from "../../../src";
+import { intercept } from "../../../src/legacy";
 
 describe("intercept.field.list", () => {
 	test("replaces field value and records metadata", () => {

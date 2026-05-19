@@ -3,11 +3,11 @@ import { describe, expect, test } from "bun:test";
 import {
 	AnnotateError,
 	DuplicateMetadataError,
-	decorate,
 	MissingMetadataError,
 	prepare,
 	UnregisteredClassError,
 } from "../../../src";
+import { decorate } from "../../../src/legacy";
 
 describe("decorate.property", () => {
 	test("captures metadata on a decorated field after construction", () => {

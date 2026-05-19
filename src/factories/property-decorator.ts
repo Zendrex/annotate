@@ -6,7 +6,7 @@ import {
 	mergeExtendedOptions,
 	prepareFactoryShell,
 } from "./shared";
-import type { Cardinality, MetadataKey } from "../metadata/types";
+import type { Cardinality, MemberKind, MetadataKey } from "../metadata/types";
 import type { DecoratedPropertyFactory, DecoratorOptions, DeriveOptions } from "./types";
 
 /** Builds a class-field decorator factory backed by a unique-cardinality metadata key. */
@@ -30,7 +30,8 @@ export function buildPropertyFactory<
 	TCard extends Cardinality = "unique",
 >(
 	key: MetadataKey<TMeta, TCard>,
-	options: DecoratorOptions<TMeta, TArgs> | undefined
+	options: DecoratorOptions<TMeta, TArgs> | undefined,
+	storedKind: Extract<MemberKind, "property" | "field"> = "property"
 ): DecoratedPropertyFactory<TMeta, TArgs, TField, TThis, TCard> {
 	const { composeFn, label, validators } = prepareFactoryShell<TMeta, TArgs>(key, options);
 
@@ -40,7 +41,7 @@ export function buildPropertyFactory<
 			emitMemberDecoration({
 				context,
 				key,
-				kind: "property",
+				kind: storedKind,
 				meta: compose(args, composeFn),
 				token: Symbol("propertyDecoration"),
 				validators,
@@ -52,7 +53,8 @@ export function buildPropertyFactory<
 	): DecoratedPropertyFactory<TMeta, TArgs, TNewField, TNewThis, TCard> =>
 		buildPropertyFactory<TMeta, TArgs, TNewField, TNewThis, TCard>(
 			key,
-			mergeExtendedOptions(options, childOptions)
+			mergeExtendedOptions(options, childOptions),
+			storedKind
 		);
 
 	return Object.assign(decoratorFn, {

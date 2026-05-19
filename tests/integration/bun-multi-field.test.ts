@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { intercept } from "../../src";
+import { intercept } from "../../src/legacy";
 
 // Reproduces the four-class arrangement (single A, B; multi Mixed; trailing D)
 // that triggers Bun 1.3's addInit shadowing. Asserts `intercept.field.apply`

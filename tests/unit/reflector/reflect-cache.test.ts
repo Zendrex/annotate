@@ -1,7 +1,8 @@
 /** biome-ignore-all lint/suspicious/noEmptyBlockStatements: test file */
 import { describe, expect, test } from "bun:test";
 
-import { decorate, reflect, UnregisteredClassError } from "../../../src";
+import { reflect, UnregisteredClassError } from "../../../src";
+import { decorate } from "../../../src/legacy";
 
 describe("reflect() per-ctor caching", () => {
 	test("returns the same Reflector instance for repeated calls on the same ctor", () => {

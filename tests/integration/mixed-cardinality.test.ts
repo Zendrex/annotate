@@ -2,7 +2,8 @@
 /** biome-ignore-all lint/suspicious/noUnusedExpressions: accessor reads are side effects under test */
 import { describe, expect, it } from "bun:test";
 
-import { decorate, intercept, reflect } from "../../src";
+import { reflect } from "../../src";
+import { decorate, intercept } from "../../src/legacy";
 
 // ── Factories ─────────────────────────────────────────────────────────────────
 

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { decorate } from "../../src";
+import { decorate } from "../../src/legacy";
 
 // Regression guards against Bun 1.3.13's Stage-3 bug where instance-member
 // `addInitializer` callbacks are globally shared across classes: only the last

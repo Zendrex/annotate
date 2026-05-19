@@ -2,7 +2,8 @@
 import { describe, expect, test } from "bun:test";
 
 // biome-ignore lint/correctness/noUnusedImports: kept per plan L2 test spec; referenced by auto-materialize test behavior transitively.
-import { decorate, prepare, reflect, UnregisteredClassError } from "../../../src";
+import { prepare, reflect, UnregisteredClassError } from "../../../src";
+import { decorate } from "../../../src/legacy";
 
 describe("Reflector", () => {
 	test("class() returns undefined when factory not applied (but class has other metadata)", () => {

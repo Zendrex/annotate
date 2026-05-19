@@ -1,4 +1,4 @@
-import { decorate } from "../../src";
+import { decorate } from "../../src/legacy";
 
 export const ClassTag = decorate.class<string>();
 export const MethodRoute = decorate.method<string>();

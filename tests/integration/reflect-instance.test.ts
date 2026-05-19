@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import { decorate, reflect } from "../../src";
+import { reflect } from "../../src";
+import { decorate } from "../../src/legacy";
 
 describe("reflect(...) — Stage-3 fixtures", () => {
 	test("reflect(instance) parity with reflect(Class)", () => {

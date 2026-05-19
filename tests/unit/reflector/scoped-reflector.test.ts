@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/suspicious/noEmptyBlockStatements: test file */
 import { describe, expect, test } from "bun:test";
 
-import { decorate } from "../../../src";
+import { decorate } from "../../../src/legacy";
 import { ClassTag, PropertyColumn } from "../../fixtures/decorators";
 
 describe("factory.reader()", () => {

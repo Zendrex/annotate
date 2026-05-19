@@ -2,7 +2,8 @@
 /** biome-ignore-all lint/suspicious/noEmptyBlockStatements: stub methods and bases */
 import { describe, expect, test } from "bun:test";
 
-import { DuplicateMetadataError, decorate, InvalidDecorationTargetError } from "../../../src";
+import { DuplicateMetadataError, InvalidDecorationTargetError } from "../../../src";
+import { decorate } from "../../../src/legacy";
 
 class BaseListener {}
 class OtherBase {}

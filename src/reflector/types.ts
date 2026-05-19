@@ -4,8 +4,8 @@ import type { Cardinality } from "../metadata/types";
 // biome-ignore lint/complexity/noBannedTypes: needed for constructor type
 export type AnyConstructor = Function & { prototype: object };
 
-/** Discriminator for {@link DecoratedItem} variants — class, method, or property decoration. */
-export type DecoratedKind = "class" | "method" | "property";
+/** Discriminator for decorated entries. `property` is the legacy field/accessor bucket. */
+export type DecoratedKind = "class" | "method" | "property" | "field" | "accessor";
 
 // ── Class ─────────────────────────────────────────────────────────────────────
 

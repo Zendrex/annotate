@@ -18,10 +18,11 @@ export type ListMetadataKey<T> = MetadataKey<T, "list">;
 export type ClassBucket = Map<symbol, unknown[]>;
 
 /**
- * One member's own values under a key. `static` is fixed at first append; later
- * appends do not change it.
+ * One member's own values under a key. `static` and `kind` are fixed at first
+ * append; later appends do not change them.
  */
 export interface MemberEntry {
+	readonly kind: MemberKind;
 	readonly static: boolean;
 	values: unknown[];
 }
@@ -29,7 +30,7 @@ export interface MemberEntry {
 /** Per-class member metadata: key → member name → entry. */
 export type MemberBucket = Map<symbol, Map<string | symbol, MemberEntry>>;
 
-export type MemberKind = "method" | "property";
+export type MemberKind = "method" | "property" | "field" | "accessor";
 
 /** Member metadata held until ctor correlation supplies the real `Ctor`. */
 export interface Deferred {

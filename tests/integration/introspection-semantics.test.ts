@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
-import { decorate, prepare } from "../../src";
+import { prepare } from "../../src";
+import { decorate } from "../../src/legacy";
 
 describe("Field.has and prepare", () => {
 	const Field = decorate.property<string>();

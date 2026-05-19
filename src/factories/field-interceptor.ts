@@ -9,7 +9,7 @@ import {
 	mergeExtendedOptions,
 	prepareFactoryShell,
 } from "./shared";
-import type { Cardinality, Ctor, MetadataKey } from "../metadata/types";
+import type { Cardinality, Ctor, MemberKind, MetadataKey } from "../metadata/types";
 import type {
 	DecoratedPropertyFactory,
 	DecoratorOptions,
@@ -100,7 +100,8 @@ export function createFieldInterceptor<
 export function buildFieldFactory<TMeta, TArgs extends unknown[], TField, TThis, TCard extends Cardinality = "unique">(
 	key: MetadataKey<TMeta, TCard>,
 	options: DecoratorOptions<TMeta, TArgs> | undefined,
-	hookRefs: FieldHookRefs<TMeta, TField>
+	hookRefs: FieldHookRefs<TMeta, TField>,
+	storedKind: Extract<MemberKind, "property" | "field"> = "property"
 ): DecoratedPropertyFactory<TMeta, TArgs, TField, TThis, TCard> {
 	const { composeFn, label, validators } = prepareFactoryShell<TMeta, TArgs>(key, options);
 	const { onInit } = hookRefs;
@@ -113,7 +114,7 @@ export function buildFieldFactory<TMeta, TArgs extends unknown[], TField, TThis,
 			emitMemberDecoration({
 				context,
 				key,
-				kind: "property",
+				kind: storedKind,
 				meta: compose(args, composeFn),
 				token: Symbol("fieldIntercept"),
 				validators,
@@ -145,7 +146,8 @@ export function buildFieldFactory<TMeta, TArgs extends unknown[], TField, TThis,
 		buildFieldFactory<TMeta, TArgs, TNewField, TNewThis, TCard>(
 			key,
 			mergeExtendedOptions(options, childOptions),
-			hookRefs as unknown as FieldHookRefs<TMeta, TNewField>
+			hookRefs as unknown as FieldHookRefs<TMeta, TNewField>,
+			storedKind
 		);
 
 	return Object.assign(decoratorFn, {

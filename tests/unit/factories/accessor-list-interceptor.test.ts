@@ -2,7 +2,7 @@
 /** biome-ignore-all lint/suspicious/noUnusedExpressions: accessor reads are the side effect under test */
 import { describe, expect, test } from "bun:test";
 
-import { intercept } from "../../../src";
+import { intercept } from "../../../src/legacy";
 
 describe("intercept.accessor.list", () => {
 	test("wraps accessor getter and records metadata", () => {

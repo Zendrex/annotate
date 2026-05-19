@@ -171,8 +171,8 @@ describe("snapshotMembers", () => {
 		appendMemberMeta(A, key, "klass", "v2", Symbol("t2"), { static: true, kind: "method" });
 		const snapshot = snapshotMembers(A, key);
 		expect(snapshot.size).toBe(2);
-		expect(snapshot.get("instance")).toEqual({ static: false, values: ["v1"] });
-		expect(snapshot.get("klass")).toEqual({ static: true, values: ["v2"] });
+		expect(snapshot.get("instance")).toEqual({ kind: "method", static: false, values: ["v1"] });
+		expect(snapshot.get("klass")).toEqual({ kind: "method", static: true, values: ["v2"] });
 	});
 
 	test("merges chain in subclass-first order", () => {
