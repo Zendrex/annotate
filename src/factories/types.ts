@@ -14,7 +14,7 @@ export type AnyFn = (...args: any[]) => any;
 
 /** Identifies the member being wrapped, passed into interceptor callbacks. */
 export interface InterceptorContext {
-	kind: "method" | "accessor";
+	kind: "method" | "accessor" | "field";
 	name: string | symbol;
 	static: boolean;
 }
@@ -80,6 +80,25 @@ export type AccessorInterceptorOptions<TMeta, TArgs extends unknown[] = [TMeta],
 		readMetadata: (instance: object) => TMeta[],
 		context: InterceptorContext
 	) => (value: TValue) => void;
+};
+
+/**
+ * Options for `intercept.field`. The `onInit` hook receives the field's
+ * initial value (already assigned by Stage-3 initializer chain), the
+ * `readMetadata(instance)` reader, and an {@link InterceptorContext}; its
+ * return value is assigned back to the field.
+ *
+ * Replacement runs from an `addInitializer` body that re-derives state via
+ * `this.constructor`, sidestepping the Bun 1.3 transformer bug where field
+ * decorators returning a value-replacement initializer closure share the
+ * closure across every class in the same module (`var _init` shadowing).
+ * Pure-metadata field decorators (`decorate.property`) are unaffected.
+ */
+export type FieldInterceptorOptions<TMeta, TArgs extends unknown[] = [TMeta], TField = unknown> = DecoratorOptions<
+	TMeta,
+	TArgs
+> & {
+	onInit: (initial: TField, readMetadata: (instance: object) => TMeta[], context: InterceptorContext) => TField;
 };
 
 // biome-ignore lint/suspicious/noExplicitAny: structural Stage-3 generic shape

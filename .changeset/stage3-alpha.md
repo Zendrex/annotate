@@ -24,8 +24,16 @@ continue to work.
 ## Public API
 
 - Consolidated namespaces: `decorate.{class,method,property}` and
-  `intercept.{method,accessor}`, each with a `.list` sibling for
+  `intercept.{method,accessor,field}`, each with a `.list` sibling for
   list-cardinality keys (`decorate.method.list`, etc.).
+- `intercept.field({ onInit })`: class-field interceptor that replaces the
+  field's initial value from an `addInitializer` body resolved via
+  `this.constructor`. Closure-free by design — survives Bun 1.3's
+  `var _init` transformer bug where field-decorator value-replacement
+  initializer closures are shared across every class in the same module.
+  Companion `intercept.field.list` for list-cardinality metadata.
+  `InterceptorContext.kind` extended with `"field"`. New exported type
+  `FieldInterceptorOptions<TMeta, TArgs, TField>`.
 - `mintUniqueKey<T>(description?)` and `mintListKey<T>(description?)`
   replace the old `generateKey`. `MetadataKey<TValue, TCard>` is generic
   and branded; aliases `UniqueMetadataKey<T>` and `ListMetadataKey<T>`.
