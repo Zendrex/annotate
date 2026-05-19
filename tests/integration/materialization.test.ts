@@ -1,11 +1,11 @@
 /** biome-ignore-all lint/suspicious/noEmptyBlockStatements: test file */
 import { describe, expect, test } from "bun:test";
 
-import { createPropertyDecorator } from "../../src/factories/property-decorator";
+import { Annotate } from "../../src";
 
 describe("subclass-of-parent-only-decorated regression", () => {
-	test("has/hasOwn/reader + token dedup under interleaved construction", () => {
-		const Field = createPropertyDecorator<string>();
+	test("selector reads and entries remain stable under interleaved construction", () => {
+		const Field = Annotate.field<string>();
 		class A {
 			@Field("a")
 			foo!: number;
@@ -13,11 +13,10 @@ describe("subclass-of-parent-only-decorated regression", () => {
 		class B extends A {}
 
 		new B();
-		expect(Field.hasOwn(A, "foo")).toBe(true);
-		expect(Field.hasOwn(B, "foo")).toBe(false);
-		expect(Field.has(B, "foo")).toBe(true);
+		expect(Field.read(A).get((target) => target.foo)).toBe("a");
+		expect(Field.read(B).get((target) => target.foo)).toBe("a");
 
-		const props = Field.reader(B).properties();
+		const props = Field.read(B).fields();
 		expect(props).toHaveLength(1);
 		expect(props[0]?.name).toBe("foo");
 
@@ -28,8 +27,8 @@ describe("subclass-of-parent-only-decorated regression", () => {
 				new B();
 			}
 		}
-		const list = Field.reader(A).properties();
+		const list = Field.read(A).fields();
 		expect(list[0]?.metadata).toBe("a");
-		expect(Field.hasOwn(B, "foo")).toBe(false);
+		expect(Field.read(B).fields()).toHaveLength(1);
 	});
 });

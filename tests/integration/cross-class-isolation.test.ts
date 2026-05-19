@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { createClassDecorator } from "../../src/factories/class-decorator";
-import { createPropertyDecorator } from "../../src/factories/property-decorator";
+import { Annotate } from "../../src";
 
 // Regression guards against Bun 1.3.13's Stage-3 bug where instance-member
 // `addInitializer` callbacks are globally shared across classes: only the last
@@ -16,8 +15,8 @@ interface Tagged {
 
 describe("cross-class member isolation", () => {
 	test("property decorator on two classes does not cross-pollute after construction", () => {
-		const Prop = createPropertyDecorator<Tagged, [string]>({ compose: (tag) => ({ tag }) });
-		const Tag = createClassDecorator<void, []>();
+		const Prop = Annotate.field<Tagged, [string]>({ args: (tag) => ({ tag }) });
+		const Tag = Annotate.class<void, []>({ args: () => undefined });
 
 		@Tag()
 		class Alpha {
@@ -31,8 +30,8 @@ describe("cross-class member isolation", () => {
 		new Alpha();
 		new Beta();
 
-		const alphaProps = Prop.reader(Alpha).properties();
-		const betaProps = Prop.reader(Beta).properties();
+		const alphaProps = Prop.read(Alpha).fields();
+		const betaProps = Prop.read(Beta).fields();
 
 		expect(alphaProps.map((p) => p.name)).toEqual(["a"]);
 		expect(betaProps.map((p) => p.name)).toEqual(["b"]);
@@ -42,7 +41,7 @@ describe("cross-class member isolation", () => {
 	});
 
 	test("bare-member-decorator class: metadata readable after reflect via materialize", () => {
-		const Prop = createPropertyDecorator<Tagged, [string]>({ compose: (tag) => ({ tag }) });
+		const Prop = Annotate.field<Tagged, [string]>({ args: (tag) => ({ tag }) });
 
 		class Bare {
 			@Prop("only") x = 1;
@@ -50,7 +49,7 @@ describe("cross-class member isolation", () => {
 
 		// No class decorator and no instance yet — reflect() must trigger
 		// materialize so pending deferreds surface.
-		const props = Prop.reader(Bare).properties();
+		const props = Prop.read(Bare).fields();
 		expect(props.map((p) => p.name)).toEqual(["x"]);
 		// Unique-cardinality key: metadata is a scalar Tagged value, not an array.
 		expect(props[0]?.metadata).toEqual({ tag: "only" });

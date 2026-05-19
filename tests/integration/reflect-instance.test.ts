@@ -1,15 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
-import { reflect } from "../../src";
-import { createClassDecorator } from "../../src/factories/class-decorator";
-import { createMethodDecorator } from "../../src/factories/method-decorator";
-import { createPropertyDecorator } from "../../src/factories/property-decorator";
+import { Annotate } from "../../src";
 
 describe("reflect(...) — Stage-3 fixtures", () => {
-	test("reflect(instance) parity with reflect(Class)", () => {
-		const Tag = createClassDecorator<string>();
-		const Route = createMethodDecorator<string>();
-		const Field = createPropertyDecorator<string>();
+	test("Annotate read(instance) parity with read(Class)", () => {
+		const Tag = Annotate.class<string>();
+		const Route = Annotate.method<string>();
+		const Field = Annotate.field<string>();
 
 		@Tag("svc")
 		class Service {
@@ -21,8 +18,8 @@ describe("reflect(...) — Stage-3 fixtures", () => {
 		}
 
 		const instance = new Service();
-		expect(reflect(instance).class<string>(Tag.key)).toEqual(reflect(Service).class<string>(Tag.key));
-		expect(reflect(instance).methods<string>(Route.key)).toEqual(reflect(Service).methods<string>(Route.key));
-		expect(reflect(instance).properties<string>(Field.key)).toEqual(reflect(Service).properties<string>(Field.key));
+		expect(Tag.read(instance).entries()).toEqual(Tag.read(Service).entries());
+		expect(Route.read(instance).methods()).toEqual(Route.read(Service).methods());
+		expect(Field.read(instance).fields()).toEqual(Field.read(Service).fields());
 	});
 });

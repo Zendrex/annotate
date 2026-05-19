@@ -1,10 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { prepare } from "../../src";
-import { createPropertyDecorator } from "../../src/factories/property-decorator";
+import { Annotate, prepare } from "../../src";
 
 describe("Field.has and prepare", () => {
-	const Field = createPropertyDecorator<string>();
+	const Field = Annotate.field<string>();
 
 	class User {
 		@Field("varchar")
@@ -20,8 +19,8 @@ describe("Field.has and prepare", () => {
 
 	test("Field.has is true for decorated fields with prepare; false for undecorated method", () => {
 		prepare(User);
-		expect(Field.has(User, "name")).toBe(true);
-		expect(Field.has(User, "age")).toBe(true);
-		expect(Field.has(User, "method")).toBe(false);
+		expect(Field.read(User).get((target) => target.name) !== undefined).toBe(true);
+		expect(Field.read(User).get((target) => target.age) !== undefined).toBe(true);
+		expect(Field.read(User).get((target) => target.method) !== undefined).toBe(false);
 	});
 });

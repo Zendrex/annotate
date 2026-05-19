@@ -1,16 +1,15 @@
 import { describe, expect, test } from "bun:test";
 
-import { createMethodDecorator } from "../../src/factories/method-decorator";
-import { createMethodInterceptor } from "../../src/factories/method-interceptor";
+import { Annotate } from "../../src";
 
 describe("interceptor decoration-order independence", () => {
 	test("interceptor at the bottom observes sibling decorators applied above", () => {
-		const Sibling = createMethodDecorator<string>();
-		const seen: string[][] = [];
-		const Bottom = createMethodInterceptor<string>({
-			intercept: (original, readMetadata) =>
-				function (this: unknown, ...args: unknown[]) {
-					seen.push(readMetadata(this as object));
+		const Sibling = Annotate.method<string>();
+		const seen: (string | undefined)[] = [];
+		const Bottom = Annotate.intercept.method<string>({
+			wrap: (original, ctx) =>
+				function (this: object, ...args: unknown[]) {
+					seen.push(ctx.get(this));
 					return original.call(this, ...args);
 				} as typeof original,
 		});
@@ -24,7 +23,7 @@ describe("interceptor decoration-order independence", () => {
 
 		const x = new X();
 		x.run();
-		expect(seen).toEqual([["from-bottom"]]);
-		expect(Sibling.first(X, "run")).toBe("from-sibling");
+		expect(seen).toEqual(["from-bottom"]);
+		expect(Sibling.read(X).get((target) => target.run)).toBe("from-sibling");
 	});
 });
