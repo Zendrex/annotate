@@ -78,7 +78,10 @@ export type MethodAnnotation<
 
 export type FieldAnnotation<TMeta, TArgs extends unknown[], TField, TThis, TCard extends Cardinality> = ((
 	...args: TArgs
-) => (value: undefined, context: ClassFieldDecoratorContext<TThis, TField>) => void) & {
+) => (
+	value: undefined,
+	context: ClassFieldDecoratorContext<TThis, TField>
+) => ((this: TThis, initial: any) => any) | undefined) & {
 	read<TTarget extends object>(target: TTarget): MemberAnnotationReader<TMeta, TCard, TThis, TTarget>;
 };
 

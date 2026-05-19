@@ -3,7 +3,8 @@ import type { AnyConstructor } from "../reflector/types";
 import type { Cardinality } from "./types";
 import type { ValidatorFn } from "./validation-types";
 
-export type AnyFn = (...args: never[]) => unknown;
+// biome-ignore lint/suspicious/noExplicitAny: public method decorators must preserve arbitrary function signatures
+export type AnyFn = (...args: any[]) => any;
 
 export type AnyClass<TInstance> = abstract new (...args: never[]) => TInstance;
 

@@ -1,15 +1,11 @@
-import { buildAccessorFactory } from "../factories/accessor-interceptor";
-import { buildClassFactory } from "../factories/class-decorator";
-import { buildFieldFactory } from "../factories/field-interceptor";
-import { buildMethodFactory } from "../factories/method-decorator";
-import { buildPropertyFactory } from "../factories/property-decorator";
 import { normalizeBuilderInput } from "./normalize-input";
 import { attachClassRead, attachMemberRead, publicContext } from "./readers";
-import type { AccessorHookRefs } from "../factories/accessor-interceptor";
-import type { FieldHookRefs } from "../factories/field-interceptor";
-import type { MethodHookRefs } from "../factories/method-decorator";
-import type { AnyFn } from "../factories/types";
-import type { BuilderInput, InternalCardinalityOf } from "./normalize-input";
+import { buildAccessorTarget } from "./targets/accessor";
+import { buildClassTarget } from "./targets/class";
+import { buildFieldInterceptorTarget, buildFieldTarget } from "./targets/field";
+import { buildMethodTarget } from "./targets/method";
+import type { AccessorHookRefs, AnyFn, FieldHookRefs, InternalCardinalityOf, MethodHookRefs } from "./internal-types";
+import type { BuilderInput } from "./normalize-input";
 import type {
 	AccessorAnnotation,
 	AccessorInterceptorOptions,
@@ -25,7 +21,7 @@ export function classAnnotation<TMeta, TArgs extends unknown[], TInstance, TCard
 	input?: BuilderInput<TMeta, TArgs, TCard>
 ): ClassAnnotation<TMeta, TArgs, TInstance, TCard> {
 	const { cardinality, key, options } = normalizeBuilderInput<TMeta, TArgs, TCard>(input);
-	const factory = buildClassFactory<TMeta, TArgs, TInstance, InternalCardinalityOf<TCard>>(key, options);
+	const factory = buildClassTarget<TMeta, TArgs, TInstance, InternalCardinalityOf<TCard>>(key, options);
 	return attachClassRead(factory, key, cardinality) as ClassAnnotation<TMeta, TArgs, TInstance, TCard>;
 }
 
@@ -37,7 +33,7 @@ export function methodAnnotation<
 	TCard extends Cardinality,
 >(input?: BuilderInput<TMeta, TArgs, TCard>): MethodAnnotation<TMeta, TArgs, TMethod, TThis, TCard> {
 	const { cardinality, key, options } = normalizeBuilderInput<TMeta, TArgs, TCard>(input);
-	const factory = buildMethodFactory<TMeta, TArgs, TMethod, TThis, InternalCardinalityOf<TCard>>(key, options);
+	const factory = buildMethodTarget<TMeta, TArgs, TMethod, TThis, InternalCardinalityOf<TCard>>(key, options);
 	return attachMemberRead<typeof factory, TMeta, TCard, TThis>(factory, key, cardinality) as MethodAnnotation<
 		TMeta,
 		TArgs,
@@ -51,11 +47,7 @@ export function fieldAnnotation<TMeta, TArgs extends unknown[], TField, TThis, T
 	input?: BuilderInput<TMeta, TArgs, TCard>
 ): FieldAnnotation<TMeta, TArgs, TField, TThis, TCard> {
 	const { cardinality, key, options } = normalizeBuilderInput<TMeta, TArgs, TCard>(input);
-	const factory = buildPropertyFactory<TMeta, TArgs, TField, TThis, InternalCardinalityOf<TCard>>(
-		key,
-		options,
-		"field"
-	);
+	const factory = buildFieldTarget<TMeta, TArgs, TField, TThis, InternalCardinalityOf<TCard>>(key, options, "field");
 	return attachMemberRead<typeof factory, TMeta, TCard, TThis>(factory, key, cardinality) as FieldAnnotation<
 		TMeta,
 		TArgs,
@@ -69,7 +61,7 @@ export function accessorAnnotation<TMeta, TArgs extends unknown[], TValue, TThis
 	input?: BuilderInput<TMeta, TArgs, TCard>
 ): AccessorAnnotation<TMeta, TArgs, TValue, TThis, TCard> {
 	const { cardinality, key, options } = normalizeBuilderInput<TMeta, TArgs, TCard>(input);
-	const factory = buildAccessorFactory<TMeta, TArgs, TValue, TThis, InternalCardinalityOf<TCard>>(
+	const factory = buildAccessorTarget<TMeta, TArgs, TValue, TThis, InternalCardinalityOf<TCard>>(
 		key,
 		options,
 		{},
@@ -93,17 +85,17 @@ export function methodInterceptor<
 >(
 	options: MethodInterceptorOptions<TMeta, TArgs, TMethod, TCard>
 ): MethodAnnotation<TMeta, TArgs, TMethod, TThis, TCard> {
-	const { cardinality, key, options: legacyOptions } = normalizeBuilderInput<TMeta, TArgs, TCard>(options);
+	const { cardinality, key, options: annotationOptions } = normalizeBuilderInput<TMeta, TArgs, TCard>(options);
 	const hookRefs: MethodHookRefs<TMeta, TMethod> = {
-		intercept: (original, readMetadata, context) =>
+		wrap: (original, readMetadata, context) =>
 			options.wrap(
 				original,
 				publicContext({ kind: "method", name: context.name, static: context.static }, readMetadata, cardinality)
 			),
 	};
-	const factory = buildMethodFactory<TMeta, TArgs, TMethod, TThis, InternalCardinalityOf<TCard>>(
+	const factory = buildMethodTarget<TMeta, TArgs, TMethod, TThis, InternalCardinalityOf<TCard>>(
 		key,
-		legacyOptions,
+		annotationOptions,
 		hookRefs
 	);
 	return attachMemberRead<typeof factory, TMeta, TCard, TThis>(factory, key, cardinality) as MethodAnnotation<
@@ -118,10 +110,10 @@ export function methodInterceptor<
 export function accessorInterceptor<TMeta, TArgs extends unknown[], TValue, TThis, TCard extends Cardinality>(
 	options: AccessorInterceptorOptions<TMeta, TArgs, TValue, TCard>
 ): AccessorAnnotation<TMeta, TArgs, TValue, TThis, TCard> {
-	const { cardinality, key, options: legacyOptions } = normalizeBuilderInput<TMeta, TArgs, TCard>(options);
+	const { cardinality, key, options: annotationOptions } = normalizeBuilderInput<TMeta, TArgs, TCard>(options);
 	const hookRefs: AccessorHookRefs<TMeta, TValue> = {};
 	if (options.get) {
-		hookRefs.onGet = (original, readMetadata, context) =>
+		hookRefs.get = (original, readMetadata, context) =>
 			options.get?.(
 				original,
 				publicContext(
@@ -132,7 +124,7 @@ export function accessorInterceptor<TMeta, TArgs extends unknown[], TValue, TThi
 			) ?? original;
 	}
 	if (options.set) {
-		hookRefs.onSet = (original, readMetadata, context) =>
+		hookRefs.set = (original, readMetadata, context) =>
 			options.set?.(
 				original,
 				publicContext(
@@ -142,9 +134,9 @@ export function accessorInterceptor<TMeta, TArgs extends unknown[], TValue, TThi
 				)
 			) ?? original;
 	}
-	const factory = buildAccessorFactory<TMeta, TArgs, TValue, TThis, InternalCardinalityOf<TCard>>(
+	const factory = buildAccessorTarget<TMeta, TArgs, TValue, TThis, InternalCardinalityOf<TCard>>(
 		key,
-		legacyOptions,
+		annotationOptions,
 		hookRefs,
 		"accessor"
 	);
@@ -160,9 +152,9 @@ export function accessorInterceptor<TMeta, TArgs extends unknown[], TValue, TThi
 export function fieldInterceptor<TMeta, TArgs extends unknown[], TField, TThis, TCard extends Cardinality>(
 	options: FieldInterceptorOptions<TMeta, TArgs, TField, TThis, TCard>
 ): FieldAnnotation<TMeta, TArgs, TField, TThis, TCard> {
-	const { cardinality, key, options: legacyOptions } = normalizeBuilderInput<TMeta, TArgs, TCard>(options);
+	const { cardinality, key, options: annotationOptions } = normalizeBuilderInput<TMeta, TArgs, TCard>(options);
 	const hookRefs: FieldHookRefs<TMeta, TField> = {
-		onInit(this: TThis, initial, readMetadata, context) {
+		init(this: TThis, initial, readMetadata, context) {
 			return options.init.call(
 				this,
 				initial,
@@ -170,9 +162,9 @@ export function fieldInterceptor<TMeta, TArgs extends unknown[], TField, TThis, 
 			);
 		},
 	};
-	const factory = buildFieldFactory<TMeta, TArgs, TField, TThis, InternalCardinalityOf<TCard>>(
+	const factory = buildFieldInterceptorTarget<TMeta, TArgs, TField, TThis, InternalCardinalityOf<TCard>>(
 		key,
-		legacyOptions,
+		annotationOptions,
 		hookRefs,
 		"field"
 	);

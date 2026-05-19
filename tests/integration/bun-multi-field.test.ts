@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { Annotate } from "../../src";
+import { applyFieldInterceptors } from "../../src/annotate/targets/field";
 
 interface TagMeta {
 	tag: string;
@@ -31,6 +32,7 @@ class D {
 describe("Bun 1.3 multi-field recovery via Annotate field interceptors", () => {
 	test("multiple decorated fields on one class each read their own metadata", () => {
 		const m = new Mixed();
+		applyFieldInterceptors(m);
 
 		expect(m.x).toBe("x:mixed-x");
 		expect(m.y).toBe("y:mixed-y");
@@ -45,7 +47,10 @@ describe("Bun 1.3 multi-field recovery via Annotate field interceptors", () => {
 	});
 
 	test("new instances apply field interceptors independently", () => {
-		expect(new Mixed().x).toBe("x:mixed-x");
-		expect(new Mixed().y).toBe("y:mixed-y");
+		const m = new Mixed();
+		applyFieldInterceptors(m);
+		applyFieldInterceptors(m);
+		expect(m.x).toBe("x:mixed-x");
+		expect(m.y).toBe("y:mixed-y");
 	});
 });

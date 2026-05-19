@@ -1,20 +1,21 @@
 import { mintMetadataKey } from "../metadata/cardinality";
-import type { DecoratorOptions } from "../factories/types";
-import type { ValidatorFn } from "../factories/validator-types";
 import type { MetadataKey } from "../metadata/types";
 import type { AnyConstructor } from "../reflector/types";
-import type { AnnotationOptions, Cardinality } from "./types";
+import type { InternalAnnotationOptions, InternalCardinalityOf } from "./internal-types";
+import type { Cardinality } from "./types";
+import type { ValidatorFn } from "./validation-types";
 
-export type InternalCardinalityOf<TCard extends Cardinality> = TCard extends "many" ? "list" : "unique";
-
-export interface LegacyOptionsInput<TMeta, TArgs extends unknown[], TCard extends Cardinality>
-	extends AnnotationOptions<TMeta, TCard> {
+export interface BuilderOptionsInput<TMeta, TArgs extends unknown[], TCard extends Cardinality> {
 	args?: (...args: TArgs) => TMeta;
+	cardinality?: TCard;
+	label?: string;
+	requires?: AnyConstructor;
+	validate?: ValidatorFn<TMeta>;
 }
 
 export type BuilderInput<TMeta, TArgs extends unknown[], TCard extends Cardinality> =
 	| ((...args: TArgs) => TMeta)
-	| LegacyOptionsInput<TMeta, TArgs, TCard>
+	| BuilderOptionsInput<TMeta, TArgs, TCard>
 	| undefined;
 
 export function resolveCardinality<TMeta, TArgs extends unknown[], TCard extends Cardinality>(
@@ -23,34 +24,34 @@ export function resolveCardinality<TMeta, TArgs extends unknown[], TCard extends
 	return (typeof input === "object" && input?.cardinality ? input.cardinality : "one") as TCard;
 }
 
-export function toLegacyOptions<TMeta, TArgs extends unknown[], TCard extends Cardinality>(
+export function toAnnotationOptions<TMeta, TArgs extends unknown[], TCard extends Cardinality>(
 	input: BuilderInput<TMeta, TArgs, TCard>
-): DecoratorOptions<TMeta, TArgs> | undefined {
+): InternalAnnotationOptions<TMeta, TArgs> | undefined {
 	if (typeof input === "function") {
-		return { compose: input } as DecoratorOptions<TMeta, TArgs>;
+		return { args: input } as InternalAnnotationOptions<TMeta, TArgs>;
 	}
 	if (!input) {
 		return;
 	}
 	const options: {
-		compose?: (...args: TArgs) => TMeta;
-		name?: string;
-		requireInstanceOf?: AnyConstructor;
-		validate?: ValidatorFn<TMeta>;
+		args?: (...args: TArgs) => TMeta;
+		label?: string;
+		requires?: BuilderOptionsInput<TMeta, TArgs, TCard>["requires"];
+		validate?: BuilderOptionsInput<TMeta, TArgs, TCard>["validate"];
 	} = {};
 	if (input.args) {
-		options.compose = input.args;
+		options.args = input.args;
 	}
 	if (input.label !== undefined) {
-		options.name = input.label;
+		options.label = input.label;
 	}
 	if (input.requires) {
-		options.requireInstanceOf = input.requires;
+		options.requires = input.requires;
 	}
 	if (input.validate) {
 		options.validate = input.validate;
 	}
-	return options as DecoratorOptions<TMeta, TArgs>;
+	return options as InternalAnnotationOptions<TMeta, TArgs>;
 }
 
 export function mintKey<TMeta, TCard extends Cardinality>(
@@ -65,14 +66,14 @@ export function mintKey<TMeta, TCard extends Cardinality>(
 export interface NormalizedBuilderInput<TMeta, TArgs extends unknown[], TCard extends Cardinality> {
 	cardinality: TCard;
 	key: MetadataKey<TMeta, InternalCardinalityOf<TCard>>;
-	options: DecoratorOptions<TMeta, TArgs> | undefined;
+	options: InternalAnnotationOptions<TMeta, TArgs> | undefined;
 }
 
 export function normalizeBuilderInput<TMeta, TArgs extends unknown[], TCard extends Cardinality>(
 	input: BuilderInput<TMeta, TArgs, TCard>
 ): NormalizedBuilderInput<TMeta, TArgs, TCard> {
 	const cardinality = resolveCardinality<TMeta, TArgs, TCard>(input);
-	const options = toLegacyOptions<TMeta, TArgs, TCard>(input);
-	const key = mintKey<TMeta, TCard>(cardinality, options?.name);
+	const options = toAnnotationOptions<TMeta, TArgs, TCard>(input);
+	const key = mintKey<TMeta, TCard>(cardinality, options?.label);
 	return { cardinality, key, options };
 }
