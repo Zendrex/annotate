@@ -34,10 +34,9 @@ continue to work.
   separate list builders. `"one"` is the default; `"many"` returns frozen
   metadata arrays from reads.
 - `Annotate.intercept.field({ init })`: class-field interceptor that replaces
-  the field's initial value from an `addInitializer` body resolved via
-  `this.constructor`. Closure-free by design — survives Bun 1.3's
-  `var _init` transformer bug where field-decorator value-replacement
-  initializer closures are shared across every class in the same module.
+  the field's initial value and includes an internal recovery path for Bun
+  1.3's `var _init` transformer bug where field-decorator value-replacement
+  initializer closures can be skipped across fields in the same module.
 - Public interceptor contexts expose `kind`, `name`, `static`, and
   `ctx.get(instance)` for reading the interceptor's own metadata.
 - `mintUniqueKey<T>(description?)` and `mintListKey<T>(description?)`
@@ -66,10 +65,10 @@ continue to work.
 - `UnregisteredClassError` (code `"unregistered"`) — `reflect()` of a class
   with no registered metadata. `applied(...)` / `appliedOwn(...)` never
   throw and return `false` on the unregistered path.
-- `DuplicateMetadataError` (code `"duplicate"`) — carries cardinality +
-  label.
+- `DuplicateMetadataError` (code `"duplicate"`) — carries key, kind, and
+  target context for duplicate one-cardinality annotations.
 - `InvalidDecorationTargetError` (code `"invalidTarget"`) — thrown when
-  `requireInstanceOf` rejects.
+  `requires` rejects the decorated host class.
 - `ValidationError` (code `"validation"`) — thrown when `validate` rejects;
   original throwable preserved on `Error.cause`.
 - `MissingMetadataError` (code `"missing"`) — thrown by `firstOrThrow`.
