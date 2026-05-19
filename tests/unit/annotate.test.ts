@@ -1,5 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: tests intentionally exercise decorator call shapes */
 /** biome-ignore-all lint/suspicious/noEmptyBlockStatements: test fixture methods */
+/** biome-ignore-all lint/complexity/noVoid: discard decorator fixture class references */
 
 import { describe, expect, test } from "bun:test";
 
@@ -40,6 +41,46 @@ describe("Annotate", () => {
 
 		expect(Tag.read(Api).get((api) => api.index)).toEqual(["inner", "outer"]);
 		expect(Object.isFrozen(Tag.read(Api).get((api) => api.index))).toBe(true);
+	});
+
+	test("one-cardinality annotations reject duplicate application at the same site", () => {
+		const Tag = Annotate.class<string>({ label: "Tag" });
+
+		expect(() => {
+			@Tag("outer")
+			@Tag("inner")
+			class Duplicate {}
+			void Duplicate;
+		}).toThrow("Duplicate metadata for @Tag on Duplicate");
+	});
+
+	test("many-cardinality class annotations preserve inherited most-derived-first reads", () => {
+		const Tag = Annotate.class<string>({ cardinality: "many" });
+
+		@Tag("base")
+		class Base {}
+
+		@Tag("child")
+		class Child extends Base {}
+
+		expect(Tag.read(Child).get()).toEqual(["child", "base"]);
+		expect(Tag.read(Child).entries()).toEqual([
+			{ kind: "class", name: "Child", target: Child, metadata: ["child", "base"] },
+		]);
+	});
+
+	test("argument mapper options infer decorator arguments", () => {
+		const Route = Annotate.method({
+			label: "Route",
+			args: (method: "GET" | "POST", path: string) => ({ method, path }),
+		});
+
+		class Api {
+			@Route("GET", "/users")
+			list(): void {}
+		}
+
+		expect(Route.read(Api).get((api) => api.list)).toEqual({ method: "GET", path: "/users" });
 	});
 
 	test("class annotations read without a selector", () => {
