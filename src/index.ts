@@ -18,7 +18,11 @@ export {
 
 import { createAccessorInterceptor, createAccessorListInterceptor } from "./factories/accessor-interceptor";
 import { createClassDecorator, createClassListDecorator } from "./factories/class-decorator";
-import { createFieldInterceptor, createFieldListInterceptor } from "./factories/field-interceptor";
+import {
+	applyFieldInterceptors,
+	createFieldInterceptor,
+	createFieldListInterceptor,
+} from "./factories/field-interceptor";
 import { createMethodDecorator, createMethodListDecorator } from "./factories/method-decorator";
 import { createMethodInterceptor, createMethodListInterceptor } from "./factories/method-interceptor";
 import { createPropertyDecorator, createPropertyListDecorator } from "./factories/property-decorator";
@@ -40,17 +44,16 @@ export const decorate = Object.freeze({
 /**
  * Frozen registry of interceptor factories. `method`, `accessor`, and `field`
  * each expose the unique-cardinality factory and a `.list` sibling for
- * list-cardinality metadata. Prefer this over deep imports.
- *
- * `field` performs value replacement from an `addInitializer` body rather than
- * returning a replacement initializer closure, so it is safe under Bun 1.3's
- * Stage-3 transformer (which shares such closures across classes in the same
- * module).
+ * list-cardinality metadata. `field.apply(instance)` is the post-construction
+ * recovery path; see {@link createFieldInterceptor}. Prefer this over deep
+ * imports.
  */
 export const intercept = Object.freeze({
 	method: withList(createMethodInterceptor, createMethodListInterceptor),
 	accessor: withList(createAccessorInterceptor, createAccessorListInterceptor),
-	field: withList(createFieldInterceptor, createFieldListInterceptor),
+	field: Object.assign(withList(createFieldInterceptor, createFieldListInterceptor), {
+		apply: applyFieldInterceptors,
+	}),
 } as const);
 
 export { mintListKey, mintUniqueKey } from "./metadata/cardinality-registry";
