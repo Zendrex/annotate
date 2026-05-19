@@ -1,10 +1,11 @@
 import { mintMetadataKey } from "../metadata/cardinality-registry";
-import { collectMemberMeta, collectMemberNames, getMemberStatic } from "../metadata/member-meta-store";
+import { collectMemberNames, getMemberStatic } from "../metadata/member-meta-store";
 import { prepare } from "../runtime/prepare";
 import { walkPrototypeChain } from "../runtime/prototype-chain";
 import {
 	compose,
 	createMemberFactoryHelpers,
+	createMemberMetadataReader,
 	emitMemberDecoration,
 	mergeExtendedOptions,
 	prepareFactoryShell,
@@ -69,7 +70,7 @@ export function buildFieldFactory<TMeta, TArgs extends unknown[], TField, TThis,
 	const { composeFn, label, validators } = prepareFactoryShell<TMeta, TArgs>(key, options);
 	const { onInit } = hookRefs;
 
-	registerFieldInterceptor(key, hookRefs);
+	fieldInterceptors.set(key, hookRefs as FieldHookRefs<unknown, unknown>);
 
 	const decoratorFn =
 		(...args: TArgs) =>
@@ -85,7 +86,7 @@ export function buildFieldFactory<TMeta, TArgs extends unknown[], TField, TThis,
 
 			if (context.static) {
 				const memberName = context.name;
-				const readMetadata = makeStaticReader<TMeta>(key, memberName);
+				const readMetadata = createMemberMetadataReader<TMeta>(key, memberName, true);
 				const interceptorContext: InterceptorContext = { name: memberName, static: true, kind: "field" };
 				context.addInitializer(function (this: unknown) {
 					const ctor = this as Ctor;
@@ -149,10 +150,6 @@ function requireFieldHook(options: { onInit?: unknown }, label: string): void {
 	}
 }
 
-function registerFieldInterceptor<TMeta, TField>(key: MetadataKey<TMeta>, refs: FieldHookRefs<TMeta, TField>): void {
-	fieldInterceptors.set(key, refs as FieldHookRefs<unknown, unknown>);
-}
-
 /**
  * Instance-side addInitializer body shared across every `intercept.field`
  * decoration. References only `this.constructor` and module-global state, so
@@ -177,17 +174,9 @@ function applyAllFieldInterceptors(this: unknown): void {
 			if (getMemberStatic(ctor, key, name)) {
 				continue;
 			}
-			const reader = makeInstanceReader(key, name);
+			const reader = createMemberMetadataReader<unknown>(key, name, false);
 			const interceptorContext: InterceptorContext = { name, static: false, kind: "field" };
 			target[name] = refs.onInit.call(target, target[name], reader, interceptorContext);
 		}
 	}
-}
-
-function makeInstanceReader<TMeta>(key: MetadataKey<TMeta>, name: string | symbol): (instance: object) => TMeta[] {
-	return (instance: object) => collectMemberMeta<TMeta>((instance as { constructor: Ctor }).constructor, key, name);
-}
-
-function makeStaticReader<TMeta>(key: MetadataKey<TMeta>, name: string | symbol): (instance: object) => TMeta[] {
-	return (instance: object) => collectMemberMeta<TMeta>(instance as unknown as Ctor, key, name);
 }

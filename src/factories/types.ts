@@ -84,15 +84,10 @@ export type AccessorInterceptorOptions<TMeta, TArgs extends unknown[] = [TMeta],
 
 /**
  * Options for `intercept.field`. The `onInit` hook receives the field's
- * initial value (already assigned by Stage-3 initializer chain), the
+ * initial value (already assigned by the Stage-3 initializer chain), the
  * `readMetadata(instance)` reader, and an {@link InterceptorContext}; its
- * return value is assigned back to the field.
- *
- * Replacement runs from an `addInitializer` body that re-derives state via
- * `this.constructor`, sidestepping the Bun 1.3 transformer bug where field
- * decorators returning a value-replacement initializer closure share the
- * closure across every class in the same module (`var _init` shadowing).
- * Pure-metadata field decorators (`decorate.property`) are unaffected.
+ * return value is assigned back to the field. See `createFieldInterceptor`
+ * for the addInitializer-based replacement strategy and Bun 1.3 rationale.
  */
 export type FieldInterceptorOptions<TMeta, TArgs extends unknown[] = [TMeta], TField = unknown> = DecoratorOptions<
 	TMeta,
