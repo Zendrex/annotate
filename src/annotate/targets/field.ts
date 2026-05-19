@@ -63,7 +63,7 @@ export function buildFieldTarget<TMeta, TArgs extends unknown[], TField, TThis, 
 	const { argsMapper, validators } = prepareTargetBuilder<TMeta, TArgs>(key, options);
 
 	return (...args: TArgs) =>
-		(_value: undefined, context: ClassFieldDecoratorContext<TThis, TField>): void => {
+		(_value: undefined, context: ClassFieldDecoratorContext<TThis, TField>): undefined => {
 			emitMemberDecoration({
 				context,
 				key,
@@ -72,6 +72,7 @@ export function buildFieldTarget<TMeta, TArgs extends unknown[], TField, TThis, 
 				token: Symbol("fieldDecoration"),
 				validators,
 			});
+			return;
 		};
 }
 

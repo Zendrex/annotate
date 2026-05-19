@@ -22,7 +22,7 @@ describe("Annotate validation", () => {
 	});
 
 	test("validate receives mapped metadata", () => {
-		const Route = Annotate.method({
+		const Route = Annotate.method<{ path: string }, [string]>({
 			label: "Route",
 			args: (path: string) => ({ path }),
 			validate(route) {

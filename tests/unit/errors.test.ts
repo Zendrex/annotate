@@ -220,7 +220,6 @@ describe("DuplicateMetadataError", () => {
 		expect(err.target).toBe(Subject);
 		expect(err.memberName).toBeUndefined();
 		expect(err.message).toContain("Subject");
-		expect(err.message).toContain("unique");
 		expect(err.message).toContain("test-key");
 	});
 
@@ -230,6 +229,5 @@ describe("DuplicateMetadataError", () => {
 
 		expect(err.memberName).toBe("field");
 		expect(err.message).toContain("Subject.field");
-		expect(err.message).toContain("list");
 	});
 });

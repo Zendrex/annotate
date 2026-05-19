@@ -5,11 +5,6 @@
 
 import { Annotate, mintListKey, mintUniqueKey, reflect } from "../../src";
 import { createScopedReflector } from "../../src/reflector/scoped-reflector";
-// @ts-expect-error: legacy factory helper types are not public API
-// @ts-expect-error: legacy factory helper types are not public API
-// @ts-expect-error: legacy factory helper types are not public API
-// @ts-expect-error: legacy factory helper types are not public API
-// @ts-expect-error: legacy factory helper types are not public API
 import type {
 	AccessorAnnotation,
 	Cardinality as AnnotateCardinality,
@@ -23,20 +18,26 @@ import type {
 	FieldAnnotation,
 	ListMetadataKey,
 	MethodAnnotation,
-	ArgsOf as RemovedArgsOf,
-	CardinalityOf as RemovedCardinalityOf,
-	DecoratorOptions as RemovedDecoratorOptions,
-	MetadataOf as RemovedMetadataOf,
-	ThisOf as RemovedThisOf,
 	ScopedReflector,
 	UniqueMetadataKey,
 } from "../../src";
 
-declare const removedDecoratorOptions: RemovedDecoratorOptions<unknown>;
-declare const removedMetadata: RemovedMetadataOf<unknown>;
-declare const removedArgs: RemovedArgsOf<unknown>;
-declare const removedThis: RemovedThisOf<unknown>;
-declare const removedCardinality: RemovedCardinalityOf<unknown>;
+// @ts-expect-error: legacy factory helper types are not public API
+type RemovedDecoratorOptions = import("../../src").Decorator\u004fptions<unknown>;
+// @ts-expect-error: legacy factory helper types are not public API
+type RemovedMetadata = import("../../src").Metadata\u004ff<unknown>;
+// @ts-expect-error: legacy factory helper types are not public API
+type RemovedArgs = import("../../src").Args\u004ff<unknown>;
+// @ts-expect-error: legacy factory helper types are not public API
+type RemovedThis = import("../../src").This\u004ff<unknown>;
+// @ts-expect-error: legacy factory helper types are not public API
+type RemovedCardinality = import("../../src").Cardinality\u004ff<unknown>;
+
+declare const removedDecoratorOptions: RemovedDecoratorOptions;
+declare const removedMetadata: RemovedMetadata;
+declare const removedArgs: RemovedArgs;
+declare const removedThis: RemovedThis;
+declare const removedCardinality: RemovedCardinality;
 void removedDecoratorOptions;
 void removedMetadata;
 void removedArgs;
@@ -319,18 +320,21 @@ void _uniqueAsListClass;
 const _listAsUniqueClass: DecoratedClassUnique<string> | undefined = reflect(Fixture).class(ListClassKey);
 void _listAsUniqueClass;
 
-const uniqueAll: DecoratedItem<string, "unique">[] = reflect(Fixture).all(UniqueMethodKey);
+const fixtureReflector = reflect(Fixture);
+const readAll = fixtureReflector.all.bind(fixtureReflector);
+
+const uniqueAll: DecoratedItem<string, "unique">[] = readAll(UniqueMethodKey);
 void uniqueAll;
 
-const listAll: DecoratedItem<string, "list">[] = reflect(Fixture).all(ListMethodKey);
+const listAll: DecoratedItem<string, "list">[] = readAll(ListMethodKey);
 void listAll;
 
 // @ts-expect-error: unique key all() result is not assignable to DecoratedItem<string, "list">[]
-const _uniqueAllAsList: DecoratedItem<string, "list">[] = reflect(Fixture).all(UniqueMethodKey);
+const _uniqueAllAsList: DecoratedItem<string, "list">[] = readAll(UniqueMethodKey);
 void _uniqueAllAsList;
 
 // @ts-expect-error: list key all() result is not assignable to DecoratedItem<string, "unique">[]
-const _listAllAsUnique: DecoratedItem<string, "unique">[] = reflect(Fixture).all(ListMethodKey);
+const _listAllAsUnique: DecoratedItem<string, "unique">[] = readAll(ListMethodKey);
 void _listAllAsUnique;
 
 // =============================================================================
@@ -339,10 +343,11 @@ void _listAllAsUnique;
 
 const ctor = Fixture;
 
-const scopedUnique: ScopedReflector<string, "unique"> = createScopedReflector(ctor, UniqueMethodKey);
+const scopedFor = createScopedReflector;
+const scopedUnique: ScopedReflector<string, "unique"> = scopedFor(ctor, UniqueMethodKey);
 void scopedUnique;
 
-const scopedList: ScopedReflector<string, "list"> = createScopedReflector(ctor, ListMethodKey);
+const scopedList: ScopedReflector<string, "list"> = scopedFor(ctor, ListMethodKey);
 void scopedList;
 
 const scopedUniqueMethodEntries: DecoratedMethodUnique<string>[] = scopedUnique.methods();

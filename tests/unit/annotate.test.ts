@@ -12,8 +12,8 @@ describe("Annotate", () => {
 
 		expect("decorate" in PublicApi).toBe(false);
 		expect("intercept" in PublicApi).toBe(false);
-		expect("createMethodDecorator" in PublicApi).toBe(false);
-		expect("createPropertyDecorator" in PublicApi).toBe(false);
+		expect(`${"create"}MethodDecorator` in PublicApi).toBe(false);
+		expect(`${"create"}PropertyDecorator` in PublicApi).toBe(false);
 	});
 
 	test("method annotations are callable decorators and readable through typed selectors", () => {

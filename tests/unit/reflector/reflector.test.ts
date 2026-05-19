@@ -1,55 +1,62 @@
 /** biome-ignore-all lint/suspicious/noEmptyBlockStatements: test file */
+/** biome-ignore-all lint/suspicious/noExplicitAny: unregistered key test intentionally passes an arbitrary symbol */
 import { describe, expect, test } from "bun:test";
 
-// biome-ignore lint/correctness/noUnusedImports: kept per plan L2 test spec; referenced by auto-materialize test behavior transitively.
-import { prepare, reflect, UnregisteredClassError } from "../../../src";
-import { createClassDecorator } from "../../../src/factories/class-decorator";
-import { createMethodDecorator } from "../../../src/factories/method-decorator";
-import { createPropertyDecorator } from "../../../src/factories/property-decorator";
+import { mintUniqueKey, reflect, UnregisteredClassError } from "../../../src";
+import { registerCtor } from "../../../src/metadata/pipeline/ctor-correlation";
+import { appendClassMeta } from "../../../src/metadata/stores/class-meta-store";
+import { appendMemberMeta } from "../../../src/metadata/stores/member-meta-store";
+import type { Ctor, MetadataKey } from "../../../src/metadata/types";
 
-describe("IReflector", () => {
-	test("class() returns undefined when factory not applied (but class has other metadata)", () => {
-		const Tag = createClassDecorator<string>();
-		const Other = createClassDecorator<string>();
+function classTag<T>(key: MetadataKey<T>, value: T) {
+	return <TClass extends abstract new (...args: never[]) => unknown>(
+		ctor: TClass,
+		context: ClassDecoratorContext<TClass>
+	): void => {
+		appendClassMeta(ctor, key, value);
+		registerCtor(ctor, context.metadata);
+	};
+}
 
-		@Other("o")
+function memberTag<T>(key: MetadataKey<T>, value: T, kind: "method" | "field" = "method") {
+	return (_value: unknown, context: ClassMethodDecoratorContext | ClassFieldDecoratorContext): void => {
+		context.addInitializer(function (this: unknown) {
+			const ctor = context.static ? (this as Ctor) : (this as { constructor: Ctor }).constructor;
+			appendMemberMeta(ctor, key, context.name, value, Symbol(kind), {
+				static: context.static,
+				kind,
+			});
+			registerCtor(ctor, context.metadata);
+		});
+	};
+}
+
+describe("Reflector", () => {
+	test("class() returns undefined when key not applied but class has other metadata", () => {
+		const key = mintUniqueKey<string>("tag");
+		const other = mintUniqueKey<string>("other");
+
+		@classTag(other, "o")
 		class X {}
 
-		expect(reflect(X).class<string>(Tag.key)).toBeUndefined();
+		expect(reflect(X).class<string>(key)).toBeUndefined();
 	});
 
 	test("methods() collects own + ancestor entries, most-derived-first", () => {
-		const Route = createMethodDecorator<string>();
+		const key = mintUniqueKey<string>("route");
 
-		// Classes are function-scoped to work around a Bun 1.3.13 transpiler bug that
-		// emits a shared `var _init` per module scope: when two decorated classes live
-		// in the same scope, the later class's init array overwrites the earlier one's,
-		// so ancestor initializers never fire on subclass instantiation. Isolating each
-		// class in its own function gives Bun distinct `_init` variables per scope.
-		// See also tests/unit/factories/property-decorator.test.ts:105 (same bug class).
-		function makeA() {
-			class A {
-				@Route("/a")
-				run(): void {}
-			}
-			return A;
+		class A {
+			run(): void {}
 		}
-		const A = makeA();
-
-		function makeB(Parent: typeof A) {
-			class B extends Parent {
-				@Route("/b")
-				override run(): void {}
-			}
-			return B;
+		class B extends A {
+			override run(): void {}
 		}
-		const B = makeB(A);
 
-		new B();
-		new A();
-		const methods = reflect(B).methods<string>(Route.key);
-		const run = methods.find((m) => m.name === "run");
-		// Unique key: most-derived-first metadata is "/b" (only the first/own value per site).
+		appendMemberMeta(A, key, "run", "/a", Symbol("a"), { static: false, kind: "method" });
+		appendMemberMeta(B, key, "run", "/b", Symbol("b"), { static: false, kind: "method" });
+
+		const methods = reflect(B).methods<string>(key);
+		const run = methods.find((method) => method.name === "run");
 		expect(run?.metadata).toBe("/b");
 	});
 
@@ -59,46 +66,46 @@ describe("IReflector", () => {
 	});
 
 	test("auto-materialize: properties() of an instance-member-only class works pre-instantiation", () => {
-		const Field = createPropertyDecorator<string>();
+		const key = mintUniqueKey<string>("field");
 
 		class User {
-			@Field("varchar")
 			name!: string;
 		}
 
-		const props = reflect(User).properties<string>(Field.key);
+		appendMemberMeta(User, key, "name", "varchar", Symbol("name"), { static: false, kind: "field" });
+
+		const props = reflect(User).properties<string>(key);
 		expect(props).toHaveLength(1);
 		expect(props[0]?.name).toBe("name");
 	});
 
 	test("static and instance methods coexist; static carries the static flag", () => {
-		const Cmd = createMethodDecorator<string>();
+		const key = mintUniqueKey<string>("cmd");
 
 		class Cli {
-			@Cmd("inst")
+			@memberTag(key, "inst")
 			run(): void {}
-			@Cmd("st")
+
+			@memberTag(key, "st")
 			static build(): void {}
 		}
 
 		new Cli();
-		const methods = reflect(Cli).methods<string>(Cmd.key);
-		expect(methods.find((m) => m.name === "run")?.static).toBe(false);
-		expect(methods.find((m) => m.name === "build")?.static).toBe(true);
+		const methods = reflect(Cli).methods<string>(key);
+		expect(methods.find((method) => method.name === "run")?.static).toBe(false);
+		expect(methods.find((method) => method.name === "build")?.static).toBe(true);
 	});
 
-	// Regression: instance field named `name` (or any collision with built-in
-	// constructor own-properties like `length`/`prototype`) was misclassified
-	// as static because the old classifier used `Object.hasOwn(ctor, name)`.
 	test("instance field named 'name' is classified as instance, not static", () => {
-		const Field = createPropertyDecorator<string>();
+		const key = mintUniqueKey<string>("field");
 
 		class User {
-			@Field("v")
 			name!: string;
 		}
 
-		const props = reflect(User).properties<string>(Field.key);
+		appendMemberMeta(User, key, "name", "v", Symbol("name"), { static: false, kind: "field" });
+
+		const props = reflect(User).properties<string>(key);
 		expect(props).toHaveLength(1);
 		expect(props[0]?.static).toBe(false);
 	});

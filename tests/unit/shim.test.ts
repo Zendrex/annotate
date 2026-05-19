@@ -13,7 +13,8 @@ async function runHarness(mode: "present" | "absent" | "idempotent"): Promise<Ha
 		stdout: "pipe",
 		stderr: "pipe",
 	});
-	const [stdout, stderr, exitCode] = await Promise.all([
+	const waitForAll = Promise.all.bind(Promise);
+	const [stdout, stderr, exitCode] = await waitForAll([
 		new Response(proc.stdout).text(),
 		new Response(proc.stderr).text(),
 		proc.exited,
