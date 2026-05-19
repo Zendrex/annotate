@@ -191,6 +191,23 @@ Field reads use the same selector shape:
 Column.read(User).get((user) => user.name);
 ```
 
+Class annotation reads do not need a selector:
+
+```ts
+Controller.read(User).get();
+```
+
+Static member reads use a small `static` reader namespace so the selector is typed against the constructor instead of the instance:
+
+```ts
+Route.read(Api).static.get((api) => api.health);
+```
+
+`get` return types are driven by cardinality:
+
+- `"one"` returns `T | undefined`.
+- `"many"` returns `readonly T[]`.
+
 Existence checks use normal JavaScript:
 
 ```ts
@@ -209,7 +226,55 @@ const routes = Route.read(Api)
 	}));
 ```
 
+The collection surface is intentionally small:
+
+```ts
+const Watched = Annotate.accessor<string>();
+
+Route.read(Api).entries();
+Route.read(Api).methods();
+Column.read(User).fields();
+Watched.read(User).accessors();
+```
+
+Collections include inherited metadata by default and preserve the current most-derived-first behavior. Member entries include `kind`, `name`, `static`, and `metadata`, so callers can use ordinary array operations for more specific scans:
+
+```ts
+const staticRoutes = Route.read(Api)
+	.methods()
+	.filter((method) => method.static);
+```
+
 The public read surface should not include `first`, `all`, `has`, `byName`, or `hasName`. Name-based reads are not part of the v1 public API. If dynamic access is needed later, it should be considered as a separate low-level API instead of being attached to every annotation handle.
+
+### Selector Semantics
+
+Selectors are type-safe member selectors, not arbitrary predicates.
+
+At runtime, Annotate resolves the selected member by executing the selector against a proxy that records property access. The selector must synchronously read exactly one public property or method:
+
+```ts
+Role.read(Api).get((api) => api.index);
+Column.read(User).get((user) => user.name);
+Route.read(Api).static.get((api) => api.health);
+```
+
+Selectors may use symbols:
+
+```ts
+const key = Symbol("route");
+Route.read(Api).get((api) => api[key]);
+```
+
+Invalid selectors throw `InvalidSelectorError`:
+
+```ts
+Role.read(Api).get((api) => api.index()); // invalid: invokes the method
+Role.read(Api).get((api) => api.a || api.b); // invalid: reads more than one member
+Role.read(Api).get(() => undefined); // invalid: reads no member
+```
+
+Private fields cannot be selected. Applying Annotate decorators to private members should throw `InvalidDecorationTargetError`; private member decorators are out of scope for v1.
 
 ## Interceptors
 
@@ -222,13 +287,30 @@ const Log = Annotate.intercept.method<string>({
 	label: "Log",
 	wrap: (original, ctx) =>
 		function (...args) {
-			ctx.read(this);
+			ctx.get(this);
 			return original.apply(this, args);
 		},
 });
 ```
 
-Open design area: finalize exact interceptor hook names and context shape. The current direction is to use plain names like `wrap`, `get`, `set`, and `init` instead of the existing `intercept`, `onGet`, `onSet`, and `onInit` names.
+Interceptor hook names should be plain verbs:
+
+```ts
+Annotate.intercept.method({
+	wrap: (original, ctx) => original,
+});
+
+Annotate.intercept.accessor({
+	get: (original, ctx) => original,
+	set: (original, ctx) => original,
+});
+
+Annotate.intercept.field({
+	init: (initial, ctx) => initial,
+});
+```
+
+The interceptor context exposes the decorated member and a `get(instance)` helper for reading this interceptor's metadata on the current member. The return type of `ctx.get(instance)` follows cardinality just like annotation readers.
 
 ## Validation And Target Constraints
 
@@ -246,12 +328,16 @@ const Route = Annotate.method({
 });
 ```
 
-Open design area: decide whether `requireInstanceOf` should be renamed. Candidate names:
+`requireInstanceOf` is renamed to `requires`:
 
-- `require`
-- `requires`
-- `target`
-- `host`
+```ts
+const Route = Annotate.method({
+	requires: ControllerBase,
+	args: (method: "GET" | "POST", path: string) => ({ method, path }),
+});
+```
+
+`requires` means the class hosting the decorator must extend the supplied constructor.
 
 The existing runtime semantics should remain: class and static member validation occurs during class evaluation, while instance member validation occurs on first construction or first reflective read.
 
@@ -259,7 +345,9 @@ The existing runtime semantics should remain: class and static member validation
 
 This is a breaking redesign. Public docs should teach `Annotate` only.
 
-The implementation may temporarily keep lower-level internal helpers that resemble the current `decorate` / `intercept` factories, but those names are not part of the desired v1 public API.
+The existing `decorate` and `intercept` public exports are removed in the breaking release. No legacy public subpath is planned for v1.
+
+The implementation may temporarily keep lower-level internal helpers that resemble the current factories, but those names are not exported as public API.
 
 ## Internal Refactor Direction
 
@@ -268,7 +356,7 @@ The current implementation has repeated factory code across class, method, prope
 - A key/cardinality module that understands public `"one" | "many"` and internal storage cardinality.
 - A shared annotation handle builder that creates callable decorators with attached read helpers.
 - Thin target adapters for class, method, field, accessor, and interceptor behavior.
-- A read layer that supports typed selectors and reflected collections without name-based helper methods.
+- A read layer that supports proxy-backed typed selectors and reflected collections without name-based helper methods.
 
 Runtime invariants already covered by tests should be preserved:
 
@@ -290,8 +378,4 @@ Runtime invariants already covered by tests should be preserved:
 
 ## Open Questions
 
-1. Finalize selector implementation details and limitations. TypeScript selectors are type-safe at compile time, but runtime member-name extraction requires a deliberate strategy.
-2. Finalize static member selector syntax.
-3. Finalize interceptor hook names and context type.
-4. Choose a replacement name for `requireInstanceOf`, if any.
-5. Decide whether the old public API is removed immediately or kept under a legacy subpath during transition.
+No unresolved public API questions remain in this draft. Further work should move into implementation planning after user review.
