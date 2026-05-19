@@ -31,26 +31,8 @@ export type {
 	MethodAnnotation,
 	MethodInterceptorOptions as AnnotateMethodInterceptorOptions,
 	PublicInterceptorContext,
-} from "./annotate";
-export type {
-	AccessorInterceptorOptions,
-	AnyFn,
-	ArgsOf,
-	CardinalityOf,
-	DecoratedAccessorFactory,
-	DecoratedClassFactory,
-	DecoratedMethodFactory,
-	DecoratedPropertyFactory,
-	DecoratorOptions,
-	DeriveOptions,
-	FieldInterceptorOptions,
-	InterceptorContext,
-	MetadataOf,
-	MethodInterceptorOptions,
-	ThisOf,
 	ValidateContext,
-	ValidatorFn,
-} from "./factories/types";
+} from "./annotate";
 export type { ListMetadataKey, MetadataArray, MetadataKey, UniqueMetadataKey } from "./metadata/types";
 export type { Reflector } from "./reflector/reflector";
 export type {

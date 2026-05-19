@@ -1,7 +1,7 @@
 import { InvalidDecorationTargetError, ValidationError } from "../errors";
 import type { DeferredValidatorFn, MetadataKey } from "../metadata/types";
 import type { AnyConstructor } from "../reflector/types";
-import type { ValidateContext, ValidatorFn } from "./validator-types";
+import type { ValidateContext, ValidatorFn } from "./validation-types";
 
 function extractReason(error: unknown): string {
 	if (error === null || error === undefined) {
@@ -49,11 +49,11 @@ function wrapUserValidate<TMeta>(fn: ValidatorFn<TMeta>, label: string, key: Met
 }
 
 export function buildValidatorChain<TMeta>(
-	options: { validate?: ValidatorFn<TMeta>; requireInstanceOf?: AnyConstructor } | undefined,
+	options: { validate?: ValidatorFn<TMeta>; requires?: AnyConstructor } | undefined,
 	label: string,
 	key: MetadataKey
 ): ValidatorFn<TMeta>[] | undefined {
-	const requiredBase = options?.requireInstanceOf;
+	const requiredBase = options?.requires;
 	const userValidate = options?.validate;
 	if (!(requiredBase || userValidate)) {
 		return;

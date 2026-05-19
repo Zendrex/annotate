@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: public decorator handles default to permissive target types unless callers constrain them */
-import type { AnyFn } from "../factories/types";
-import type { ValidatorFn } from "../factories/validator-types";
 import type { AnyConstructor } from "../reflector/types";
+import type { AnyFn } from "./internal-types";
+import type { ValidatorFn } from "./validation-types";
 
 export type Cardinality = "one" | "many";
 
@@ -91,7 +91,7 @@ export type AccessorAnnotation<TMeta, TArgs extends unknown[], TValue, TThis, TC
 	read<TTarget extends object>(target: TTarget): MemberAnnotationReader<TMeta, TCard, TThis, TTarget>;
 };
 
-interface LegacyOptionsInputBase<TMeta, TArgs extends unknown[], TCard extends Cardinality>
+interface BuilderOptionsInputBase<TMeta, TArgs extends unknown[], TCard extends Cardinality>
 	extends AnnotationOptions<TMeta, TCard> {
 	args?: (...args: TArgs) => TMeta;
 }
@@ -101,7 +101,7 @@ export type MethodInterceptorOptions<
 	TArgs extends unknown[] = [TMeta],
 	TMethod extends AnyFn = AnyFn,
 	TCard extends Cardinality = "one",
-> = LegacyOptionsInputBase<TMeta, TArgs, TCard> & {
+> = BuilderOptionsInputBase<TMeta, TArgs, TCard> & {
 	wrap: (original: TMethod, context: PublicInterceptorContext<TMeta, TCard>) => TMethod;
 };
 
@@ -110,7 +110,7 @@ export type AccessorInterceptorOptions<
 	TArgs extends unknown[] = [TMeta],
 	TValue = unknown,
 	TCard extends Cardinality = "one",
-> = LegacyOptionsInputBase<TMeta, TArgs, TCard> & {
+> = BuilderOptionsInputBase<TMeta, TArgs, TCard> & {
 	get?: (original: () => TValue, context: PublicInterceptorContext<TMeta, TCard>) => () => TValue;
 	set?: (
 		original: (value: TValue) => void,
@@ -122,7 +122,8 @@ export type FieldInterceptorOptions<
 	TMeta,
 	TArgs extends unknown[] = [TMeta],
 	TField = unknown,
+	TThis = unknown,
 	TCard extends Cardinality = "one",
-> = LegacyOptionsInputBase<TMeta, TArgs, TCard> & {
-	init: (initial: TField, context: PublicInterceptorContext<TMeta, TCard>) => TField;
+> = BuilderOptionsInputBase<TMeta, TArgs, TCard> & {
+	init: (this: TThis, initial: TField, context: PublicInterceptorContext<TMeta, TCard>) => TField;
 };

@@ -8,7 +8,7 @@ import {
 	methodAnnotation,
 	methodInterceptor,
 } from "./builders";
-import type { AnyFn } from "../factories/types";
+import type { AnyFn } from "./internal-types";
 import type {
 	AccessorAnnotation,
 	AccessorInterceptorOptions,
@@ -67,13 +67,13 @@ interface AnnotateNamespace {
 			options: AccessorInterceptorOptions<TMeta, TArgs, TValue, TCard>
 		): AccessorAnnotation<TMeta, TArgs, TValue, TThis, TCard>;
 		field<TMeta, TField = any>(
-			options: FieldInterceptorOptions<TMeta, [TMeta], TField, "one">
+			options: FieldInterceptorOptions<TMeta, [TMeta], TField, any, "one">
 		): FieldAnnotation<TMeta, [TMeta], TField, any, "one">;
 		field<TMeta, TField = any>(
-			options: FieldInterceptorOptions<TMeta, [TMeta], TField, "many">
+			options: FieldInterceptorOptions<TMeta, [TMeta], TField, any, "many">
 		): FieldAnnotation<TMeta, [TMeta], TField, any, "many">;
 		field<TMeta, TArgs extends unknown[] = [TMeta], TField = any, TThis = any, TCard extends Cardinality = "one">(
-			options: FieldInterceptorOptions<TMeta, TArgs, TField, TCard>
+			options: FieldInterceptorOptions<TMeta, TArgs, TField, TThis, TCard>
 		): FieldAnnotation<TMeta, TArgs, TField, TThis, TCard>;
 		method<TMeta, TMethod extends AnyFn = AnyFn>(
 			options: MethodInterceptorOptions<TMeta, [TMeta], TMethod, "one">
@@ -114,7 +114,6 @@ export const Annotate: AnnotateNamespace = Object.freeze({
 	method: methodAnnotation,
 } as AnnotateNamespace);
 
-export type { ValidateContext } from "../factories/validator-types";
 export type {
 	AccessorAnnotation,
 	AccessorInterceptorOptions,
@@ -132,3 +131,4 @@ export type {
 	MethodInterceptorOptions,
 	PublicInterceptorContext,
 } from "./types";
+export type { ValidateContext } from "./validation-types";

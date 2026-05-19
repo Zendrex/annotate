@@ -158,15 +158,17 @@ export function accessorInterceptor<TMeta, TArgs extends unknown[], TValue, TThi
 }
 
 export function fieldInterceptor<TMeta, TArgs extends unknown[], TField, TThis, TCard extends Cardinality>(
-	options: FieldInterceptorOptions<TMeta, TArgs, TField, TCard>
+	options: FieldInterceptorOptions<TMeta, TArgs, TField, TThis, TCard>
 ): FieldAnnotation<TMeta, TArgs, TField, TThis, TCard> {
 	const { cardinality, key, options: legacyOptions } = normalizeBuilderInput<TMeta, TArgs, TCard>(options);
 	const hookRefs: FieldHookRefs<TMeta, TField> = {
-		onInit: (initial, readMetadata, context) =>
-			options.init(
+		onInit(this: TThis, initial, readMetadata, context) {
+			return options.init.call(
+				this,
 				initial,
 				publicContext({ kind: "field", name: context.name, static: context.static }, readMetadata, cardinality)
-			),
+			);
+		},
 	};
 	const factory = buildFieldFactory<TMeta, TArgs, TField, TThis, InternalCardinalityOf<TCard>>(
 		key,

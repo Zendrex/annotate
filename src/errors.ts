@@ -79,12 +79,12 @@ interface DuplicateMetadataArgs {
 	memberName?: string | symbol;
 }
 
-/** Unique-cardinality factory applied twice to the same class or member site. */
+/** Unique-cardinality annotation applied twice to the same class or member site. */
 export class DuplicateMetadataError extends defineAnnotateError<DuplicateMetadataArgs>({
 	name: "DuplicateMetadataError",
 	code: AnnotateErrorCode.DUPLICATE,
-	format: ({ ctor, key, cardinality, memberName }) =>
-		`duplicate decoration [${cardinality} key "${keyDisplayName(key)}"]: "${formatSlot(ctor, memberName)}" already has metadata for this factory`,
+	format: ({ ctor, key, memberName }) =>
+		`Duplicate metadata for @${keyDisplayName(key)} on ${formatSlot(ctor, memberName)}`,
 	toContext: ({ ctor, key, kind, memberName }) => ({ target: ctor, key, kind, memberName }),
 }) {
 	constructor(
@@ -106,7 +106,7 @@ interface MissingMetadataArgs {
 	target: AnyConstructor;
 }
 
-/** `firstOrThrow` found no metadata for the requested factory. */
+/** Throwing reader found no metadata for the requested annotation. */
 export class MissingMetadataError extends defineAnnotateError<MissingMetadataArgs>({
 	name: "MissingMetadataError",
 	code: AnnotateErrorCode.MISSING,
@@ -138,7 +138,7 @@ interface InvalidDecorationTargetArgs {
 	target: AnyConstructor;
 }
 
-/** Decorated type does not extend the factory's `requireInstanceOf` base. */
+/** Decorated type does not extend the annotation's `requires` base. */
 export class InvalidDecorationTargetError extends defineAnnotateError<InvalidDecorationTargetArgs>({
 	name: "InvalidDecorationTargetError",
 	code: AnnotateErrorCode.INVALID_TARGET,
