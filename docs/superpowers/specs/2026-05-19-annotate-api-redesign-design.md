@@ -80,7 +80,7 @@ const Role = Annotate.method<string>();
 
 class Api {
 	@Role("admin")
-	list() {}
+	index() {}
 }
 ```
 
@@ -105,7 +105,7 @@ const Route = Annotate.method((method: "GET" | "POST", path: string) => ({
 
 class Api {
 	@Route("GET", "/")
-	list() {}
+	index() {}
 }
 ```
 
@@ -137,7 +137,9 @@ The mapper property is named `args`, not `map` or `fromArgs`, because it describ
 
 ## Cardinality
 
-The `.list` namespace is removed from the public API. It is terse but unclear, and it forces users to learn a library-specific concept before understanding the behavior.
+No separate namespace is exposed for many-cardinality annotations. Users configure cardinality through options only.
+
+Separate builder namespaces are terse but unclear, and they force users to learn a library-specific concept before understanding the behavior.
 
 Cardinality is configured with plain language:
 
@@ -164,20 +166,20 @@ Behavior:
 Read return types follow cardinality:
 
 ```ts
-Role.read(Api).first((api) => api.list); // string | undefined
-Tag.read(Api).all((api) => api.list); // readonly string[]
+Role.read(Api).first((api) => api.index); // string | undefined
+Tag.read(Api).all((api) => api.index); // readonly string[]
 ```
 
 ## Reading Metadata
 
-The canonical read API must avoid stringly member names. Passing `"list"` to read a method is an escape hatch, not the recommended path.
+The canonical read API must avoid stringly member names. Passing a member name string to read a method is an escape hatch, not the recommended path.
 
 Preferred reads use typed selectors or reflected collections:
 
 ```ts
-Role.read(Api).has((api) => api.list);
-Role.read(Api).first((api) => api.list);
-Role.read(Api).all((api) => api.list);
+Role.read(Api).has((api) => api.index);
+Role.read(Api).first((api) => api.index);
+Role.read(Api).all((api) => api.index);
 ```
 
 Field reads use the same selector shape:
@@ -199,8 +201,8 @@ for (const method of Route.read(Api).methods()) {
 String-based member reads can exist, but they must be clearly named as escape hatches:
 
 ```ts
-Role.read(Api).byName("list");
-Role.read(Api).hasName("list");
+Role.read(Api).byName("index");
+Role.read(Api).hasName("index");
 ```
 
 These methods are not used in primary documentation examples.
