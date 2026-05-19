@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
-import { intercept } from "../../../src/legacy";
+import { createMethodInterceptor } from "../../../src/factories/method-interceptor";
 
-describe("intercept.method", () => {
+describe("createMethodInterceptor", () => {
 	test("wraps a method and records metadata", () => {
 		const calls: string[] = [];
-		const Log = intercept.method<string>({
+		const Log = createMethodInterceptor<string>({
 			intercept: (original, readMetadata, context) =>
 				function (this: unknown, ...args: unknown[]) {
 					const meta = readMetadata(this as object);
@@ -33,7 +33,7 @@ describe("intercept.method", () => {
 	});
 
 	test("static method interception", () => {
-		const Cmd = intercept.method<string>({
+		const Cmd = createMethodInterceptor<string>({
 			intercept: (original) => ((...args: unknown[]) => `[${original(...args)}]`) as typeof original,
 		});
 
@@ -49,7 +49,7 @@ describe("intercept.method", () => {
 	});
 
 	test("stacked interceptors via derive(): outer wraps inner; both entries visible via parent reader", () => {
-		const Trace = intercept.method<string>({
+		const Trace = createMethodInterceptor<string>({
 			intercept: (original, readMetadata) =>
 				function (this: unknown, ...args: unknown[]) {
 					const meta = readMetadata(this as object);

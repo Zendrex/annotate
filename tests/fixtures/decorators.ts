@@ -1,5 +1,7 @@
-import { decorate } from "../../src/legacy";
+import { createClassDecorator } from "../../src/factories/class-decorator";
+import { createMethodDecorator } from "../../src/factories/method-decorator";
+import { createPropertyDecorator } from "../../src/factories/property-decorator";
 
-export const ClassTag = decorate.class<string>();
-export const MethodRoute = decorate.method<string>();
-export const PropertyColumn = decorate.property<string>();
+export const ClassTag = createClassDecorator<string>();
+export const MethodRoute = createMethodDecorator<string>();
+export const PropertyColumn = createPropertyDecorator<string>();

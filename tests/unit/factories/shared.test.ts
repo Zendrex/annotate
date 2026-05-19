@@ -1,11 +1,12 @@
 /** biome-ignore-all lint/complexity/noVoid: discard class references to avoid unused-variable warnings in test */
 import { describe, expect, test } from "bun:test";
 
-import { decorate } from "../../../src/legacy";
+import { createMethodDecorator } from "../../../src/factories/method-decorator";
+import { createPropertyDecorator } from "../../../src/factories/property-decorator";
 
 describe("reader prepares deferred instance-member metadata (asymmetry fix)", () => {
 	test("reader flushes pending deferred instance members like sibling helpers do", () => {
-		const Field = decorate.property<string>();
+		const Field = createPropertyDecorator<string>();
 
 		class User {
 			@Field("varchar")
@@ -25,7 +26,7 @@ describe("reader prepares deferred instance-member metadata (asymmetry fix)", ()
 	});
 
 	test("member reader is prepared like member first() is", () => {
-		const Method = decorate.method<string>();
+		const Method = createMethodDecorator<string>();
 
 		class Service {
 			@Method("endpoint")

@@ -1,5 +1,5 @@
-import { mintMetadataKey } from "../metadata/cardinality-registry";
-import { appendClassMeta } from "../metadata/class-meta-store";
+import { mintMetadataKey } from "../metadata/cardinality";
+import { appendClassMeta } from "../metadata/stores/class-meta-store";
 import {
 	commitDecoration,
 	compose,
@@ -11,7 +11,6 @@ import type { Cardinality, Ctor, MetadataKey } from "../metadata/types";
 import type { AnyConstructor } from "../reflector/types";
 import type { AnyClass, DecoratedClassFactory, DecoratorOptions, DeriveOptions } from "./types";
 
-/** Builds a class decorator factory backed by a unique-cardinality metadata key. */
 export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta], TInstance = unknown>(
 	options?: DecoratorOptions<TMeta, TArgs>
 ): DecoratedClassFactory<TMeta, TArgs, TInstance> {
@@ -19,7 +18,6 @@ export function createClassDecorator<TMeta, TArgs extends unknown[] = [TMeta], T
 	return buildClassFactory<TMeta, TArgs, TInstance>(key, options);
 }
 
-/** @internal Builds the factory against a pre-minted key; reused by `derive`. */
 export function buildClassFactory<TMeta, TArgs extends unknown[], TInstance, TCard extends Cardinality = "unique">(
 	key: MetadataKey<TMeta, TCard>,
 	options: DecoratorOptions<TMeta, TArgs> | undefined
@@ -58,10 +56,6 @@ export function buildClassFactory<TMeta, TArgs extends unknown[], TInstance, TCa
 	}) as DecoratedClassFactory<TMeta, TArgs, TInstance, TCard>;
 }
 
-/**
- * List-cardinality class decorator: repeat decorations append entries instead
- * of throwing on duplicates. `.key` is branded as a list key.
- */
 export function createClassListDecorator<TMeta, TArgs extends unknown[] = [TMeta], TInstance = unknown>(
 	options?: DecoratorOptions<TMeta, TArgs>
 ): DecoratedClassFactory<TMeta, TArgs, TInstance, "list"> {

@@ -1,5 +1,5 @@
-import { mintMetadataKey } from "../metadata/cardinality-registry";
-import { collectMemberNames, getMemberStatic } from "../metadata/member-meta-store";
+import { mintMetadataKey } from "../metadata/cardinality";
+import { collectMemberNames, getMemberStatic } from "../metadata/stores/member-meta-store";
 import { prepare } from "../runtime/prepare";
 import {
 	compose,
@@ -18,22 +18,16 @@ import type {
 	InterceptorContext,
 } from "./types";
 
-/** @internal Hook bundle preserved by `derive` across factory rebuilds. */
 export interface FieldHookRefs<TMeta, TField> {
 	onInit: (initial: TField, readMetadata: (instance: object) => TMeta[], context: InterceptorContext) => TField;
 }
 
-/**
- * Module-global registry of every `intercept.field` factory. The instance
- * addInitializer body iterates this registry rather than capturing
- * per-decoration state, so it survives Bun 1.3's module-shared `var _init`
- * transformer bug where only the last-registered instance addInit fires.
- *
- * @internal
- */
+// Module-global registry of every `intercept.field` factory. The instance
+// addInitializer body iterates this registry rather than capturing per-decoration
+// state, so it survives Bun 1.3's module-shared `var _init` transformer bug where
+// only the last-registered instance addInit fires.
 const fieldInterceptors = new Map<MetadataKey, FieldHookRefs<unknown, unknown>>();
 
-/** @internal Resolved per-ctor instance-field interceptor entry; readers, contexts, and hook refs pre-bound. */
 interface IndexedFieldEntry {
 	context: InterceptorContext;
 	name: string | symbol;
@@ -41,14 +35,8 @@ interface IndexedFieldEntry {
 	reader: (instance: object) => unknown[];
 }
 
-/**
- * Per-ctor cache of instance-field interceptor entries, built lazily on the
- * first `applyAllFieldInterceptors` call for that ctor. Field decorations are
- * frozen at class evaluation time, so the index never goes stale for a given
- * ctor; subsequent instances collapse to a single WeakMap lookup + tight loop.
- *
- * @internal
- */
+// Per-ctor cache of instance-field interceptor entries, built lazily on the first
+// `applyAllFieldInterceptors` call. Decorations are frozen at class evaluation time.
 const ctorFieldIndex = new WeakMap<Ctor, readonly IndexedFieldEntry[]>();
 
 function buildFieldEntries(ctor: Ctor): IndexedFieldEntry[] {
@@ -70,17 +58,8 @@ function buildFieldEntries(ctor: Ctor): IndexedFieldEntry[] {
 }
 
 /**
- * Stage 3 class-field interceptor: registers metadata and replaces the field's
- * initial value with `onInit(initial, readMetadata, context)`.
- *
- * Unlike returning a value-replacement initializer from the field decorator
- * (which Bun 1.3 transpiles into a shared module-scope closure across every
- * decorated class), this factory performs the replacement from an
- * `addInitializer` body that resolves all work via `this.constructor` and a
- * module-global registry. The post-construction state is correct under Bun 1.3
- * and spec-conformant transpilers (esbuild / TS / SWC).
- *
- * @throws {TypeError} When `onInit` is missing.
+ * Field replacement runs from `addInitializer` via a module-global registry, not
+ * a decorator-returned initializer (Bun 1.3 shares one module-scope closure across classes).
  */
 export function createFieldInterceptor<
 	TMeta,
@@ -96,7 +75,6 @@ export function createFieldInterceptor<
 	return buildFieldFactory<TMeta, TArgs, TField, TThis>(key, rest as DecoratorOptions<TMeta, TArgs>, { onInit });
 }
 
-/** @internal Builds the factory against a pre-minted key; reused by `derive`. */
 export function buildFieldFactory<TMeta, TArgs extends unknown[], TField, TThis, TCard extends Cardinality = "unique">(
 	key: MetadataKey<TMeta, TCard>,
 	options: DecoratorOptions<TMeta, TArgs> | undefined,
@@ -157,12 +135,6 @@ export function buildFieldFactory<TMeta, TArgs extends unknown[], TField, TThis,
 	}) as DecoratedPropertyFactory<TMeta, TArgs, TField, TThis, TCard>;
 }
 
-/**
- * List-cardinality variant of {@link createFieldInterceptor}: repeat
- * decorations append entries instead of throwing on duplicates.
- *
- * @throws {TypeError} When `onInit` is missing.
- */
 export function createFieldListInterceptor<
 	TMeta,
 	TArgs extends unknown[] = [TMeta],
@@ -187,13 +159,6 @@ function requireFieldHook(options: { onInit?: unknown }, label: string): void {
 	}
 }
 
-/**
- * Shared instance-side `addInitializer` body. Resolves work via
- * `this.constructor` and the module-global registry so Bun 1.3's shared
- * `var _init` closure produces correct results no matter which class's
- * addInit binding survives. `onInit` must be idempotent in
- * `(current value, metadata)` — it may fire repeatedly across the chain.
- */
 function applyAllFieldInterceptors(this: unknown): void {
 	const ctor = (this as { constructor: Ctor }).constructor;
 	const target = this as Record<string | symbol, unknown>;
@@ -220,11 +185,6 @@ function applyAllFieldInterceptors(this: unknown): void {
 	}
 }
 
-/**
- * Re-applies every registered `intercept.field` interceptor's `onInit` to
- * `instance`. Idempotent post-construction recovery; see
- * {@link createFieldInterceptor} for the Bun 1.3 rationale.
- */
 export function applyFieldInterceptors(instance: object): void {
 	applyAllFieldInterceptors.call(instance);
 }

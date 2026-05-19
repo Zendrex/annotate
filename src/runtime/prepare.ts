@@ -1,20 +1,15 @@
 import { UnregisteredClassError } from "../errors";
-import { getCorrelationFor, registerCtor } from "../metadata/metadata-ctor-correlation";
-import { flushFor, hasPendingFor } from "../metadata/metadata-deferred-queue";
-import { isFullyPrepared, markFullyPrepared } from "../metadata/prepared-sentinel";
+import { getCorrelationFor, registerCtor } from "../metadata/pipeline/ctor-correlation";
+import { flushFor, hasPendingFor } from "../metadata/pipeline/deferred-queue";
+import { isFullyPrepared, markFullyPrepared } from "../metadata/pipeline/prepared-sentinel";
 import { walkPrototypeChain } from "./prototype-chain";
 import { hasOwnMetadata, readOwnMetadata } from "./symbol-metadata";
 import type { Ctor } from "../metadata/types";
 import type { AnyConstructor } from "../reflector/types";
 
 /**
- * Registers `ctor` (or the first ancestor with pending work) and drains any
- * queued deferred decorations so subsequent reflection sees a consistent
- * correlation. Call before reflecting if class setup may still be staged or if
- * reads could race registration.
- *
- * @throws {UnregisteredClassError} If `ctor` has an own `Symbol.metadata` slot
- *   but it is null or undefined (the key exists with no correlation).
+ * Registers `ctor` (or the first ancestor with pending work) and drains queued
+ * deferred decorations before reflection.
  */
 export function prepare(ctor: Ctor): void {
 	// Short-circuit: nothing to do if this ctor was already drained and no new

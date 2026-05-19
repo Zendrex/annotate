@@ -1,8 +1,8 @@
 import { UnregisteredClassError } from "../errors";
-import { getKeyCardinality } from "../metadata/cardinality-registry";
-import { collectClassMeta } from "../metadata/class-meta-store";
-import { hasAnyMeta } from "../metadata/has-any-meta";
-import { snapshotMembers } from "../metadata/member-meta-store";
+import { getKeyCardinality } from "../metadata/cardinality";
+import { collectClassMeta } from "../metadata/stores/class-meta-store";
+import { hasAnyMeta } from "../metadata/stores/has-any-meta";
+import { snapshotMembers } from "../metadata/stores/member-meta-store";
 import { prepare } from "../runtime/prepare";
 import { targetDisplayName } from "./class-name";
 import { resolveReflectTarget } from "./resolve-instance";
@@ -21,22 +21,11 @@ import type {
 } from "./types";
 
 /**
- * Read API for a single class. Query keys are minted via {@link mintUniqueKey}
- * or {@link mintListKey}; unminted symbols yield no results at read time
- * (rejection of unminted keys happens at decoration time inside
- * `appendClassMeta` / `appendMemberMeta`).
- *
- * Each query ensures the class is prepared via {@link prepare}; if no metadata
- * is registered afterward, {@link UnregisteredClassError} is thrown.
- *
- * @throws {UnregisteredClassError} When the class has no registered metadata after preparation.
+ * Keys must be minted via `mintUniqueKey` or `mintListKey`. Each query runs
+ * `prepare` first; `all()` returns class, then methods, then properties
+ * (subclass-first member order).
  */
 export interface Reflector {
-	/**
-	 * Returns every decorated item for `key`: the class entry first (if
-	 * present), then methods, then properties. Within methods and properties,
-	 * order follows {@link snapshotMembers} (subclass-first across the chain).
-	 */
 	all<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedItem<T, C>[];
 	class<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedClassFor<T, C> | undefined;
 	methods<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedMethodFor<T, C>[];
@@ -56,12 +45,6 @@ function isMethodLike(ctor: Ctor, name: string | symbol, isStatic: boolean): boo
 // across repeated reflect() calls; without it, every call rebuilds both.
 const reflectorCache = new WeakMap<AnyConstructor, ReflectorImpl>();
 
-/**
- * Concrete {@link Reflector}: lazily prepares the class on first successful
- * query and caches member-shape lookups across reads.
- *
- * @internal
- */
 export class ReflectorImpl implements Reflector {
 	private readonly ctor: AnyConstructor;
 	private registered = false;
@@ -73,10 +56,10 @@ export class ReflectorImpl implements Reflector {
 
 	all<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedItem<T, C>[] {
 		this.ensureRegistered();
-		const c = this.collectClass<T>(key);
+		const classItem = this.collectClass<T>(key);
 		const methods = this.collectMethods<T>(key);
 		const properties = this.collectProperties<T>(key);
-		const items = c ? [c, ...methods, ...properties] : [...methods, ...properties];
+		const items = classItem ? [classItem, ...methods, ...properties] : [...methods, ...properties];
 		return items as DecoratedItem<T, C>[];
 	}
 
@@ -170,14 +153,7 @@ export class ReflectorImpl implements Reflector {
 	}
 }
 
-/**
- * Returns a {@link Reflector} bound to the resolved class. Accepts a
- * constructor or instance; instances are normalised via
- * {@link resolveReflectTarget}. The reflector is cached per constructor;
- * queries lazily invoke {@link prepare} until registration succeeds.
- *
- * @throws {TypeError} If `target` does not resolve to a usable constructor.
- */
+/** Cached per constructor; queries run `prepare` until registration succeeds. */
 export function reflect(target: object): Reflector {
 	const ctor = resolveReflectTarget(target);
 	const cached = reflectorCache.get(ctor);

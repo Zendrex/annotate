@@ -23,43 +23,43 @@ continue to work.
 
 ## Public API
 
-- Consolidated namespaces: `decorate.{class,method,property}` and
-  `intercept.{method,accessor,field}`, each with a `.list` sibling for
-  list-cardinality keys (`decorate.method.list`, etc.).
-- `intercept.field({ onInit })`: class-field interceptor that replaces the
-  field's initial value from an `addInitializer` body resolved via
+- `Annotate` is the canonical decorator namespace:
+  `Annotate.class`, `Annotate.method`, `Annotate.field`,
+  `Annotate.accessor`, and `Annotate.intercept.{method,accessor,field}`.
+- Annotation handles are callable decorators with an attached `.read(target)`
+  API. Class reads use `.get()`, member reads use typed selectors such as
+  `.get((api) => api.index)`, and collection reads use `.entries()`,
+  `.methods()`, `.fields()`, or `.accessors()`.
+- Cardinality is configured with `cardinality: "one" | "many"` instead of
+  separate list builders. `"one"` is the default; `"many"` returns frozen
+  metadata arrays from reads.
+- `Annotate.intercept.field({ init })`: class-field interceptor that replaces
+  the field's initial value from an `addInitializer` body resolved via
   `this.constructor`. Closure-free by design — survives Bun 1.3's
   `var _init` transformer bug where field-decorator value-replacement
   initializer closures are shared across every class in the same module.
-  Companion `intercept.field.list` for list-cardinality metadata.
-  `InterceptorContext.kind` extended with `"field"`. New exported type
-  `FieldInterceptorOptions<TMeta, TArgs, TField>`.
+- Public interceptor contexts expose `kind`, `name`, `static`, and
+  `ctx.get(instance)` for reading the interceptor's own metadata.
 - `mintUniqueKey<T>(description?)` and `mintListKey<T>(description?)`
   replace the old `generateKey`. `MetadataKey<TValue, TCard>` is generic
   and branded; aliases `UniqueMetadataKey<T>` and `ListMetadataKey<T>`.
-- Per-factory accessors: `has` / `hasOwn` / `first` / `firstOrThrow` /
-  `all` / `reader`. Free `reflect(target)` and `Reflector` /
-  `ScopedReflector` unchanged.
+- Free `reflect(target)`, `Reflector`, `ScopedReflector`, and `prepare(ctor)`
+  remain available for low-level tooling that deliberately manages keys.
 - `DecoratedMethod<T>` / `DecoratedProperty<T>` / `DecoratedClass<T>` split
   into `*Unique<T>` / `*List<T>`; the unparameterized aliases are unions.
   Reflector overloads narrow on key brand.
-- `Factory.derive<TThis, ...>(options?)` shares the parent's metadata key.
-  Accepts `Pick<DecoratorOptions, "name" | "validate" |
-  "requireInstanceOf">`. Parent's validator runs before child's;
-  `requireInstanceOf` replaces.
-- Type helpers `MetadataOf<F>` / `ArgsOf<F>` / `ThisOf<F>` /
-  `CardinalityOf<F>` for consumer generics.
 
 ## Decorator options
 
-- Decorator-side type constraints via `TInstance` / `TField` / `TMethod`
-  generics. `createPropertyDecorator<M, [M], number>()` rejects
-  application to a `boolean` field at compile time.
-- `validate(meta, context)` option runs after compose, before commit;
-  throwing aborts the decoration. For instance members, deferred until
-  `prepare(ctor)` so `context.target` is the concrete class constructor.
-- `requireInstanceOf: Base` declarative sugar over `validate`; rejects
-  when the target class is not a subclass of `Base`.
+- Direct metadata form: `Annotate.method<T>()`.
+- Argument mapper form: `Annotate.method((arg) => metadata)`.
+- Options form: `{ label, args, cardinality, validate, requires }`.
+- `validate(meta, context)` runs after argument mapping and before commit.
+  Throwing aborts the decoration. For instance members, validation is
+  deferred until `prepare(ctor)` so `context.target` is the concrete class
+  constructor.
+- `requires: Base` rejects decorations hosted by classes that do not extend
+  `Base`.
 
 ## Errors
 
@@ -78,10 +78,14 @@ continue to work.
 
 - `createParameterDecorator` and the parameter reflector slice. Stage-3
   has no parameter decorator primitive.
-- `createPropertyInterceptor` — renamed to `createAccessorInterceptor`,
-  requires the `accessor` keyword (or `get`/`set` members). Plain fields
-  still work for metadata via `createPropertyDecorator`, but no
-  interception.
+- The old `decorate.*` / `intercept.*` public API and the source-level
+  compatibility registry.
+- Public factory helper type exports such as `DecoratorOptions`,
+  `Decorated*Factory`, `MetadataOf`, `ArgsOf`, `ThisOf`, and
+  `CardinalityOf`.
+- Property-interceptor behavior based on descriptors. Auto-accessor wrapping
+  uses `Annotate.intercept.accessor`; plain field value replacement uses
+  `Annotate.intercept.field`.
 - `InterceptorContext.descriptor` and `.owner` (Stage-3 context carries
   `name` / `static` / `kind` directly).
 - `unique` field on every `DecoratorOptions` variant (cardinality lives on
@@ -90,19 +94,23 @@ continue to work.
   `DecoratedMethodScalar` / `DecoratedPropertyScalar` exports.
 - The `ensureProperty` workaround. Non-annotate introspection of decorated
   classes will observe different results (`"x" in Ctor.prototype`,
-  `Object.keys(instance)`, etc.). Use `Factory.applied(ctor, name)` /
-  `Factory.reflect(ctor).properties()` to enumerate decorated members.
+  `Object.keys(instance)`, etc.). Use annotation-handle readers or
+  `reflect(ctor)` to enumerate decorated members.
 
 ## Migration
 
 | Before | After |
 |---|---|
-| `decorate.method({ unique: true })` | `decorate.method(...)` (default) |
-| `decorate.method(...)` (append-style) | `decorate.method.list(...)` |
-| `factory.reader(t).methodsScalar()` | `factory.reader(t).methods()` |
-| `factory.reader(t).propertiesScalar()` | `factory.reader(t).properties()` |
-| `import type { DecoratedMethodScalar }` | `import type { DecoratedMethodUnique }` |
+| `decorate.method(...)` | `Annotate.method(...)` |
+| `decorate.property(...)` | `Annotate.field(...)` |
+| `intercept.method({ intercept })` | `Annotate.intercept.method({ wrap })` |
+| `intercept.accessor({ onGet, onSet })` | `Annotate.intercept.accessor({ get, set })` |
+| `intercept.field({ onInit })` | `Annotate.intercept.field({ init })` |
+| `.list` factory variants | `{ cardinality: "many" }` |
+| `name` option | `label` option |
+| `compose` option | `args` option |
+| `requireInstanceOf` option | `requires` option |
+| `factory.first(target, "name")` | `Factory.read(target).get((x) => x.name)` |
+| `factory.reader(t).methods()` | `Factory.read(t).methods()` |
 | `createParameterDecorator(...)` | (removed) |
-| `createPropertyInterceptor(...)` on `accessor` member | `createAccessorInterceptor(...)` |
-| `class C { @dec foo = 1 }` interception | requires `accessor foo = 1` |
 | `generateKey()` | `mintUniqueKey<T>()` / `mintListKey<T>()` |

@@ -4,56 +4,30 @@ import type { ValidatorFn } from "./validator-types";
 
 export type { ValidateContext, ValidatorFn } from "./validator-types";
 
-/**
- * Loose function brand used as the default for `TMethod` slots on method
- * factories and interceptors. Deliberately bivariant so consumers can narrow
- * to concrete signatures at the call site without fighting variance.
- */
 // biome-ignore lint/suspicious/noExplicitAny: required for variance on TMethod
 export type AnyFn = (...args: any[]) => any;
 
-/** Identifies the member being wrapped, passed into interceptor callbacks. */
 export interface InterceptorContext {
 	kind: "method" | "accessor" | "field";
 	name: string | symbol;
 	static: boolean;
 }
 
-/**
- * Forces `compose` to be supplied when `TArgs` widens beyond the identity
- * tuple `[TMeta]`. The default form keeps `compose` optional; any wider shape
- * requires an explicit `TArgs → TMeta` mapper so the runtime `args[0] as TMeta`
- * fallback in `compose` is unreachable.
- */
 type ComposeRequirement<TMeta, TArgs extends unknown[]> = [TArgs] extends [[TMeta]]
 	? { compose?: (...args: TArgs) => TMeta }
 	: { compose: (...args: TArgs) => TMeta };
 
-/**
- * Shared options for every factory and interceptor.
- *
- * - `requireInstanceOf` / `validate`: composed into a validator chain via
- *   `buildValidatorChain`.
- * - `compose`: maps decorator arguments to the stored metadata value.
- *   Required when `TArgs` widens beyond `[TMeta]`; optional otherwise.
- */
 export type DecoratorOptions<TMeta, TArgs extends unknown[] = [TMeta]> = {
 	name?: string;
 	requireInstanceOf?: AnyConstructor;
 	validate?: ValidatorFn<TMeta>;
 } & ComposeRequirement<TMeta, TArgs>;
 
-/** Options accepted by `derive()`; excludes `compose` (taken from the parent). */
 export type DeriveOptions<TMeta, TArgs extends unknown[]> = Pick<
 	DecoratorOptions<TMeta, TArgs>,
 	"requireInstanceOf" | "validate" | "name"
 >;
 
-/**
- * Options for `intercept.method`. The hook's return value replaces the
- * original method; `readMetadata` returns every value stored under this
- * factory's key for `(instance, member)`.
- */
 export type MethodInterceptorOptions<
 	TMeta,
 	TArgs extends unknown[] = [TMeta],
@@ -62,10 +36,6 @@ export type MethodInterceptorOptions<
 	intercept: (original: TMethod, readMetadata: (instance: object) => TMeta[], context: InterceptorContext) => TMethod;
 };
 
-/**
- * Options for `intercept.accessor`. Provide `onGet` and/or `onSet` to wrap
- * the compiler-generated getter/setter of an auto-accessor.
- */
 export type AccessorInterceptorOptions<TMeta, TArgs extends unknown[] = [TMeta], TValue = unknown> = DecoratorOptions<
 	TMeta,
 	TArgs
@@ -82,13 +52,7 @@ export type AccessorInterceptorOptions<TMeta, TArgs extends unknown[] = [TMeta],
 	) => (value: TValue) => void;
 };
 
-/**
- * Options for `intercept.field`. The `onInit` hook receives the field's
- * initial value (already assigned by the Stage-3 initializer chain), the
- * `readMetadata(instance)` reader, and an {@link InterceptorContext}; its
- * return value is assigned back to the field. See `createFieldInterceptor`
- * for the addInitializer-based replacement strategy and Bun 1.3 rationale.
- */
+/** See `createFieldInterceptor` for the addInitializer-based replacement strategy (Bun 1.3). */
 export type FieldInterceptorOptions<TMeta, TArgs extends unknown[] = [TMeta], TField = unknown> = DecoratorOptions<
 	TMeta,
 	TArgs
@@ -118,21 +82,6 @@ export type AccessorDecoratorFn<TThis, TValue, TArgs extends unknown[]> = (
 	context: ClassAccessorDecoratorContext<TThis, TValue>
 ) => ClassAccessorDecoratorResult<TThis, TValue> | undefined;
 
-/**
- * Class decorator factory enriched with `key`, read helpers (`reader`,
- * `first`, `firstOrThrow`, `has`, `hasOwn`, `all`), and `derive` for
- * narrowing the instance type against the same key.
- *
- * `TCard` is the cardinality brand carried by `.key`; the `reader` return
- * type narrows on `TCard` so unique keys yield scalar `metadata` and list
- * keys yield array `metadata`.
- *
- * Read helpers (`first`, `firstOrThrow`, `all`) throw
- * {@link UnregisteredClassError} when `target` has no metadata of any kind;
- * `firstOrThrow` additionally throws {@link MissingMetadataError} when the
- * class has metadata but none for this key. `has` and `hasOwn` never throw.
- * `all` returns a frozen array.
- */
 export type DecoratedClassFactory<
 	TMeta,
 	TArgs extends unknown[] = [TMeta],
@@ -151,12 +100,6 @@ export type DecoratedClassFactory<
 	): DecoratedClassFactory<TMeta, TArgs, TNewInstance, TCard>;
 };
 
-/**
- * Method decorator factory with `(target, name)`-scoped read helpers and
- * `derive` for alternate `this`/method shapes against the same storage key.
- * See {@link DecoratedClassFactory} for `TCard` semantics and the read-helper
- * throw contract.
- */
 export type DecoratedMethodFactory<
 	TMeta,
 	TArgs extends unknown[] = [TMeta],
@@ -177,11 +120,6 @@ export type DecoratedMethodFactory<
 	): DecoratedMethodFactory<TMeta, TArgs, TMethod, TNewThis, TCard>;
 };
 
-/**
- * Stage 3 field decorator factory; mirrors the method factory's reader and
- * `derive` shape. See {@link DecoratedClassFactory} for `TCard` semantics and
- * the read-helper throw contract.
- */
 export type DecoratedPropertyFactory<
 	TMeta,
 	TArgs extends unknown[] = [TMeta],
@@ -202,11 +140,6 @@ export type DecoratedPropertyFactory<
 	): DecoratedPropertyFactory<TMeta, TArgs, TNewField, TNewThis, TCard>;
 };
 
-/**
- * Auto-accessor decorator factory. Metadata is stored property-scoped to keep
- * reflection parity with field decorators. See {@link DecoratedClassFactory}
- * for `TCard` semantics and the read-helper throw contract.
- */
 export type DecoratedAccessorFactory<
 	TMeta,
 	TArgs extends unknown[] = [TMeta],
@@ -247,20 +180,10 @@ type _Slot<F, K extends "meta" | "args" | "this" | "card"> = [FactoryGenerics<F>
 		? V
 		: never;
 
-/** Metadata type carried by a `Decorated*Factory`. */
 export type MetadataOf<F> = _Slot<F, "meta">;
 
-/** Decorator argument tuple carried by a `Decorated*Factory`. */
 export type ArgsOf<F> = _Slot<F, "args">;
 
-/** Instance / `this` slot carried by a `Decorated*Factory`. */
 export type ThisOf<F> = _Slot<F, "this">;
 
-/**
- * Cardinality brand carried by a `Decorated*Factory`.
- *
- * When `F` is typed without an explicit `TCard` argument, `infer` falls back
- * to the constraint `Cardinality` rather than the `"unique"` default. Typed
- * factory values usually preserve the literal via `.key`.
- */
 export type CardinalityOf<F> = _Slot<F, "card">;

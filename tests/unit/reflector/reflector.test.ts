@@ -3,12 +3,14 @@ import { describe, expect, test } from "bun:test";
 
 // biome-ignore lint/correctness/noUnusedImports: kept per plan L2 test spec; referenced by auto-materialize test behavior transitively.
 import { prepare, reflect, UnregisteredClassError } from "../../../src";
-import { decorate } from "../../../src/legacy";
+import { createClassDecorator } from "../../../src/factories/class-decorator";
+import { createMethodDecorator } from "../../../src/factories/method-decorator";
+import { createPropertyDecorator } from "../../../src/factories/property-decorator";
 
-describe("Reflector", () => {
+describe("IReflector", () => {
 	test("class() returns undefined when factory not applied (but class has other metadata)", () => {
-		const Tag = decorate.class<string>();
-		const Other = decorate.class<string>();
+		const Tag = createClassDecorator<string>();
+		const Other = createClassDecorator<string>();
 
 		@Other("o")
 		class X {}
@@ -17,7 +19,7 @@ describe("Reflector", () => {
 	});
 
 	test("methods() collects own + ancestor entries, most-derived-first", () => {
-		const Route = decorate.method<string>();
+		const Route = createMethodDecorator<string>();
 
 		// Classes are function-scoped to work around a Bun 1.3.13 transpiler bug that
 		// emits a shared `var _init` per module scope: when two decorated classes live
@@ -57,7 +59,7 @@ describe("Reflector", () => {
 	});
 
 	test("auto-materialize: properties() of an instance-member-only class works pre-instantiation", () => {
-		const Field = decorate.property<string>();
+		const Field = createPropertyDecorator<string>();
 
 		class User {
 			@Field("varchar")
@@ -70,7 +72,7 @@ describe("Reflector", () => {
 	});
 
 	test("static and instance methods coexist; static carries the static flag", () => {
-		const Cmd = decorate.method<string>();
+		const Cmd = createMethodDecorator<string>();
 
 		class Cli {
 			@Cmd("inst")
@@ -89,7 +91,7 @@ describe("Reflector", () => {
 	// constructor own-properties like `length`/`prototype`) was misclassified
 	// as static because the old classifier used `Object.hasOwn(ctor, name)`.
 	test("instance field named 'name' is classified as instance, not static", () => {
-		const Field = decorate.property<string>();
+		const Field = createPropertyDecorator<string>();
 
 		class User {
 			@Field("v")

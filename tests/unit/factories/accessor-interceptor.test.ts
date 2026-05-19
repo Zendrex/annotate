@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
-import { intercept } from "../../../src/legacy";
+import { createAccessorInterceptor } from "../../../src/factories/accessor-interceptor";
 
-describe("intercept.accessor", () => {
+describe("createAccessorInterceptor", () => {
 	test("intercepts accessor getter and records metadata", () => {
-		const Trace = intercept.accessor<string, [string], string>({
+		const Trace = createAccessorInterceptor<string, [string], string>({
 			onGet: (original, readMetadata) =>
 				function (this: unknown) {
 					const meta = readMetadata(this as object);
@@ -29,7 +29,7 @@ describe("intercept.accessor", () => {
 
 	test("intercepts setter side", () => {
 		const observed: string[] = [];
-		const Watch = intercept.accessor<string, [string], string>({
+		const Watch = createAccessorInterceptor<string, [string], string>({
 			onSet: (original) =>
 				function (this: unknown, v: string) {
 					observed.push(v);
@@ -48,11 +48,11 @@ describe("intercept.accessor", () => {
 	});
 
 	test("throws when neither onGet nor onSet provided", () => {
-		expect(() => intercept.accessor({} as never)).toThrow(TypeError);
+		expect(() => createAccessorInterceptor({} as never)).toThrow(TypeError);
 	});
 
 	test("ancestor-merged metadata visible in onGet at call-time", () => {
-		const Layer = intercept.accessor<string, [string], number>({
+		const Layer = createAccessorInterceptor<string, [string], number>({
 			onGet: (original, readMetadata) =>
 				function (this: unknown) {
 					const meta = readMetadata(this as object);
@@ -76,7 +76,7 @@ describe("intercept.accessor", () => {
 	// .properties(), not .methods(), because auto-accessor get/set pairs
 	// previously fooled the descriptor-based classifier.
 	test("accessor appears in reflect().properties(), not .methods()", () => {
-		const Tag = intercept.accessor<string, [string], number>({
+		const Tag = createAccessorInterceptor<string, [string], number>({
 			onGet: (original) =>
 				function (this: unknown) {
 					return original.call(this);

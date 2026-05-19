@@ -1,4 +1,4 @@
-import { mintMetadataKey } from "../metadata/cardinality-registry";
+import { mintMetadataKey } from "../metadata/cardinality";
 import {
 	compose,
 	createMemberFactoryHelpers,
@@ -9,7 +9,6 @@ import {
 import type { Cardinality, MemberKind, MetadataKey } from "../metadata/types";
 import type { DecoratedPropertyFactory, DecoratorOptions, DeriveOptions } from "./types";
 
-/** Builds a class-field decorator factory backed by a unique-cardinality metadata key. */
 export function createPropertyDecorator<
 	TMeta,
 	TArgs extends unknown[] = [TMeta],
@@ -21,7 +20,6 @@ export function createPropertyDecorator<
 	return buildPropertyFactory<TMeta, TArgs, TField, TThis>(key, options);
 }
 
-/** @internal Builds the factory against a pre-minted key; reused by `derive`. */
 export function buildPropertyFactory<
 	TMeta,
 	TArgs extends unknown[],
@@ -64,10 +62,6 @@ export function buildPropertyFactory<
 	}) as DecoratedPropertyFactory<TMeta, TArgs, TField, TThis, TCard>;
 }
 
-/**
- * List-cardinality field decorator: repeat decorations append entries instead
- * of throwing on duplicates. `.key` is branded as a list key.
- */
 export function createPropertyListDecorator<
 	TMeta,
 	TArgs extends unknown[] = [TMeta],

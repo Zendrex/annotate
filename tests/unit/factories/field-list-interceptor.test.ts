@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
-import { intercept } from "../../../src/legacy";
+import { createFieldListInterceptor } from "../../../src/factories/field-interceptor";
 
-describe("intercept.field.list", () => {
+describe("createFieldListInterceptor", () => {
 	test("replaces field value and records metadata", () => {
-		const Stamp = intercept.field.list<string, [string], string>({
+		const Stamp = createFieldListInterceptor<string, [string], string>({
 			onInit(this: object, _initial, readMetadata) {
 				return readMetadata(this).join("+");
 			},
@@ -21,7 +21,7 @@ describe("intercept.field.list", () => {
 	});
 
 	test("two stacked .list field decorations append metadata; final onInit slot wins", () => {
-		const Stamp = intercept.field.list<string, [string], string>({
+		const Stamp = createFieldListInterceptor<string, [string], string>({
 			onInit(this: object, _initial, readMetadata) {
 				return readMetadata(this).join(",");
 			},
@@ -39,6 +39,6 @@ describe("intercept.field.list", () => {
 	});
 
 	test("throws when onInit missing", () => {
-		expect(() => intercept.field.list({} as never)).toThrow(TypeError);
+		expect(() => createFieldListInterceptor({} as never)).toThrow(TypeError);
 	});
 });

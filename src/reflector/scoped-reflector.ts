@@ -10,13 +10,6 @@ import type {
 	ScopedReflector,
 } from "./types";
 
-/**
- * Binds a minted metadata key to a class so reads need not pass the key. The
- * key's cardinality brand narrows reflected `metadata` fields to scalar or
- * list shapes. Errors propagate from the underlying {@link Reflector}.
- *
- * @internal
- */
 export function createScopedReflector<TMeta, TCard extends Cardinality>(
 	ctor: AnyConstructor,
 	key: MetadataKey<TMeta, TCard>

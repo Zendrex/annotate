@@ -1,4 +1,4 @@
-import { mintMetadataKey } from "../metadata/cardinality-registry";
+import { mintMetadataKey } from "../metadata/cardinality";
 import {
 	compose,
 	createMemberFactoryHelpers,
@@ -16,7 +16,6 @@ import type {
 	InterceptorContext,
 } from "./types";
 
-/** @internal Hook bundle preserved by `derive` across factory rebuilds. */
 export interface AccessorHookRefs<TMeta, TValue> {
 	onGet?: (
 		original: () => TValue,
@@ -30,11 +29,6 @@ export interface AccessorHookRefs<TMeta, TValue> {
 	) => (value: TValue) => void;
 }
 
-/**
- * Stage 3 auto-accessor interceptor that wraps the generated getter and/or setter.
- *
- * @throws {TypeError} When neither `onGet` nor `onSet` is provided.
- */
 export function createAccessorInterceptor<
 	TMeta,
 	TArgs extends unknown[] = [TMeta],
@@ -52,7 +46,6 @@ export function createAccessorInterceptor<
 	});
 }
 
-/** @internal Builds the factory against a pre-minted key; reused by `derive`. */
 export function buildAccessorFactory<
 	TMeta,
 	TArgs extends unknown[],
@@ -122,12 +115,6 @@ export function buildAccessorFactory<
 	}) as DecoratedAccessorFactory<TMeta, TArgs, TValue, TThis, TCard>;
 }
 
-/**
- * List-cardinality variant of {@link createAccessorInterceptor}: repeat
- * decorations append entries instead of throwing on duplicates.
- *
- * @throws {TypeError} When neither `onGet` nor `onSet` is provided.
- */
 export function createAccessorListInterceptor<
 	TMeta,
 	TArgs extends unknown[] = [TMeta],

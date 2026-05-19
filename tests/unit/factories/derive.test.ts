@@ -3,14 +3,15 @@
 import { describe, expect, test } from "bun:test";
 
 import { DuplicateMetadataError, InvalidDecorationTargetError } from "../../../src";
-import { decorate } from "../../../src/legacy";
+import { createClassDecorator } from "../../../src/factories/class-decorator";
+import { createMethodDecorator } from "../../../src/factories/method-decorator";
 
 class BaseListener {}
 class OtherBase {}
 
 describe("Factory.derive() — shared-key semantics", () => {
 	test("parent's reader(...) sees entries committed via derive() child", () => {
-		const Parent = decorate.method<string>({ name: "Parent" });
+		const Parent = createMethodDecorator<string>({ name: "Parent" });
 		const Child = Parent.derive();
 
 		class Api {
@@ -31,7 +32,7 @@ describe("Factory.derive() — shared-key semantics", () => {
 describe("Factory.derive() — chained validators", () => {
 	test("parent validator runs before child validator on commit", () => {
 		const order: string[] = [];
-		const Parent = decorate.class<string>({
+		const Parent = createClassDecorator<string>({
 			name: "Parent",
 			validate: () => {
 				order.push("parent");
@@ -52,7 +53,7 @@ describe("Factory.derive() — chained validators", () => {
 
 	test("parent throw aborts before child runs", () => {
 		const order: string[] = [];
-		const Parent = decorate.class<string>({
+		const Parent = createClassDecorator<string>({
 			name: "Parent",
 			validate: () => {
 				order.push("parent");
@@ -80,7 +81,7 @@ describe("Factory.derive() — chained validators", () => {
 
 describe("Factory.derive() — requireInstanceOf propagation", () => {
 	test("child's requireInstanceOf fires at runtime for unrelated target", () => {
-		const Parent = decorate.method<string>({ name: "Parent" });
+		const Parent = createMethodDecorator<string>({ name: "Parent" });
 		const Child = Parent.derive({
 			requireInstanceOf: BaseListener,
 		});
@@ -101,7 +102,7 @@ describe("Factory.derive() — requireInstanceOf propagation", () => {
 	});
 
 	test("child's requireInstanceOf replaces parent's (single IoF in chain)", () => {
-		const Parent = decorate.class<string>({
+		const Parent = createClassDecorator<string>({
 			name: "Parent",
 			requireInstanceOf: OtherBase,
 		});
@@ -124,7 +125,7 @@ describe("Factory.derive() — requireInstanceOf propagation", () => {
 
 describe("Factory.derive() — unique across shared key", () => {
 	test("class factory child on same class throws DuplicateMetadataError (all keys are unique)", () => {
-		const Parent = decorate.class<string>({ name: "Parent" });
+		const Parent = createClassDecorator<string>({ name: "Parent" });
 		const Child = Parent.derive();
 
 		let caught: unknown;
@@ -140,7 +141,7 @@ describe("Factory.derive() — unique across shared key", () => {
 	});
 
 	test("static method child on same member throws at decoration time (all keys are unique)", () => {
-		const Parent = decorate.method<string>({ name: "Parent" });
+		const Parent = createMethodDecorator<string>({ name: "Parent" });
 		const Child = Parent.derive();
 
 		let caught: unknown;

@@ -4,7 +4,9 @@
 import { describe, expect, test } from "bun:test";
 
 import { AnnotateErrorCode, InvalidDecorationTargetError, ValidationError } from "../../../src";
-import { decorate } from "../../../src/legacy";
+import { createClassDecorator } from "../../../src/factories/class-decorator";
+import { createMethodDecorator } from "../../../src/factories/method-decorator";
+import { createPropertyDecorator } from "../../../src/factories/property-decorator";
 import type { ValidateContext } from "../../../src";
 
 const BAD_PING_RE = /bad: ping/;
@@ -17,7 +19,7 @@ describe("validator chain — validate option", () => {
 	describe("happy path", () => {
 		test("class decorator: validator runs, receives (meta, context), commit succeeds", () => {
 			const seen: Array<{ meta: unknown; context: ValidateContext }> = [];
-			const Tag = decorate.class<{ slug: string }>({
+			const Tag = createClassDecorator<{ slug: string }>({
 				name: "Tag",
 				validate: (meta, context) => {
 					seen.push({ meta, context });
@@ -38,7 +40,7 @@ describe("validator chain — validate option", () => {
 
 		test("method decorator: validator runs at first `new`", () => {
 			const seen: ValidateContext[] = [];
-			const Route = decorate.method<string>({
+			const Route = createMethodDecorator<string>({
 				name: "Route",
 				validate: (_meta, context) => {
 					seen.push(context);
@@ -61,7 +63,7 @@ describe("validator chain — validate option", () => {
 
 		test("property decorator: validator runs at first `new`", () => {
 			const seen: ValidateContext[] = [];
-			const Column = decorate.property<string>({
+			const Column = createPropertyDecorator<string>({
 				name: "Column",
 				validate: (_meta, context) => {
 					seen.push(context);
@@ -82,7 +84,7 @@ describe("validator chain — validate option", () => {
 
 		test("static method: context.static is true, target is the constructor", () => {
 			const seen: ValidateContext[] = [];
-			const Cmd = decorate.method<string>({
+			const Cmd = createMethodDecorator<string>({
 				name: "Cmd",
 				validate: (_meta, context) => {
 					seen.push(context);
@@ -105,7 +107,7 @@ describe("validator chain — validate option", () => {
 	describe("error wrapping", () => {
 		test("Error instance passes through (same reference)", () => {
 			const sentinel = new Error("bad");
-			const Tag = decorate.class<string>({
+			const Tag = createClassDecorator<string>({
 				name: "Tag",
 				validate: () => {
 					throw sentinel;
@@ -125,7 +127,7 @@ describe("validator chain — validate option", () => {
 
 		test("non-Error throw is wrapped in ValidationError; cause preserves the thrown value", () => {
 			const payload = { why: "nope" };
-			const Tag = decorate.class<string>({
+			const Tag = createClassDecorator<string>({
 				name: "Tag",
 				validate: () => {
 					throw payload;
@@ -146,7 +148,7 @@ describe("validator chain — validate option", () => {
 		});
 
 		test("string throw is extracted as reason", () => {
-			const Tag = decorate.class<string>({
+			const Tag = createClassDecorator<string>({
 				name: "Tag",
 				validate: () => {
 					throw "invalid value";
@@ -169,7 +171,7 @@ describe("validator chain — validate option", () => {
 
 		test("object with message property extracts message as reason", () => {
 			const payload = { message: "bad value", code: 42 };
-			const Tag = decorate.class<string>({
+			const Tag = createClassDecorator<string>({
 				name: "Tag",
 				validate: () => {
 					throw payload;
@@ -192,7 +194,7 @@ describe("validator chain — validate option", () => {
 
 		test("plain object without message uses JSON.stringify as reason", () => {
 			const payload = { x: 1, y: 2 };
-			const Tag = decorate.class<string>({
+			const Tag = createClassDecorator<string>({
 				name: "Tag",
 				validate: () => {
 					throw payload;
@@ -214,7 +216,7 @@ describe("validator chain — validate option", () => {
 		});
 
 		test("null throw is stringified as reason", () => {
-			const Tag = decorate.class<string>({
+			const Tag = createClassDecorator<string>({
 				name: "Tag",
 				validate: () => {
 					throw null;
@@ -236,7 +238,7 @@ describe("validator chain — validate option", () => {
 		});
 
 		test("undefined throw is stringified as reason", () => {
-			const Tag = decorate.class<string>({
+			const Tag = createClassDecorator<string>({
 				name: "Tag",
 				validate: () => {
 					throw undefined;
@@ -259,7 +261,7 @@ describe("validator chain — validate option", () => {
 
 		test("object with empty message string falls back to JSON.stringify", () => {
 			const payload = { message: "", value: 123 };
-			const Tag = decorate.class<string>({
+			const Tag = createClassDecorator<string>({
 				name: "Tag",
 				validate: () => {
 					throw payload;
@@ -283,7 +285,7 @@ describe("validator chain — validate option", () => {
 		test("circular object reference falls back to [object Object]", () => {
 			const payload: Record<string, unknown> = { x: 1 };
 			payload.self = payload;
-			const Tag = decorate.class<string>({
+			const Tag = createClassDecorator<string>({
 				name: "Tag",
 				validate: () => {
 					throw payload;
@@ -305,7 +307,7 @@ describe("validator chain — validate option", () => {
 		});
 
 		test("number throw is stringified as reason", () => {
-			const Tag = decorate.class<string>({
+			const Tag = createClassDecorator<string>({
 				name: "Tag",
 				validate: () => {
 					throw 42;
@@ -330,7 +332,7 @@ describe("validator chain — validate option", () => {
 	describe("ordering and state", () => {
 		test("validator receives composed TMeta, not raw TArgs", () => {
 			let observed: unknown;
-			const Component = decorate.class({
+			const Component = createClassDecorator({
 				name: "Component",
 				compose: (selector: string, scoped: boolean) => ({ selector, scoped }),
 				validate: (meta) => {
@@ -346,7 +348,7 @@ describe("validator chain — validate option", () => {
 		});
 
 		test("instance-member: throw surfaces at first `new`, not at class-body eval", () => {
-			const Route = decorate.method<string>({
+			const Route = createMethodDecorator<string>({
 				name: "Route",
 				validate: (meta) => {
 					if (!(meta as string).startsWith("/")) {
@@ -369,7 +371,7 @@ describe("validator chain — validate option", () => {
 describe("validator chain — requireInstanceOf", () => {
 	describe("class decorator", () => {
 		test("valid subclass commits at class-body eval", () => {
-			const Listen = decorate.class<string>({
+			const Listen = createClassDecorator<string>({
 				name: "Listen",
 				requireInstanceOf: BaseListener,
 			});
@@ -381,7 +383,7 @@ describe("validator chain — requireInstanceOf", () => {
 		});
 
 		test("unrelated class throws InvalidDecorationTargetError at class-body eval", () => {
-			const Listen = decorate.class<string>({
+			const Listen = createClassDecorator<string>({
 				name: "Listen",
 				requireInstanceOf: BaseListener,
 			});
@@ -401,7 +403,7 @@ describe("validator chain — requireInstanceOf", () => {
 
 	describe("static member", () => {
 		test("valid class commits", () => {
-			const Cmd = decorate.method<string>({
+			const Cmd = createMethodDecorator<string>({
 				name: "Cmd",
 				requireInstanceOf: BaseListener,
 			});
@@ -415,7 +417,7 @@ describe("validator chain — requireInstanceOf", () => {
 		});
 
 		test("invalid class throws at class-body eval with memberName populated", () => {
-			const Cmd = decorate.method<string>({
+			const Cmd = createMethodDecorator<string>({
 				name: "Cmd",
 				requireInstanceOf: BaseListener,
 			});
@@ -440,7 +442,7 @@ describe("validator chain — requireInstanceOf", () => {
 
 	describe("instance member", () => {
 		test("invalid subclass throws at first `new`, not at class-body eval", () => {
-			const Route = decorate.method<string>({
+			const Route = createMethodDecorator<string>({
 				name: "Route",
 				requireInstanceOf: BaseListener,
 			});
@@ -456,11 +458,11 @@ describe("validator chain — requireInstanceOf", () => {
 
 	describe("Bun-bug resilience", () => {
 		test("two classes with different bases materialize independently", () => {
-			const ListenA = decorate.method<string>({
+			const ListenA = createMethodDecorator<string>({
 				name: "ListenA",
 				requireInstanceOf: BaseListener,
 			});
-			const ListenB = decorate.method<string>({
+			const ListenB = createMethodDecorator<string>({
 				name: "ListenB",
 				requireInstanceOf: OtherBase,
 			});
@@ -484,7 +486,7 @@ describe("validator chain — requireInstanceOf", () => {
 
 	describe("reader-triggered materialize", () => {
 		test("has(...) throws out of the reader when decoration is invalid", () => {
-			const Route = decorate.method<string>({
+			const Route = createMethodDecorator<string>({
 				name: "Route",
 				requireInstanceOf: BaseListener,
 			});

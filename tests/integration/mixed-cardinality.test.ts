@@ -3,21 +3,25 @@
 import { describe, expect, it } from "bun:test";
 
 import { reflect } from "../../src";
-import { decorate, intercept } from "../../src/legacy";
+import { createAccessorInterceptor, createAccessorListInterceptor } from "../../src/factories/accessor-interceptor";
+import { createClassDecorator, createClassListDecorator } from "../../src/factories/class-decorator";
+import { createMethodDecorator, createMethodListDecorator } from "../../src/factories/method-decorator";
+import { createMethodInterceptor, createMethodListInterceptor } from "../../src/factories/method-interceptor";
+import { createPropertyDecorator, createPropertyListDecorator } from "../../src/factories/property-decorator";
 
 // ── Factories ─────────────────────────────────────────────────────────────────
 
 // class decorators
-const UniqueClassMeta = decorate.class<string>();
-const ListClassMeta = decorate.class.list<string>();
+const UniqueClassMeta = createClassDecorator<string>();
+const ListClassMeta = createClassListDecorator<string>();
 
 // method decorators
-const UniqueMethodMeta = decorate.method<string>();
-const ListMethodMeta = decorate.method.list<string>();
+const UniqueMethodMeta = createMethodDecorator<string>();
+const ListMethodMeta = createMethodListDecorator<string>();
 
 // property decorators
-const UniquePropertyMeta = decorate.property<string>();
-const ListPropertyMeta = decorate.property.list<string>();
+const UniquePropertyMeta = createPropertyDecorator<string>();
+const ListPropertyMeta = createPropertyListDecorator<string>();
 
 // method interceptors — capture invocation call order
 const methodInterceptCalls: string[] = [];
@@ -27,7 +31,7 @@ const methodInterceptCalls: string[] = [];
 const listMethodCallOrder: string[] = [];
 const listMethodMetaSeen: string[][] = [];
 
-const UniqueMethodInterceptor = intercept.method<string>({
+const UniqueMethodInterceptor = createMethodInterceptor<string>({
 	intercept: (original, readMetadata) =>
 		function (this: unknown, ...args: unknown[]) {
 			methodInterceptCalls.push(...readMetadata(this as object));
@@ -40,7 +44,7 @@ const UniqueMethodInterceptor = intercept.method<string>({
 // the outer builds wrapper #2 second. At call time the outermost (last-built,
 // id=2) fires before the innermost (first-built, id=1).
 let listMethodWrapperCounter = 0;
-const ListMethodInterceptor = intercept.method.list<string>({
+const ListMethodInterceptor = createMethodListInterceptor<string>({
 	intercept: (original, readMetadata) => {
 		listMethodWrapperCounter += 1;
 		const wrapperId = listMethodWrapperCounter;
@@ -59,7 +63,7 @@ const listAccessorSetOrder: string[] = [];
 const listAccessorGetMetaSeen: string[][] = [];
 const listAccessorSetMetaSeen: string[][] = [];
 
-const UniqueAccessorInterceptor = intercept.accessor<string, [string], number>({
+const UniqueAccessorInterceptor = createAccessorInterceptor<string, [string], number>({
 	onGet: (original, readMetadata) =>
 		function (this: unknown) {
 			accessorInterceptGetCalls.push(...readMetadata(this as object));
@@ -71,7 +75,7 @@ const UniqueAccessorInterceptor = intercept.accessor<string, [string], number>({
 // ListMethodInterceptor) so positional call-order assertions prove outermost-first.
 let listAccessorGetWrapperCounter = 0;
 let listAccessorSetWrapperCounter = 0;
-const ListAccessorInterceptor = intercept.accessor.list<string, [string], number>({
+const ListAccessorInterceptor = createAccessorListInterceptor<string, [string], number>({
 	onGet: (original, readMetadata) => {
 		listAccessorGetWrapperCounter += 1;
 		const wrapperId = listAccessorGetWrapperCounter;

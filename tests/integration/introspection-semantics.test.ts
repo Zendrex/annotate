@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
 import { prepare } from "../../src";
-import { decorate } from "../../src/legacy";
+import { createPropertyDecorator } from "../../src/factories/property-decorator";
 
 describe("Field.has and prepare", () => {
-	const Field = decorate.property<string>();
+	const Field = createPropertyDecorator<string>();
 
 	class User {
 		@Field("varchar")

@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
-import { intercept } from "../../../src/legacy";
+import { createFieldInterceptor } from "../../../src/factories/field-interceptor";
 
-describe("intercept.field", () => {
+describe("createFieldInterceptor", () => {
 	test("replaces field initial value and records metadata", () => {
-		const Default = intercept.field<string, [string], string>({
+		const Default = createFieldInterceptor<string, [string], string>({
 			onInit(this: object, _initial, readMetadata) {
 				const [meta] = readMetadata(this);
 				return meta ?? "";
@@ -27,7 +27,7 @@ describe("intercept.field", () => {
 	});
 
 	test("onInit receives the field's current value", () => {
-		const Suffix = intercept.field<string, [string], string>({
+		const Suffix = createFieldInterceptor<string, [string], string>({
 			onInit: (initial) => `${initial}-tagged`,
 		});
 
@@ -40,7 +40,7 @@ describe("intercept.field", () => {
 	});
 
 	test("static field interception", () => {
-		const Const = intercept.field<number, [number], number>({
+		const Const = createFieldInterceptor<number, [number], number>({
 			onInit: () => 42,
 		});
 
@@ -54,17 +54,17 @@ describe("intercept.field", () => {
 	});
 
 	test("throws when onInit missing", () => {
-		expect(() => intercept.field({} as never)).toThrow(TypeError);
+		expect(() => createFieldInterceptor({} as never)).toThrow(TypeError);
 	});
 
 	// Regression: Bun 1.3 transformer emits a module-scope `var _init` per class.
 	// If a field decorator returns a value-replacement initializer closure, that
 	// closure is shared across every class in the module; only the latest one
-	// survives. intercept.field sidesteps this by replacing from an
+	// survives. createFieldInterceptor sidesteps this by replacing from an
 	// addInitializer body that reads metadata via `this.constructor`, so each
 	// class sees its own onInit metadata.
 	test("two classes in the same module each apply their own onInit", () => {
-		const Label = intercept.field<string, [string], string>({
+		const Label = createFieldInterceptor<string, [string], string>({
 			onInit(this: object, _initial, readMetadata) {
 				return readMetadata(this)[0] ?? "";
 			},
@@ -86,7 +86,7 @@ describe("intercept.field", () => {
 	});
 
 	test("ancestor-merged metadata visible in onInit at construction", () => {
-		const Resolve = intercept.field<string, [string], string>({
+		const Resolve = createFieldInterceptor<string, [string], string>({
 			onInit(this: object, _initial, readMetadata) {
 				return readMetadata(this).join(",");
 			},
@@ -102,7 +102,7 @@ describe("intercept.field", () => {
 	});
 
 	test("derive() shares key; reused across child factory", () => {
-		const Base = intercept.field<string, [string], string>({
+		const Base = createFieldInterceptor<string, [string], string>({
 			onInit(this: object, _initial, readMetadata) {
 				return readMetadata(this).join("+");
 			},
@@ -124,7 +124,7 @@ describe("intercept.field", () => {
 	});
 
 	test("field-decorated member appears in reflect().properties()", () => {
-		const Mark = intercept.field<string, [string], string>({
+		const Mark = createFieldInterceptor<string, [string], string>({
 			onInit: (initial) => initial,
 		});
 
@@ -142,7 +142,7 @@ describe("intercept.field", () => {
 
 	test("context.kind is 'field'", () => {
 		let seenKind: string | undefined;
-		const Sniff = intercept.field<string, [string], string>({
+		const Sniff = createFieldInterceptor<string, [string], string>({
 			onInit(_initial, _readMetadata, ctx) {
 				seenKind = ctx.kind;
 				return "ok";

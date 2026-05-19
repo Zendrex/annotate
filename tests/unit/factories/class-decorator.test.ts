@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
 import { AnnotateError, MissingMetadataError, UnregisteredClassError } from "../../../src";
-import { decorate } from "../../../src/legacy";
+import { createClassDecorator } from "../../../src/factories/class-decorator";
 
-describe("decorate.class", () => {
+describe("createClassDecorator", () => {
 	test("stores metadata via class decorator application", () => {
-		const Tag = decorate.class<string>();
+		const Tag = createClassDecorator<string>();
 
 		@Tag("svc")
 		class Service {}
@@ -16,8 +16,8 @@ describe("decorate.class", () => {
 	});
 
 	test("all() is one-element and frozen; reader returns scalar; wrong factory yields []; bare throws", () => {
-		const Tag = decorate.class<string>();
-		const Other = decorate.class<string>();
+		const Tag = createClassDecorator<string>();
+		const Other = createClassDecorator<string>();
 
 		@Tag("a")
 		class T1 {}
@@ -34,7 +34,7 @@ describe("decorate.class", () => {
 	});
 
 	test("supports compose for multi-arg call shapes", () => {
-		const Component = decorate.class({
+		const Component = createClassDecorator({
 			compose: (selector: string, scoped: boolean) => ({ selector, scoped }),
 		});
 
@@ -45,7 +45,7 @@ describe("decorate.class", () => {
 	});
 
 	test("inheritance: subclass and base each hold one value; all() collects both", () => {
-		const Tag = decorate.class<string>();
+		const Tag = createClassDecorator<string>();
 
 		@Tag("base")
 		class Base {}
@@ -58,7 +58,7 @@ describe("decorate.class", () => {
 	});
 
 	test("inheritance: child sees parent's class metadata via has(); hasOwn() does not", () => {
-		const Tag = decorate.class<string>();
+		const Tag = createClassDecorator<string>();
 
 		@Tag("base")
 		class Base {}
@@ -70,7 +70,7 @@ describe("decorate.class", () => {
 	});
 
 	test("throws DuplicateMetadataError on second application to same class (all factory keys are unique)", () => {
-		const Tag = decorate.class<string>({ name: "Tag" });
+		const Tag = createClassDecorator<string>({ name: "Tag" });
 
 		expect(() => {
 			@Tag("a")
@@ -82,15 +82,15 @@ describe("decorate.class", () => {
 	});
 
 	test("first() throws UnregisteredClassError when class never decorated", () => {
-		const Tag = decorate.class<string>({ name: "Tag" });
+		const Tag = createClassDecorator<string>({ name: "Tag" });
 
 		class Bare {}
 		expect(() => Tag.first(Bare)).toThrow(UnregisteredClassError);
 	});
 
 	test("firstOrThrow throws MissingMetadataError when class registered but factory not applied", () => {
-		const Tag = decorate.class<string>({ name: "Tag" });
-		const Other = decorate.class<string>({ name: "Other" });
+		const Tag = createClassDecorator<string>({ name: "Tag" });
+		const Other = createClassDecorator<string>({ name: "Other" });
 
 		@Other("o")
 		class X {}

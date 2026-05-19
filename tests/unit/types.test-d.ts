@@ -4,13 +4,15 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: ThisOf for unconstrained factories is intentionally any */
 
 import { Annotate, reflect } from "../../src";
-import { decorate, intercept } from "../../src/legacy";
-import { mintListKey, mintUniqueKey } from "../../src/metadata/cardinality-registry";
+import { createAccessorInterceptor, createAccessorListInterceptor } from "../../src/factories/accessor-interceptor";
+import { createClassDecorator, createClassListDecorator } from "../../src/factories/class-decorator";
+import { createMethodDecorator, createMethodListDecorator } from "../../src/factories/method-decorator";
+import { createMethodListInterceptor } from "../../src/factories/method-interceptor";
+import { createPropertyDecorator, createPropertyListDecorator } from "../../src/factories/property-decorator";
+import { mintListKey, mintUniqueKey } from "../../src/metadata/cardinality";
 import { createScopedReflector } from "../../src/reflector/scoped-reflector";
 import type {
 	Cardinality as AnnotateCardinality,
-	ArgsOf,
-	CardinalityOf,
 	DecoratedClassList,
 	DecoratedClassUnique,
 	DecoratedItem,
@@ -18,13 +20,12 @@ import type {
 	DecoratedMethodUnique,
 	DecoratedPropertyList,
 	DecoratedPropertyUnique,
+	IScopedReflector,
 	ListMetadataKey,
 	MetadataKey,
-	MetadataOf,
-	ScopedReflector,
-	ThisOf,
 	UniqueMetadataKey,
 } from "../../src";
+import type { ArgsOf, CardinalityOf, MetadataOf, ThisOf } from "../../src/factories/types";
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 
@@ -96,12 +97,12 @@ const _annotateFieldRead: string | undefined = AnnotateFieldMeta.read(Fixture).g
 void _annotateFieldRead;
 
 // Cross-section factories used by the list-brand and reflector sections.
-const UniqueMethod = decorate.method<string>();
-const ListMethod = decorate.method.list<string>();
-const UniqueProperty = decorate.property<string>();
-const ListProperty = decorate.property.list<string>();
-const UniqueClass = decorate.class<string>();
-const ListClass = decorate.class.list<string>();
+const UniqueMethod = createMethodDecorator<string>();
+const ListMethod = createMethodListDecorator<string>();
+const UniqueProperty = createPropertyDecorator<string>();
+const ListProperty = createPropertyListDecorator<string>();
+const UniqueClass = createClassDecorator<string>();
+const ListClass = createClassListDecorator<string>();
 
 // =============================================================================
 // metadata/types — key brand assignability
@@ -141,32 +142,32 @@ void _defaultSym;
 // factories/types — MetadataOf / ArgsOf / ThisOf slot wiring
 // =============================================================================
 
-const MyClassFactory = decorate.class<Meta, [Meta], BaseInstance>();
-const MyCtorlessFactory = decorate.class<Meta>();
-const MyClassCompose = decorate.class<Meta, [string, number], BaseInstance>({
+const MyClassFactory = createClassDecorator<Meta, [Meta], BaseInstance>();
+const MyCtorlessFactory = createClassDecorator<Meta>();
+const MyClassCompose = createClassDecorator<Meta, [string, number], BaseInstance>({
 	compose: (tag, count) => ({ v: `${tag}:${count}` }),
 });
 
-const MyMethodFactory = decorate.method<Meta, [Meta], () => void, BaseInstance>();
-const UnconstrainedMethodFactory = decorate.method<Meta>();
-const ScopedMethodFactory = decorate.method<Meta, [Meta], () => void, BaseInstance>();
-const MyMethodCompose = decorate.method<OtherMeta, [Args], () => void>({
+const MyMethodFactory = createMethodDecorator<Meta, [Meta], () => void, BaseInstance>();
+const UnconstrainedMethodFactory = createMethodDecorator<Meta>();
+const ScopedMethodFactory = createMethodDecorator<Meta, [Meta], () => void, BaseInstance>();
+const MyMethodCompose = createMethodDecorator<OtherMeta, [Args], () => void>({
 	compose: (a) => ({ kind: "other", ...a }),
 });
 
-const MyPropertyFactory = decorate.property<Meta, [Meta], number, BaseInstance>();
-const UnconstrainedPropertyFactory = decorate.property<Meta>();
-const MyPropertyCompose = decorate.property<OtherMeta, [Args], unknown>({
+const MyPropertyFactory = createPropertyDecorator<Meta, [Meta], number, BaseInstance>();
+const UnconstrainedPropertyFactory = createPropertyDecorator<Meta>();
+const MyPropertyCompose = createPropertyDecorator<OtherMeta, [Args], unknown>({
 	compose: (a) => ({ kind: "other", ...a }),
 });
 
-const MyAccessorFactory = intercept.accessor<Meta, [Meta], number, BaseInstance>({
+const MyAccessorFactory = createAccessorInterceptor<Meta, [Meta], number, BaseInstance>({
 	onGet: (original) => original,
 });
-const UnconstrainedAccessorFactory = intercept.accessor<Meta, [Meta], number>({
+const UnconstrainedAccessorFactory = createAccessorInterceptor<Meta, [Meta], number>({
 	onGet: (original) => original,
 });
-const MyAccessorCompose = intercept.accessor<OtherMeta, [Args], number>({
+const MyAccessorCompose = createAccessorInterceptor<OtherMeta, [Args], number>({
 	compose: (a) => ({ kind: "other", ...a }),
 	onGet: (original) => original,
 });
@@ -233,9 +234,9 @@ void MyAccessorFactory;
 void UnconstrainedAccessorFactory;
 void MyAccessorCompose;
 
-// ── decorate.property type constraints ───────────────────────────────────────
+// ── createPropertyDecorator type constraints ───────────────────────────────────────
 
-const NumberField = decorate.property<Meta, [Meta], number>();
+const NumberField = createPropertyDecorator<Meta, [Meta], number>();
 
 class P_AcceptNumber {
 	@NumberField({ v: "v" })
@@ -290,7 +291,7 @@ class Animal {
 class Dog extends Animal {
 	bark(): void {}
 }
-const DogField = decorate.property<Meta, [Meta], Dog>();
+const DogField = createPropertyDecorator<Meta, [Meta], Dog>();
 
 class P_RejectSupertype {
 	// @ts-expect-error: Dog-bound rejects Animal supertype
@@ -299,19 +300,19 @@ class P_RejectSupertype {
 }
 void P_RejectSupertype;
 
-const PermissiveField = decorate.property<Meta>();
+const PermissiveField = createPropertyDecorator<Meta>();
 class P_PermissiveAccepts {
 	@PermissiveField({ v: "v" })
 	whatever!: { complex: { type: () => boolean } };
 }
 void P_PermissiveAccepts;
 
-// ── decorate.class type constraints ──────────────────────────────────────────
+// ── createClassDecorator type constraints ──────────────────────────────────────────
 
 class Component {
 	render(): void {}
 }
-const Cmp = decorate.class<Meta, [Meta], Component>();
+const Cmp = createClassDecorator<Meta, [Meta], Component>();
 
 @Cmp({ v: "v" })
 class C_Ok extends Component {}
@@ -322,9 +323,9 @@ void C_Ok;
 class C_NotComponent {}
 void C_NotComponent;
 
-// ── decorate.method type constraints ─────────────────────────────────────────
+// ── createMethodDecorator type constraints ─────────────────────────────────────────
 
-const AsyncOnly = decorate.method<Meta, [Meta], (...a: unknown[]) => Promise<unknown>>();
+const AsyncOnly = createMethodDecorator<Meta, [Meta], (...a: unknown[]) => Promise<unknown>>();
 
 class M_AsyncOk {
 	@AsyncOnly({ v: "v" })
@@ -341,9 +342,9 @@ class M_RejectSync {
 }
 void M_RejectSync;
 
-// ── intercept.accessor: rejects plain field application ──────────────────────
+// ── createAccessorInterceptor: rejects plain field application ──────────────────────
 
-const Acc = intercept.accessor<Meta, [Meta], number>({
+const Acc = createAccessorInterceptor<Meta, [Meta], number>({
 	onGet: (original) => original,
 });
 
@@ -374,7 +375,7 @@ class ThisConstraintUnrelated {
 	whatever(): void {}
 }
 
-const BaseMethod = decorate.method<Meta, [Meta], () => void, ThisConstraintBase>();
+const BaseMethod = createMethodDecorator<Meta, [Meta], () => void, ThisConstraintBase>();
 
 class TThis_GoodChild extends ThisConstraintBase {
 	@BaseMethod({ v: "v" })
@@ -395,7 +396,7 @@ class TThis_RejectUnrelated {
 }
 void TThis_RejectUnrelated;
 
-const PermissiveMethod = decorate.method<Meta>();
+const PermissiveMethod = createMethodDecorator<Meta>();
 
 class TThis_PermissiveA {
 	@PermissiveMethod({ v: "v" })
@@ -409,7 +410,7 @@ class TThis_PermissiveB {
 }
 void TThis_PermissiveB;
 
-const BaseField = decorate.property<Meta, [Meta], unknown, ThisConstraintBase>();
+const BaseField = createPropertyDecorator<Meta, [Meta], unknown, ThisConstraintBase>();
 
 class TThis_FieldGoodChild extends ThisConstraintBase {
 	@BaseField({ v: "v" })
@@ -424,7 +425,7 @@ class TThis_FieldRejectUnrelated {
 }
 void TThis_FieldRejectUnrelated;
 
-const IsNumber = decorate.property<{ kind: "number" }, [], number>();
+const IsNumber = createPropertyDecorator<{ kind: "number" }, [], number>();
 
 class TThis_Account {
 	@IsNumber()
@@ -439,7 +440,7 @@ class TThis_Ledger {
 }
 void TThis_Ledger;
 
-const NumberFieldOnChild = decorate.property<Meta, [Meta], number, ChildListener>();
+const NumberFieldOnChild = createPropertyDecorator<Meta, [Meta], number, ChildListener>();
 
 class TThis_GoodChildCount extends ChildListener {
 	@NumberFieldOnChild({ v: "v" })
@@ -454,7 +455,7 @@ class TThis_RejectWrongThis {
 }
 void TThis_RejectWrongThis;
 
-const BaseAccessor = intercept.accessor<Meta, [Meta], number, ThisConstraintBase>({
+const BaseAccessor = createAccessorInterceptor<Meta, [Meta], number, ThisConstraintBase>({
 	onGet: (original) => original,
 });
 
@@ -475,7 +476,7 @@ void ThisConstraintUnrelated;
 
 // ── Factory.derive Pick (compose omitted) ────────────────────────────────────
 
-const DerivePickParent = decorate.class<string>({ name: "Parent" });
+const DerivePickParent = createClassDecorator<string>({ name: "Parent" });
 // @ts-expect-error — compose is omitted from the derive() Pick signature.
 DerivePickParent.derive({ compose: (x: string) => x });
 
@@ -483,7 +484,7 @@ DerivePickParent.derive({ compose: (x: string) => x });
 // factories/types-list — list vs unique key brand preservation
 // =============================================================================
 
-// decorate.method.list
+// createMethodListDecorator
 
 const _mlKey: ListMetadataKey<string> = ListMethod.key;
 void _mlKey;
@@ -500,9 +501,9 @@ void _mlDerivedKey;
 const _mlDerivedKeyUnique: UniqueMetadataKey<string> = _mlDerived.key;
 void _mlDerivedKeyUnique;
 
-// decorate.class.list
+// createClassListDecorator
 
-const ClassListNum = decorate.class.list<number>();
+const ClassListNum = createClassListDecorator<number>();
 
 const _clKey: ListMetadataKey<number> = ClassListNum.key;
 void _clKey;
@@ -519,9 +520,9 @@ void _clDerivedKey;
 const _clDerivedKeyUnique: UniqueMetadataKey<number> = _clDerived.key;
 void _clDerivedKeyUnique;
 
-// decorate.property.list
+// createPropertyListDecorator
 
-const PropertyListBool = decorate.property.list<boolean>();
+const PropertyListBool = createPropertyListDecorator<boolean>();
 
 const _plKey: ListMetadataKey<boolean> = PropertyListBool.key;
 void _plKey;
@@ -538,9 +539,9 @@ void _plDerivedKey;
 const _plDerivedKeyUnique: UniqueMetadataKey<boolean> = _plDerived.key;
 void _plDerivedKeyUnique;
 
-// intercept.method.list
+// createMethodListInterceptor
 
-const MethodIntList = intercept.method.list<string>({
+const MethodIntList = createMethodListInterceptor<string>({
 	intercept: (original) => original,
 });
 
@@ -559,9 +560,9 @@ void _milDerivedKey;
 const _milDerivedKeyUnique: UniqueMetadataKey<string> = _milDerived.key;
 void _milDerivedKeyUnique;
 
-// intercept.accessor.list
+// createAccessorListInterceptor
 
-const AccList = intercept.accessor.list<string, [string], number>({
+const AccList = createAccessorListInterceptor<string, [string], number>({
 	onGet: (original) => original,
 });
 
@@ -664,18 +665,18 @@ void _listAllAsUnique;
 // biome-ignore lint/complexity/noBannedTypes: needed for constructor type
 const ctor = Fixture as Function & { prototype: object };
 
-const scopedUnique: ScopedReflector<string, "unique"> = createScopedReflector(ctor, UniqueMethod.key);
+const scopedUnique: IScopedReflector<string, "unique"> = createScopedReflector(ctor, UniqueMethod.key);
 void scopedUnique;
 
-const scopedList: ScopedReflector<string, "list"> = createScopedReflector(ctor, ListMethod.key);
+const scopedList: IScopedReflector<string, "list"> = createScopedReflector(ctor, ListMethod.key);
 void scopedList;
 
-// @ts-expect-error: unique-key scoped reflector is not assignable to ScopedReflector<string, "list">
-const _scopedUniqueAsList: ScopedReflector<string, "list"> = createScopedReflector(ctor, UniqueMethod.key);
+// @ts-expect-error: unique-key scoped reflector is not assignable to IScopedReflector<string, "list">
+const _scopedUniqueAsList: IScopedReflector<string, "list"> = createScopedReflector(ctor, UniqueMethod.key);
 void _scopedUniqueAsList;
 
-// @ts-expect-error: list-key scoped reflector is not assignable to ScopedReflector<string, "unique">
-const _scopedListAsUnique: ScopedReflector<string, "unique"> = createScopedReflector(ctor, ListMethod.key);
+// @ts-expect-error: list-key scoped reflector is not assignable to IScopedReflector<string, "unique">
+const _scopedListAsUnique: IScopedReflector<string, "unique"> = createScopedReflector(ctor, ListMethod.key);
 void _scopedListAsUnique;
 
 // class & property keys
@@ -688,23 +689,23 @@ void scopedUniqueProperty;
 const scopedListProperty = createScopedReflector(ctor, ListProperty.key);
 void scopedListProperty;
 
-// @ts-expect-error: unique-key scoped reflector is not assignable to ScopedReflector<string, "list">
-const _uniqueClassKeyAsList: ScopedReflector<string, "list"> = createScopedReflector(ctor, UniqueClass.key);
+// @ts-expect-error: unique-key scoped reflector is not assignable to IScopedReflector<string, "list">
+const _uniqueClassKeyAsList: IScopedReflector<string, "list"> = createScopedReflector(ctor, UniqueClass.key);
 void _uniqueClassKeyAsList;
 
-// @ts-expect-error: list-key scoped reflector is not assignable to ScopedReflector<string, "unique">
-const _listClassKeyAsUnique: ScopedReflector<string, "unique"> = createScopedReflector(ctor, ListClass.key);
+// @ts-expect-error: list-key scoped reflector is not assignable to IScopedReflector<string, "unique">
+const _listClassKeyAsUnique: IScopedReflector<string, "unique"> = createScopedReflector(ctor, ListClass.key);
 void _listClassKeyAsUnique;
 
-// @ts-expect-error: unique-key scoped reflector is not assignable to ScopedReflector<string, "list">
-const _uniquePropertyKeyAsList: ScopedReflector<string, "list"> = createScopedReflector(ctor, UniqueProperty.key);
+// @ts-expect-error: unique-key scoped reflector is not assignable to IScopedReflector<string, "list">
+const _uniquePropertyKeyAsList: IScopedReflector<string, "list"> = createScopedReflector(ctor, UniqueProperty.key);
 void _uniquePropertyKeyAsList;
 
-// @ts-expect-error: list-key scoped reflector is not assignable to ScopedReflector<string, "unique">
-const _listPropertyKeyAsUnique: ScopedReflector<string, "unique"> = createScopedReflector(ctor, ListProperty.key);
+// @ts-expect-error: list-key scoped reflector is not assignable to IScopedReflector<string, "unique">
+const _listPropertyKeyAsUnique: IScopedReflector<string, "unique"> = createScopedReflector(ctor, ListProperty.key);
 void _listPropertyKeyAsUnique;
 
-// ── ScopedReflector: class() / properties() narrowing ────────────────────────
+// ── IScopedReflector: class() / properties() narrowing ────────────────────────
 
 const scopedUniquePropertyEntries: DecoratedPropertyUnique<string>[] = scopedUniqueProperty.properties();
 void scopedUniquePropertyEntries;
@@ -746,7 +747,7 @@ void scopedListMethodEntries;
 const _scopedUniqueMethodsAsList: DecoratedMethodList<string>[] = scopedUnique.methods();
 void _scopedUniqueMethodsAsList;
 
-// methodsScalar / propertiesScalar are NOT on ScopedReflector
+// methodsScalar / propertiesScalar are NOT on IScopedReflector
 
 // @ts-expect-error: methodsScalar was removed in T4
 const _methodsScalar = scopedUnique.methodsScalar;
@@ -758,12 +759,12 @@ void _propertiesScalar;
 
 // ── Factory.reader() return type narrows on TCard ────────────────────────────
 
-const _factoryReaderUnique: ScopedReflector<string, "unique"> = UniqueMethod.reader(Fixture);
+const _factoryReaderUnique: IScopedReflector<string, "unique"> = UniqueMethod.reader(Fixture);
 void _factoryReaderUnique;
 
-const _factoryReaderList: ScopedReflector<string, "list"> = ListMethod.reader(Fixture);
+const _factoryReaderList: IScopedReflector<string, "list"> = ListMethod.reader(Fixture);
 void _factoryReaderList;
 
-// @ts-expect-error: unique factory reader is not ScopedReflector<string, "list">
-const _factoryUniqueReaderAsList: ScopedReflector<string, "list"> = UniqueMethod.reader(Fixture);
+// @ts-expect-error: unique factory reader is not IScopedReflector<string, "list">
+const _factoryUniqueReaderAsList: IScopedReflector<string, "list"> = UniqueMethod.reader(Fixture);
 void _factoryUniqueReaderAsList;

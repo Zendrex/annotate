@@ -2,11 +2,11 @@
 /** biome-ignore-all lint/suspicious/noUnusedExpressions: accessor reads are the side effect under test */
 import { describe, expect, test } from "bun:test";
 
-import { intercept } from "../../../src/legacy";
+import { createAccessorListInterceptor } from "../../../src/factories/accessor-interceptor";
 
-describe("intercept.accessor.list", () => {
+describe("createAccessorListInterceptor", () => {
 	test("wraps accessor getter and records metadata", () => {
-		const Trace = intercept.accessor.list<string, [string], string>({
+		const Trace = createAccessorListInterceptor<string, [string], string>({
 			onGet: (original, readMetadata) =>
 				function (this: unknown) {
 					const meta = readMetadata(this as object);
@@ -27,7 +27,7 @@ describe("intercept.accessor.list", () => {
 	test("two stacked .list accessor decorations: onSet wrappers run for both", () => {
 		const observed: string[] = [];
 
-		const Watch = intercept.accessor.list<string, [string], string>({
+		const Watch = createAccessorListInterceptor<string, [string], string>({
 			onSet: (original, readMetadata) =>
 				function (this: unknown, v: string) {
 					const meta = readMetadata(this as object);

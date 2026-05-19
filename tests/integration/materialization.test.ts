@@ -1,11 +1,11 @@
 /** biome-ignore-all lint/suspicious/noEmptyBlockStatements: test file */
 import { describe, expect, test } from "bun:test";
 
-import { decorate } from "../../src/legacy";
+import { createPropertyDecorator } from "../../src/factories/property-decorator";
 
 describe("subclass-of-parent-only-decorated regression", () => {
 	test("has/hasOwn/reader + token dedup under interleaved construction", () => {
-		const Field = decorate.property<string>();
+		const Field = createPropertyDecorator<string>();
 		class A {
 			@Field("a")
 			foo!: number;

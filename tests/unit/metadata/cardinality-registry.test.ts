@@ -1,11 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import {
-	getKeyCardinality,
-	mintListKey,
-	mintMetadataKey,
-	mintUniqueKey,
-} from "../../../src/metadata/cardinality-registry";
+import { getKeyCardinality, mintListKey, mintMetadataKey, mintUniqueKey } from "../../../src/metadata/cardinality";
 import type { ListMetadataKey, UniqueMetadataKey } from "../../../src/metadata/types";
 
 describe("mintUniqueKey", () => {

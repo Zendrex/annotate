@@ -1,10 +1,6 @@
 /** biome-ignore-all lint/performance/noBarrelFile: main index file */
 
 export { Annotate } from "./annotate";
-/**
- * Public API barrel for `@zendrex/annotate`: the `Annotate` namespace, errors,
- * `reflect`, `prepare`, key helpers, and shared types.
- */
 export {
 	AnnotateError,
 	AnnotateErrorCode,
@@ -16,7 +12,7 @@ export {
 	UnregisteredMetadataKeyError,
 	ValidationError,
 } from "./errors";
-export { mintListKey, mintUniqueKey } from "./metadata/cardinality-registry";
+export { mintListKey, mintUniqueKey } from "./metadata/cardinality";
 export { reflect } from "./reflector/reflector";
 export { prepare } from "./runtime/prepare";
 export type {

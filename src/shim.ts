@@ -14,11 +14,6 @@
  *
  * Safe to import on engines that already define `Symbol.metadata`: the
  * existing native value is left untouched.
- *
- * @example
- * ```ts
- * import "@zendrex/annotate/shim"; // before any decorated class loads
- * ```
  */
 
 type SymbolWithMetadata = SymbolConstructor & { metadata: symbol };

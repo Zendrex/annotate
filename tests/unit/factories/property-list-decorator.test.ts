@@ -2,11 +2,11 @@
 import { describe, expect, test } from "bun:test";
 
 import { AnnotateError, MissingMetadataError } from "../../../src";
-import { decorate } from "../../../src/legacy";
+import { createPropertyListDecorator } from "../../../src/factories/property-decorator";
 
-describe("decorate.property.list", () => {
+describe("createPropertyListDecorator", () => {
 	test("two properties decorated with the same .list factory each have 1 entry", () => {
-		const Column = decorate.property.list<string>();
+		const Column = createPropertyListDecorator<string>();
 
 		class User {
 			@Column("varchar")
@@ -22,7 +22,7 @@ describe("decorate.property.list", () => {
 	});
 
 	test("one property decorated twice with same .list factory has 2 entries", () => {
-		const Column = decorate.property.list<string>();
+		const Column = createPropertyListDecorator<string>();
 
 		class X {
 			@Column("first")
@@ -37,7 +37,7 @@ describe("decorate.property.list", () => {
 	});
 
 	test("does NOT throw DuplicateMetadataError on second application (unlike unique factory)", () => {
-		const Column = decorate.property.list<string>({ name: "ListColumn" });
+		const Column = createPropertyListDecorator<string>({ name: "ListColumn" });
 
 		expect(() => {
 			class X {
@@ -50,8 +50,8 @@ describe("decorate.property.list", () => {
 	});
 
 	test("firstOrThrow() throws MissingMetadataError on an undecorated property", () => {
-		const Column = decorate.property.list<string>();
-		const Other = decorate.property.list<string>();
+		const Column = createPropertyListDecorator<string>();
+		const Other = createPropertyListDecorator<string>();
 
 		class X {
 			@Other("x")

@@ -7,11 +7,11 @@ import {
 	prepare,
 	UnregisteredClassError,
 } from "../../../src";
-import { decorate } from "../../../src/legacy";
+import { createPropertyDecorator } from "../../../src/factories/property-decorator";
 
-describe("decorate.property", () => {
+describe("createPropertyDecorator", () => {
 	test("captures metadata on a decorated field after construction", () => {
-		const Column = decorate.property<string>();
+		const Column = createPropertyDecorator<string>();
 
 		class User {
 			@Column("varchar")
@@ -29,7 +29,7 @@ describe("decorate.property", () => {
 	});
 
 	test("eager flush via prepare() makes pre-instantiation reflection work", () => {
-		const Column = decorate.property<string>();
+		const Column = createPropertyDecorator<string>();
 
 		class User {
 			@Column("varchar")
@@ -41,7 +41,7 @@ describe("decorate.property", () => {
 	});
 
 	test("inheritance: child sees parent field via has(), not hasOwn()", () => {
-		const Column = decorate.property<string>();
+		const Column = createPropertyDecorator<string>();
 
 		class Parent {
 			@Column("varchar")
@@ -56,7 +56,7 @@ describe("decorate.property", () => {
 	});
 
 	test("supports compose for multi-arg call shapes", () => {
-		const Column = decorate.property({
+		const Column = createPropertyDecorator({
 			compose: (type: string, nullable: boolean) => ({ type, nullable }),
 		});
 
@@ -70,7 +70,7 @@ describe("decorate.property", () => {
 	});
 
 	test("throws DuplicateMetadataError with property kind on duplicate (all factory keys are unique)", () => {
-		const Column = decorate.property<string>({ name: "Column" });
+		const Column = createPropertyDecorator<string>({ name: "Column" });
 
 		let caught: unknown;
 		try {
@@ -88,14 +88,14 @@ describe("decorate.property", () => {
 	});
 
 	test("first() throws UnregisteredClassError when class never decorated", () => {
-		const Column = decorate.property<string>({ name: "Column" });
+		const Column = createPropertyDecorator<string>({ name: "Column" });
 		class X {}
 		expect(() => Column.first(X, "anything")).toThrow(UnregisteredClassError);
 	});
 
 	test("firstOrThrow throws MissingMetadataError when class registered but member not decorated", () => {
-		const Column = decorate.property<string>({ name: "Column" });
-		const Other = decorate.property<string>({ name: "Other" });
+		const Column = createPropertyDecorator<string>({ name: "Column" });
+		const Other = createPropertyDecorator<string>({ name: "Other" });
 
 		class X {
 			@Other("o")
@@ -112,7 +112,7 @@ describe("decorate.property", () => {
 	// decorated classes in one scope, which is a real transpiler bug.
 	// Annotate resolves registration via the constructor, so has/hasOwn stay correct.
 	test("hasOwn(Sub, 'foo') stays false when subclass decorated a sibling member only", () => {
-		const Column = decorate.property<string>();
+		const Column = createPropertyDecorator<string>();
 		class A {
 			@Column("a")
 			foo!: string;
@@ -129,7 +129,7 @@ describe("decorate.property", () => {
 	});
 
 	test("hasOwn auto-materializes pending registrations", () => {
-		const Column = decorate.property<string>();
+		const Column = createPropertyDecorator<string>();
 		class User {
 			@Column("v")
 			name!: string;

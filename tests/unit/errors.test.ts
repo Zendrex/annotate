@@ -10,7 +10,7 @@ import {
 	UnregisteredMetadataKeyError,
 	ValidationError,
 } from "../../src/errors";
-import { mintUniqueKey } from "../../src/metadata/cardinality-registry";
+import { mintUniqueKey } from "../../src/metadata/cardinality";
 
 const KEY = mintUniqueKey("test-key");
 

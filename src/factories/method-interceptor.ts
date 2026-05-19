@@ -1,13 +1,7 @@
-import { mintMetadataKey } from "../metadata/cardinality-registry";
+import { mintMetadataKey } from "../metadata/cardinality";
 import { buildMethodFactory } from "./method-decorator";
 import type { AnyFn, DecoratedMethodFactory, DecoratorOptions, MethodInterceptorOptions } from "./types";
 
-/**
- * Method decorator factory that replaces the method with the return value of
- * `intercept`. The hook receives the original method, a `readMetadata(instance)`
- * reader, and an {@link InterceptorContext} carrying the member name, static
- * flag, and `kind: "method"`.
- */
 export function createMethodInterceptor<
 	TMeta,
 	TArgs extends unknown[] = [TMeta],
@@ -20,13 +14,6 @@ export function createMethodInterceptor<
 	return buildMethodFactory<TMeta, TArgs, TMethod, TThis>(key, rest as DecoratorOptions<TMeta, TArgs>, { intercept });
 }
 
-/**
- * List-cardinality variant of {@link createMethodInterceptor}: repeat
- * decorations append one entry each instead of throwing
- * `DuplicateMetadataError`. Inside `intercept`, `readMetadata(instance)`
- * returns the full accumulated list for the `(instance, member, key)` site.
- * `.key` is branded as a list key.
- */
 export function createMethodListInterceptor<
 	TMeta,
 	TArgs extends unknown[] = [TMeta],

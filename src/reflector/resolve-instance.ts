@@ -1,14 +1,6 @@
 import type { AnyConstructor } from "./types";
 
-/**
- * Reads `instance.constructor` and validates it is a real class-shaped
- * constructor. Rejects non-object inputs, missing/undefined constructors,
- * non-function constructors, the bare `Object` constructor, and constructors
- * whose `prototype` is not an object — so reflection only runs against
- * user-defined classes.
- *
- * @throws {TypeError} When `instance` fails any of those checks.
- */
+/** Validates `instance.constructor` is a user-defined, class-shaped constructor. */
 export function resolveConstructorFromInstance(instance: object): AnyConstructor {
 	if (instance === null || typeof instance !== "object") {
 		throw new TypeError("reflect(target): object has no resolvable constructor");
@@ -30,15 +22,7 @@ export function resolveConstructorFromInstance(instance: object): AnyConstructor
 	return ctor as AnyConstructor;
 }
 
-/**
- * Normalises a reflect target to a class constructor. For function values,
- * applies the constructor-shape checks (rejects `Object`, requires an object
- * prototype) and returns it; otherwise delegates to
- * {@link resolveConstructorFromInstance}.
- *
- * @throws {TypeError} If `target` is not a class-shaped constructor or a
- *   resolvable instance, or if it resolves to `Object`.
- */
+/** Normalises a reflect target to a class constructor (function or instance). */
 export function resolveReflectTarget(target: unknown): AnyConstructor {
 	if (typeof target === "function") {
 		if (target === Object) {

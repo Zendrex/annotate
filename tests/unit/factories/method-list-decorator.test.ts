@@ -3,11 +3,11 @@
 import { describe, expect, test } from "bun:test";
 
 import { AnnotateError, MissingMetadataError } from "../../../src";
-import { decorate } from "../../../src/legacy";
+import { createMethodListDecorator } from "../../../src/factories/method-decorator";
 
-describe("decorate.method.list", () => {
+describe("createMethodListDecorator", () => {
 	test("two methods decorated with the same .list factory each have 1 entry", () => {
-		const Route = decorate.method.list<string>();
+		const Route = createMethodListDecorator<string>();
 
 		class Api {
 			@Route("/ping")
@@ -23,7 +23,7 @@ describe("decorate.method.list", () => {
 	});
 
 	test("one method decorated twice with same .list factory has 2 entries", () => {
-		const Route = decorate.method.list<string>();
+		const Route = createMethodListDecorator<string>();
 
 		class Api {
 			@Route("/a")
@@ -38,7 +38,7 @@ describe("decorate.method.list", () => {
 	});
 
 	test("static methods are eagerly registered; list entries commit immediately", () => {
-		const Cmd = decorate.method.list<string>();
+		const Cmd = createMethodListDecorator<string>();
 
 		// biome-ignore lint/complexity/noStaticOnlyClass: test fixture requires a class with a static method
 		class Cli {
@@ -51,7 +51,7 @@ describe("decorate.method.list", () => {
 	});
 
 	test("derive() on a list factory shares the key and keeps list cardinality", () => {
-		const Parent = decorate.method.list<string>({ name: "ListParent" });
+		const Parent = createMethodListDecorator<string>({ name: "ListParent" });
 		const Child = Parent.derive();
 
 		expect(Parent.key).toBe(Child.key);
@@ -73,7 +73,7 @@ describe("decorate.method.list", () => {
 	});
 
 	test("has() and hasOwn() reflect list entries", () => {
-		const Route = decorate.method.list<string>();
+		const Route = createMethodListDecorator<string>();
 
 		class Base {
 			@Route("/base")
@@ -88,7 +88,7 @@ describe("decorate.method.list", () => {
 	});
 
 	test("first() and firstOrThrow() return the first-stored value (Stage-3 inner first)", () => {
-		const Route = decorate.method.list<string>();
+		const Route = createMethodListDecorator<string>();
 
 		class Api {
 			@Route("/outer")
@@ -102,8 +102,8 @@ describe("decorate.method.list", () => {
 	});
 
 	test("firstOrThrow() throws MissingMetadataError on an undecorated member", () => {
-		const Route = decorate.method.list<string>();
-		const Other = decorate.method.list<string>();
+		const Route = createMethodListDecorator<string>();
+		const Other = createMethodListDecorator<string>();
 
 		class Api {
 			@Other("/x")

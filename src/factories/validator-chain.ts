@@ -48,10 +48,6 @@ function wrapUserValidate<TMeta>(fn: ValidatorFn<TMeta>, label: string, key: Met
 	};
 }
 
-/**
- * @internal Chains `requireInstanceOf` (first) before user `validate`;
- *   non-Error throws from user `validate` surface as {@link ValidationError}.
- */
 export function buildValidatorChain<TMeta>(
 	options: { validate?: ValidatorFn<TMeta>; requireInstanceOf?: AnyConstructor } | undefined,
 	label: string,
@@ -84,7 +80,6 @@ export function buildValidatorChain<TMeta>(
 	return chain;
 }
 
-/** @internal Runs validators sequentially; first throw aborts the chain. */
 export function runValidatorChain<TMeta>(
 	chain: readonly ValidatorFn<TMeta>[],
 	meta: TMeta,
@@ -95,12 +90,10 @@ export function runValidatorChain<TMeta>(
 	}
 }
 
-/** @internal Adapts a typed validator chain to the deferred-queue storage shape. */
 export function asDeferredValidators<TMeta>(chain: readonly ValidatorFn<TMeta>[]): readonly DeferredValidatorFn[] {
 	return chain as unknown as readonly DeferredValidatorFn[];
 }
 
-/** @internal Sequences parent-then-child validators; returns whichever side is defined. */
 export function chainValidators<TMeta>(
 	parent: ValidatorFn<TMeta> | undefined,
 	child: ValidatorFn<TMeta> | undefined

@@ -1,20 +1,20 @@
 import { keyDisplayName, MissingMetadataError, UnregisteredClassError } from "../errors";
+import { registerCtor } from "../metadata/pipeline/ctor-correlation";
+import { flushFor, queueDeferred } from "../metadata/pipeline/deferred-queue";
 import {
 	collectClassMeta,
 	firstClassMetaForKey,
 	hasAnyClassMetaForKey,
 	hasOwnClassMeta,
-} from "../metadata/class-meta-store";
-import { hasAnyMeta } from "../metadata/has-any-meta";
+} from "../metadata/stores/class-meta-store";
+import { hasAnyMeta } from "../metadata/stores/has-any-meta";
 import {
 	appendMemberMeta,
 	collectMemberMeta,
 	firstMemberMetaForKey,
 	hasAnyMemberMetaForKey,
 	hasOwnMemberMeta,
-} from "../metadata/member-meta-store";
-import { registerCtor } from "../metadata/metadata-ctor-correlation";
-import { flushFor, queueDeferred } from "../metadata/metadata-deferred-queue";
+} from "../metadata/stores/member-meta-store";
 import { resolveReflectTarget } from "../reflector/resolve-instance";
 import { createScopedReflector } from "../reflector/scoped-reflector";
 import { prepare } from "../runtime/prepare";
@@ -25,19 +25,16 @@ import type { AnyConstructor, DecoratedKind, ScopedReflector } from "../reflecto
 import type { DecoratorOptions, DeriveOptions } from "./types";
 import type { ValidateContext, ValidatorFn } from "./validator-types";
 
-/** @internal Applies optional `compose` mapper; falls back to `args[0]` for identity tuples. */
 export function compose<TMeta>(args: [TMeta]): TMeta;
 export function compose<TMeta, TArgs extends unknown[]>(args: TArgs, fn: ((...a: TArgs) => TMeta) | undefined): TMeta;
 export function compose<TMeta, TArgs extends unknown[]>(args: TArgs, fn?: (...a: TArgs) => TMeta): TMeta {
 	return fn ? fn(...args) : (args[0] as TMeta);
 }
 
-/** @internal Resolves a display label from the explicit `name` option or the key. */
 export function labelFor(name: string | undefined, key: MetadataKey): string {
 	return name ?? keyDisplayName(key);
 }
 
-/** @internal Shared setup for every `build*Factory`: composeFn, label, validator chain. */
 export function prepareFactoryShell<TMeta, TArgs extends unknown[]>(
 	key: MetadataKey<TMeta>,
 	options: DecoratorOptions<TMeta, TArgs> | undefined
@@ -52,12 +49,10 @@ export function prepareFactoryShell<TMeta, TArgs extends unknown[]>(
 	return { composeFn, label, validators };
 }
 
-/** @internal @throws {MissingMetadataError} Always. */
 export function throwMissingClass(key: MetadataKey, ctor: AnyConstructor, label: string): never {
 	throw new MissingMetadataError({ key, kind: "class", target: ctor, label });
 }
 
-/** @internal @throws {MissingMetadataError} Always. */
 export function throwMissingMember(
 	key: MetadataKey,
 	kind: Extract<DecoratedKind, "method" | "property">,
@@ -68,11 +63,6 @@ export function throwMissingMember(
 	throw new MissingMetadataError({ key, kind, target: ctor, memberName: member, label });
 }
 
-/**
- * @internal Asserts the constructor has at least one class- or member-level entry.
- *
- * @throws {UnregisteredClassError} When no metadata is associated with `ctor`.
- */
 export function ensureClassRegistered(ctor: Ctor): void {
 	if (!hasAnyMeta(ctor)) {
 		throw new UnregisteredClassError(ctor as AnyConstructor);
@@ -85,11 +75,6 @@ function prepareForRead(target: object): Ctor {
 	return ctor;
 }
 
-/**
- * @internal Reader collecting all entries for `(instance, memberName, key)`.
- *   Static reads treat the argument as the constructor; instance reads
- *   dereference `instance.constructor`. Both then walk the prototype chain.
- */
 export function createMemberMetadataReader<TMeta>(
 	key: MetadataKey<TMeta>,
 	memberName: string | symbol,
@@ -108,18 +93,6 @@ interface MemberEmitContext {
 	readonly static: boolean;
 }
 
-/**
- * @internal Commit envelope for class- and static-member decorators:
- *   validates, runs the kind-specific `append`, calls `registerCtor` to bind
- *   the constructor to the decorator-context bag, then `flushFor` drains any
- *   reflector work deferred against that bag. Instance-member decorators
- *   bypass this helper; their work is queued via {@link queueDeferred} and
- *   drained by `prepare`.
- *
- * @throws {InvalidDecorationTargetError} When `requireInstanceOf` rejects the target.
- * @throws {ValidationError} When the user `validate` callback rejects the metadata.
- * @throws {DuplicateMetadataError} When `append` detects an existing entry on a unique key.
- */
 export function commitDecoration<TMeta>(params: {
 	append: () => void;
 	correlation: object | null;
@@ -137,19 +110,6 @@ export function commitDecoration<TMeta>(params: {
 	flushFor(ctor, correlation);
 }
 
-/**
- * @internal Emits a member decoration. Static members validate and commit
- *   during their `addInitializer` phase. Instance members are queued via
- *   {@link queueDeferred} and drained by `prepare` (which walks the ancestor
- *   chain when invoked from reader helpers) and by an instance-construction
- *   initializer that walks the prototype chain and invokes `prepare` per
- *   link. The `token` guards against double-commit; cardinality is resolved
- *   from the registry inside `appendMemberMeta`.
- *
- * @throws {InvalidDecorationTargetError} (deferred) Validator chain rejects via `requireInstanceOf`.
- * @throws {ValidationError} (deferred) User `validate` callback rejects the metadata.
- * @throws {DuplicateMetadataError} (deferred) Unique key already has an entry on the same `(class, member)`.
- */
 export function emitMemberDecoration<TMeta>(params: {
 	context: MemberEmitContext;
 	key: MetadataKey;
@@ -166,7 +126,7 @@ export function emitMemberDecoration<TMeta>(params: {
 	if (isStatic) {
 		context.addInitializer(function (this: unknown) {
 			const ctor = this as Ctor;
-			// Validate, commit, then flush; flush drains sibling instance deferreds on the same bag.
+			// flush drains sibling instance deferreds queued on the same correlation bag.
 			commitDecoration({
 				ctor,
 				correlation,
@@ -206,11 +166,6 @@ export function emitMemberDecoration<TMeta>(params: {
 	});
 }
 
-/**
- * @internal Merges parent {@link DecoratorOptions} with `derive` child
- *   {@link DeriveOptions}. Chains validators parent-then-child; `name` and
- *   `requireInstanceOf` prefer child; `compose` only from parent.
- */
 export function mergeExtendedOptions<TMeta, TArgs extends unknown[]>(
 	parent: DecoratorOptions<TMeta, TArgs> | undefined,
 	child: DeriveOptions<TMeta, TArgs> | undefined
@@ -242,11 +197,6 @@ export function mergeExtendedOptions<TMeta, TArgs extends unknown[]>(
 	return merged as DecoratorOptions<TMeta, TArgs>;
 }
 
-/**
- * @internal Assembles read-side helpers (reader/first/firstOrThrow/has/hasOwn/all)
- *   for a class factory bound to one key and error label. Member-level contracts
- *   are documented on {@link DecoratedClassFactory}.
- */
 export function createClassFactoryHelpers<TMeta, TCard extends Cardinality = "unique">(
 	key: MetadataKey<TMeta, TCard>,
 	label: string
@@ -285,10 +235,6 @@ export function createClassFactoryHelpers<TMeta, TCard extends Cardinality = "un
 	};
 }
 
-/**
- * @internal Assembles read-side helpers for a member factory; mirrors
- *   {@link createClassFactoryHelpers} but scopes lookups by `(target, member)`.
- */
 export function createMemberFactoryHelpers<TMeta, TCard extends Cardinality = "unique">(
 	key: MetadataKey<TMeta, TCard>,
 	kind: Extract<DecoratedKind, "method" | "property">,

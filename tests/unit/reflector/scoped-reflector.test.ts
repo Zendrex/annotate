@@ -1,7 +1,8 @@
 /** biome-ignore-all lint/suspicious/noEmptyBlockStatements: test file */
 import { describe, expect, test } from "bun:test";
 
-import { decorate } from "../../../src/legacy";
+import { createClassListDecorator } from "../../../src/factories/class-decorator";
+import { createMethodDecorator } from "../../../src/factories/method-decorator";
 import { ClassTag, PropertyColumn } from "../../fixtures/decorators";
 
 describe("factory.reader()", () => {
@@ -17,7 +18,7 @@ describe("factory.reader()", () => {
 	});
 
 	test("should provide methods() and all() without key argument", () => {
-		const Route = decorate.method<string>();
+		const Route = createMethodDecorator<string>();
 
 		class Target {
 			@Route("/a")
@@ -47,9 +48,9 @@ describe("factory.reader()", () => {
 	});
 });
 
-describe("decorate.class reader — list class() cardinality", () => {
+describe("createClassDecorator reader — list class() cardinality", () => {
 	test("list key: array class metadata", () => {
-		const Tags = decorate.class.list<string>();
+		const Tags = createClassListDecorator<string>();
 
 		@Tags("a")
 		@Tags("b")

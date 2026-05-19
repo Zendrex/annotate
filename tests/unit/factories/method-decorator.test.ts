@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
 
 import { AnnotateError, MissingMetadataError, UnregisteredClassError } from "../../../src";
-import { decorate } from "../../../src/legacy";
+import { createMethodDecorator } from "../../../src/factories/method-decorator";
 
-describe("decorate.method", () => {
+describe("createMethodDecorator", () => {
 	test("stores metadata on instance method after construction", () => {
-		const Route = decorate.method<string>();
+		const Route = createMethodDecorator<string>();
 
 		class Api {
 			@Route("/ping")
@@ -24,7 +24,7 @@ describe("decorate.method", () => {
 	});
 
 	test("static methods are eagerly registered (no instantiation needed)", () => {
-		const Cmd = decorate.method<string>();
+		const Cmd = createMethodDecorator<string>();
 
 		// biome-ignore lint/complexity/noStaticOnlyClass: test fixture requires a class with a single static method
 		class Cli {
@@ -38,7 +38,7 @@ describe("decorate.method", () => {
 	});
 
 	test("inheritance: child sees parent metadata via has(), not hasOwn()", () => {
-		const Route = decorate.method<string>();
+		const Route = createMethodDecorator<string>();
 
 		class Base {
 			@Route("/parent")
@@ -54,7 +54,7 @@ describe("decorate.method", () => {
 	});
 
 	test("throws DuplicateMetadataError on second application (all factory keys are unique)", () => {
-		const Cmd = decorate.method<string>({ name: "Cmd" });
+		const Cmd = createMethodDecorator<string>({ name: "Cmd" });
 
 		expect(() => {
 			// biome-ignore lint/complexity/noStaticOnlyClass: test fixture requires a class with a single static method
@@ -70,14 +70,14 @@ describe("decorate.method", () => {
 	});
 
 	test("first() throws UnregisteredClassError when class never decorated", () => {
-		const Route = decorate.method<string>({ name: "Route" });
+		const Route = createMethodDecorator<string>({ name: "Route" });
 		class X {}
 		expect(() => Route.first(X, "anything")).toThrow(UnregisteredClassError);
 	});
 
 	test("firstOrThrow throws MissingMetadataError when class registered but member not decorated", () => {
-		const Route = decorate.method<string>({ name: "Route" });
-		const Other = decorate.method<string>({ name: "Other" });
+		const Route = createMethodDecorator<string>({ name: "Route" });
+		const Other = createMethodDecorator<string>({ name: "Other" });
 
 		class X {
 			@Other("o")

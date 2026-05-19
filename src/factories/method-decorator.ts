@@ -1,4 +1,4 @@
-import { mintMetadataKey } from "../metadata/cardinality-registry";
+import { mintMetadataKey } from "../metadata/cardinality";
 import {
 	compose,
 	createMemberFactoryHelpers,
@@ -10,15 +10,10 @@ import {
 import type { Cardinality, MetadataKey } from "../metadata/types";
 import type { AnyFn, DecoratedMethodFactory, DecoratorOptions, DeriveOptions, InterceptorContext } from "./types";
 
-/** @internal Hook bundle preserved by `derive` across factory rebuilds. */
 export interface MethodHookRefs<TMeta, TMethod extends AnyFn> {
 	intercept: (original: TMethod, readMetadata: (instance: object) => TMeta[], context: InterceptorContext) => TMethod;
 }
 
-/**
- * Builds a method decorator factory backed by a unique-cardinality metadata
- * key. For interception, use {@link createMethodInterceptor}.
- */
 export function createMethodDecorator<
 	TMeta,
 	TArgs extends unknown[] = [TMeta],
@@ -30,10 +25,6 @@ export function createMethodDecorator<
 	return buildMethodFactory<TMeta, TArgs, TMethod, TThis>(key, options);
 }
 
-/**
- * @internal Builds the factory against a pre-minted key; the intercept return
- *   value (if any) replaces the original method.
- */
 export function buildMethodFactory<
 	TMeta,
 	TArgs extends unknown[],
@@ -93,10 +84,6 @@ export function buildMethodFactory<
 	}) as DecoratedMethodFactory<TMeta, TArgs, TMethod, TThis, TCard>;
 }
 
-/**
- * List-cardinality method decorator: repeat decorations append entries instead
- * of throwing on duplicates. `.key` is branded as a list key.
- */
 export function createMethodListDecorator<
 	TMeta,
 	TArgs extends unknown[] = [TMeta],

@@ -2,11 +2,12 @@
 import { describe, expect, test } from "bun:test";
 
 import { reflect, UnregisteredClassError } from "../../../src";
-import { decorate } from "../../../src/legacy";
+import { createClassDecorator } from "../../../src/factories/class-decorator";
+import { createMethodDecorator } from "../../../src/factories/method-decorator";
 
 describe("reflect() per-ctor caching", () => {
-	test("returns the same Reflector instance for repeated calls on the same ctor", () => {
-		const Tag = decorate.class<string>();
+	test("returns the same IReflector instance for repeated calls on the same ctor", () => {
+		const Tag = createClassDecorator<string>();
 
 		@Tag("a")
 		class A {}
@@ -17,8 +18,8 @@ describe("reflect() per-ctor caching", () => {
 		expect(second).toBe(first);
 	});
 
-	test("returns the same Reflector for an instance and its constructor", () => {
-		const Tag = decorate.class<string>();
+	test("returns the same IReflector for an instance and its constructor", () => {
+		const Tag = createClassDecorator<string>();
 
 		@Tag("a")
 		class A {}
@@ -30,8 +31,8 @@ describe("reflect() per-ctor caching", () => {
 		expect(fromInstance).toBe(fromCtor);
 	});
 
-	test("returns distinct Reflector instances for different ctors", () => {
-		const Tag = decorate.class<string>();
+	test("returns distinct IReflector instances for different ctors", () => {
+		const Tag = createClassDecorator<string>();
 
 		@Tag("a")
 		class A {}
@@ -44,7 +45,7 @@ describe("reflect() per-ctor caching", () => {
 	test("methodLikeCache is shared: prototype mutation after first call does not affect second call result", () => {
 		// Isolation: wrap in a function so Bun emits a distinct _init per scope.
 		function makeC() {
-			const Route = decorate.method<string>();
+			const Route = createMethodDecorator<string>();
 
 			class C {
 				@Route("/c")
@@ -74,7 +75,7 @@ describe("reflect() per-ctor caching", () => {
 	});
 
 	test("late decoration: cached impl retries ensureRegistered after class is decorated post-reflect", () => {
-		const Tag = decorate.class<string>();
+		const Tag = createClassDecorator<string>();
 
 		// A truly bare class — no decorators applied at definition time.
 		class Late {}

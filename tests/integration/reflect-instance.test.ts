@@ -1,13 +1,15 @@
 import { describe, expect, test } from "bun:test";
 
 import { reflect } from "../../src";
-import { decorate } from "../../src/legacy";
+import { createClassDecorator } from "../../src/factories/class-decorator";
+import { createMethodDecorator } from "../../src/factories/method-decorator";
+import { createPropertyDecorator } from "../../src/factories/property-decorator";
 
 describe("reflect(...) — Stage-3 fixtures", () => {
 	test("reflect(instance) parity with reflect(Class)", () => {
-		const Tag = decorate.class<string>();
-		const Route = decorate.method<string>();
-		const Field = decorate.property<string>();
+		const Tag = createClassDecorator<string>();
+		const Route = createMethodDecorator<string>();
+		const Field = createPropertyDecorator<string>();
 
 		@Tag("svc")
 		class Service {

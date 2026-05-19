@@ -2,11 +2,11 @@
 import { describe, expect, test } from "bun:test";
 
 import { AnnotateError, MissingMetadataError } from "../../../src";
-import { decorate } from "../../../src/legacy";
+import { createClassListDecorator } from "../../../src/factories/class-decorator";
 
-describe("decorate.class.list", () => {
+describe("createClassListDecorator", () => {
 	test("two classes decorated with the same .list factory each have 1 entry", () => {
-		const Tag = decorate.class.list<string>();
+		const Tag = createClassListDecorator<string>();
 
 		@Tag("alpha")
 		class A {}
@@ -19,7 +19,7 @@ describe("decorate.class.list", () => {
 	});
 
 	test("one class decorated twice with same .list factory has 2 entries", () => {
-		const Tag = decorate.class.list<string>();
+		const Tag = createClassListDecorator<string>();
 
 		@Tag("first")
 		@Tag("second")
@@ -31,7 +31,7 @@ describe("decorate.class.list", () => {
 	});
 
 	test("inheritance: all() collects across chain", () => {
-		const Tag = decorate.class.list<string>();
+		const Tag = createClassListDecorator<string>();
 
 		@Tag("base")
 		class Base {}
@@ -43,8 +43,8 @@ describe("decorate.class.list", () => {
 	});
 
 	test("firstOrThrow() throws MissingMetadataError on an undecorated class", () => {
-		const Tag = decorate.class.list<string>();
-		const Other = decorate.class.list<string>();
+		const Tag = createClassListDecorator<string>();
+		const Other = createClassListDecorator<string>();
 
 		@Other("o")
 		class X {}
