@@ -10,6 +10,11 @@ import type {
 	IScopedReflector,
 } from "./types";
 
+/**
+ * Returns a reflector bound to one `(ctor, key)` pair, shaping results to the
+ * key's runtime cardinality. Equivalent to `reflect(ctor)` queries with the
+ * key elided.
+ */
 export function createScopedReflector<TMeta, TCard extends Cardinality>(
 	ctor: AnyConstructor,
 	key: MetadataKey<TMeta, TCard>

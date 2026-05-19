@@ -3,6 +3,12 @@ export type Ctor = Function;
 
 export type Cardinality = "unique" | "list";
 
+/**
+ * Branded `symbol` carrying value type and cardinality. Mint via
+ * `mintUniqueKey` / `mintListKey` so the cardinality registry stays in sync;
+ * casting a bare symbol to `MetadataKey<T>` throws `UnregisteredMetadataKeyError`
+ * the first time the store sees it.
+ */
 export type MetadataKey<TValue = unknown, TCard extends Cardinality = Cardinality> = symbol & {
 	readonly __metadataKey: { value: TValue; cardinality: TCard };
 };

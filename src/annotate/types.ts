@@ -42,6 +42,15 @@ export interface StaticMemberAnnotationReader<TMeta, TCard extends Cardinality, 
 	get(selector: (target: TStatic) => unknown): ReadResult<TMeta, TCard>;
 }
 
+/**
+ * Reads member-annotation metadata against `target`'s prototype chain.
+ *
+ * `get` and `static.get` accept a callback invoked against a property-recording
+ * proxy: `reader.get(t => t.foo)` targets member `foo`. The callback must
+ * access exactly one member and must not invoke it.
+ *
+ * @throws {InvalidSelectorError} From `get` / `static.get` when the selector reads zero or multiple members, or invokes the recorded value.
+ */
 export interface MemberAnnotationReader<TMeta, TCard extends Cardinality, TThis, TStatic = unknown> {
 	accessors(): MemberAnnotationEntry<TMeta, TCard>[];
 	entries(): MemberAnnotationEntry<TMeta, TCard>[];
@@ -51,6 +60,11 @@ export interface MemberAnnotationReader<TMeta, TCard extends Cardinality, TThis,
 	readonly static: StaticMemberAnnotationReader<TMeta, TCard, TStatic>;
 }
 
+/**
+ * Live context passed to interceptor hooks. `get(instance)` collects metadata
+ * along `instance`'s prototype chain at call time, so subclass-added entries
+ * become visible without re-installing the interceptor.
+ */
 export interface PublicInterceptorContext<TMeta, TCard extends Cardinality> {
 	get(instance: object): ReadResult<TMeta, TCard>;
 	kind: "method" | "field" | "accessor";

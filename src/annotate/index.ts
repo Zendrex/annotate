@@ -102,6 +102,12 @@ interface AnnotateApi {
 	): MethodAnnotation<TMeta, TArgs, AnyFn, any, TCard>;
 }
 
+/**
+ * Decorator factories grouped by target. Each entry mints a metadata key,
+ * returns a decorator that records its arguments on the decorated site, and
+ * attaches a `read(target)` helper for later retrieval. Cardinality (`one`
+ * vs `many`) is fixed at creation and shapes all reads.
+ */
 export const Annotate: AnnotateApi = Object.freeze({
 	accessor: accessorAnnotation,
 	class: classAnnotation,

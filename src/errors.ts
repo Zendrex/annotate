@@ -106,7 +106,11 @@ interface MissingMetadataArgs {
 	target: AnyConstructor;
 }
 
-/** Throwing reader found no metadata for the requested annotation. */
+/**
+ * Public error consumers may throw from their own readers when metadata is
+ * absent. The library itself returns `undefined` / `[]` on absent reads rather
+ * than throwing this.
+ */
 export class MissingMetadataError extends defineAnnotateError<MissingMetadataArgs>({
 	name: "MissingMetadataError",
 	code: AnnotateErrorCode.MISSING,
