@@ -166,46 +166,50 @@ Behavior:
 Read return types follow cardinality:
 
 ```ts
-Role.read(Api).first((api) => api.index); // string | undefined
-Tag.read(Api).all((api) => api.index); // readonly string[]
+Role.read(Api).get((api) => api.index); // string | undefined
+Tag.read(Api).get((api) => api.index); // readonly string[]
 ```
 
 ## Reading Metadata
 
-The canonical read API must avoid stringly member names. Passing a member name string to read a method is an escape hatch, not the recommended path.
+The read API should stay small. It should not expose separate sugar methods for every common operation.
 
-Preferred reads use typed selectors or reflected collections:
+There are two canonical read paths:
+
+1. Use `get` with a typed selector when reading one known class member.
+2. Use collection methods and normal array operations when scanning metadata.
+
+Selector reads avoid stringly member names:
 
 ```ts
-Role.read(Api).has((api) => api.index);
-Role.read(Api).first((api) => api.index);
-Role.read(Api).all((api) => api.index);
+Role.read(Api).get((api) => api.index);
 ```
 
 Field reads use the same selector shape:
 
 ```ts
-Column.read(User).has((user) => user.name);
-Column.read(User).first((user) => user.name);
+Column.read(User).get((user) => user.name);
 ```
 
-Framework builders can enumerate collections:
+Existence checks use normal JavaScript:
 
 ```ts
-for (const method of Route.read(Api).methods()) {
-	method.name;
-	method.metadata;
-}
+Role.read(Api).get((api) => api.index) !== undefined;
+Tag.read(Api).get((api) => api.index).length > 0;
 ```
 
-String-based member reads can exist, but they must be clearly named as escape hatches:
+Framework builders enumerate collections and compose with `map`, `filter`, and other array methods:
 
 ```ts
-Role.read(Api).byName("index");
-Role.read(Api).hasName("index");
+const routes = Route.read(Api)
+	.methods()
+	.map((method) => ({
+		name: method.name,
+		route: method.metadata,
+	}));
 ```
 
-These methods are not used in primary documentation examples.
+The public read surface should not include `first`, `all`, `has`, `byName`, or `hasName`. Name-based reads are not part of the v1 public API. If dynamic access is needed later, it should be considered as a separate low-level API instead of being attached to every annotation handle.
 
 ## Interceptors
 
@@ -264,7 +268,7 @@ The current implementation has repeated factory code across class, method, prope
 - A key/cardinality module that understands public `"one" | "many"` and internal storage cardinality.
 - A shared annotation handle builder that creates callable decorators with attached read helpers.
 - Thin target adapters for class, method, field, accessor, and interceptor behavior.
-- A read layer that supports typed selectors, reflected collections, and explicitly named string escape hatches.
+- A read layer that supports typed selectors and reflected collections without name-based helper methods.
 
 Runtime invariants already covered by tests should be preserved:
 
