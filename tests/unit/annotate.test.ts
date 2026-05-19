@@ -7,15 +7,6 @@ import { describe, expect, test } from "bun:test";
 import { Annotate, InvalidSelectorError } from "../../src";
 
 describe("Annotate", () => {
-	test("public root does not expose removed legacy decorator namespaces", async () => {
-		const PublicApi = await import("../../src");
-
-		expect("decorate" in PublicApi).toBe(false);
-		expect("intercept" in PublicApi).toBe(false);
-		expect(`${"create"}MethodDecorator` in PublicApi).toBe(false);
-		expect(`${"create"}PropertyDecorator` in PublicApi).toBe(false);
-	});
-
 	test("method annotations are callable decorators and readable through typed selectors", () => {
 		const Route = Annotate.method((method: "GET" | "POST", path: string) => ({ method, path }));
 

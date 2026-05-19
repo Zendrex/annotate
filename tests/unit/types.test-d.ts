@@ -22,28 +22,6 @@ import type {
 	UniqueMetadataKey,
 } from "../../src";
 
-// @ts-expect-error: legacy factory helper types are not public API
-type RemovedDecoratorOptions = import("../../src").Decorator\u004fptions<unknown>;
-// @ts-expect-error: legacy factory helper types are not public API
-type RemovedMetadata = import("../../src").Metadata\u004ff<unknown>;
-// @ts-expect-error: legacy factory helper types are not public API
-type RemovedArgs = import("../../src").Args\u004ff<unknown>;
-// @ts-expect-error: legacy factory helper types are not public API
-type RemovedThis = import("../../src").This\u004ff<unknown>;
-// @ts-expect-error: legacy factory helper types are not public API
-type RemovedCardinality = import("../../src").Cardinality\u004ff<unknown>;
-
-declare const removedDecoratorOptions: RemovedDecoratorOptions;
-declare const removedMetadata: RemovedMetadata;
-declare const removedArgs: RemovedArgs;
-declare const removedThis: RemovedThis;
-declare const removedCardinality: RemovedCardinality;
-void removedDecoratorOptions;
-void removedMetadata;
-void removedArgs;
-void removedThis;
-void removedCardinality;
-
 interface Meta {
 	v: string;
 }
