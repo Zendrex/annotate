@@ -23,8 +23,6 @@ export type MemberBucket = Map<symbol, Map<string | symbol, MemberEntry>>;
 
 export type MemberKind = "method" | "property" | "field" | "accessor";
 
-export type MetadataArray<T = unknown> = readonly T[];
-
 export interface Deferred {
 	key: MetadataKey;
 	kind: MemberKind;

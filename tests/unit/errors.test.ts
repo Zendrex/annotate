@@ -184,6 +184,7 @@ describe("ValidationError", () => {
 		});
 
 		expect(err.cause).toBeUndefined();
+		expect(Object.hasOwn(err, "cause")).toBe(false);
 	});
 });
 

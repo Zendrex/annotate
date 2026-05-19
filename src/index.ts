@@ -15,6 +15,7 @@ export {
 export { mintListKey, mintUniqueKey } from "./metadata/cardinality";
 export { prepare } from "./metadata/pipeline";
 export { reflect } from "./reflector/reflector";
+export { createScopedReflector } from "./reflector/scoped-reflector";
 export type {
 	AccessorAnnotation,
 	AccessorInterceptorOptions as AnnotateAccessorInterceptorOptions,
@@ -33,7 +34,7 @@ export type {
 	PublicInterceptorContext,
 	ValidateContext,
 } from "./annotate";
-export type { ListMetadataKey, MetadataArray, MetadataKey, UniqueMetadataKey } from "./metadata/types";
+export type { ListMetadataKey, MetadataKey, UniqueMetadataKey } from "./metadata/types";
 export type { IReflector } from "./reflector/reflector";
 export type {
 	DecoratedClassList,

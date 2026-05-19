@@ -24,16 +24,6 @@ function formatRead<TMeta, TCard extends Cardinality>(
 	return values[0] as ReadResult<TMeta, TCard>;
 }
 
-function formatMetadata<TMeta, TCard extends Cardinality>(
-	values: readonly unknown[],
-	cardinality: TCard
-): TCard extends "many" ? readonly TMeta[] : TMeta {
-	if (cardinality === "many") {
-		return Object.freeze([...values]) as TCard extends "many" ? readonly TMeta[] : TMeta;
-	}
-	return values[0] as TCard extends "many" ? readonly TMeta[] : TMeta;
-}
-
 function resolveSelector(target: AnyConstructor, selector: (target: never) => unknown): string | symbol {
 	const reads: (string | symbol)[] = [];
 	let invoked = false;
@@ -97,11 +87,14 @@ export function createClassReader<TMeta, TCard extends Cardinality>(
 			return [
 				{
 					kind: "class",
-					metadata: formatMetadata<TMeta, TCard>(values, cardinality),
+					metadata: formatRead<TMeta, TCard>(values, cardinality) as ClassAnnotationEntry<
+						TMeta,
+						TCard
+					>["metadata"],
 					name: targetDisplayName(ctor),
 					target: ctor,
 				},
-			] as ClassAnnotationEntry<TMeta, TCard>[];
+			];
 		},
 		get: () => formatRead(collectClassMeta<TMeta>(ctor, key), cardinality),
 	};
@@ -125,7 +118,10 @@ export function createMemberReader<TMeta, TCard extends Cardinality, TThis>(
 			}
 			entries.push({
 				kind: entry.kind,
-				metadata: formatMetadata<TMeta, TCard>(entry.values, cardinality),
+				metadata: formatRead<TMeta, TCard>(
+					entry.values as readonly TMeta[],
+					cardinality
+				) as MemberAnnotationEntry<TMeta, TCard>["metadata"],
 				name,
 				static: entry.static,
 			});

@@ -146,10 +146,10 @@ export function prepare(ctor: Ctor): void {
 		throw new UnregisteredClassError(ctor as AnyConstructor);
 	}
 
-	// Chain-walk fallback (rare): `ctor` has no own metadata slot, but an
-	// ancestor may have pending deferred work. Walk until we find one and flush
-	// it. Do NOT mark `ctor` fully prepared here — the walk stops at the first
-	// hit, and further ancestors may still hold pending work for later calls.
+	// Chain-walk fallback (rare): `ctor` has no own metadata slot, but ancestors
+	// may have pending deferred work. Flush every ancestor with pending work in
+	// one pass. Do NOT mark `ctor` fully prepared — it has no own correlation,
+	// so future `queueDeferred` calls cannot invalidate a sentinel on it.
 	walkPrototypeChain(Object.getPrototypeOf(ctor) as Ctor, (current) => {
 		if (!hasOwnMetadata(current)) {
 			return;
@@ -158,7 +158,6 @@ export function prepare(ctor: Ctor): void {
 		if (correlation && hasPendingFor(correlation)) {
 			registerCtor(current, correlation);
 			flushFor(current, correlation);
-			return true;
 		}
 	});
 }

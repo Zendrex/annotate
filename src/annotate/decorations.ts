@@ -78,8 +78,6 @@ export function emitMemberDecoration<TMeta>(params: {
 	}
 	queueDeferred(correlation, deferred);
 	context.addInitializer(function (this: unknown) {
-		walkPrototypeChain((this as { constructor: Ctor }).constructor, (ctor) => {
-			prepare(ctor);
-		});
+		walkPrototypeChain((this as { constructor: Ctor }).constructor, prepare);
 	});
 }

@@ -1,6 +1,6 @@
 import { emitMemberDecoration } from "../decorations";
 import { createMemberMetadataReader, mapArgs, prepareTargetBuilder } from "./shared";
-import type { Cardinality, MemberKind, MetadataKey } from "../../metadata/types";
+import type { Cardinality, MetadataKey } from "../../metadata/types";
 import type { AccessorHookRefs, InternalAnnotationOptions, InternalInterceptorContext } from "../internal-types";
 
 export type AccessorTargetDecorator<_TMeta, TArgs extends unknown[], TValue, TThis> = (
@@ -19,8 +19,7 @@ export function buildAccessorTarget<
 >(
 	key: MetadataKey<TMeta, TCard>,
 	options: InternalAnnotationOptions<TMeta, TArgs> | undefined,
-	hookRefs: AccessorHookRefs<TMeta, TValue> = {},
-	storedKind: Extract<MemberKind, "property" | "accessor"> = "accessor"
+	hookRefs: AccessorHookRefs<TMeta, TValue> = {}
 ): AccessorTargetDecorator<TMeta, TArgs, TValue, TThis> {
 	const { argsMapper, validators } = prepareTargetBuilder<TMeta, TArgs>(key, options);
 	const { get, set } = hookRefs;
@@ -52,7 +51,7 @@ export function buildAccessorTarget<
 			emitMemberDecoration({
 				context,
 				key,
-				kind: storedKind,
+				kind: "accessor",
 				meta: mapArgs(args, argsMapper),
 				token: Symbol(get || set ? "accessorIntercept" : "accessorDecoration"),
 				validators,

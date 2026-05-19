@@ -1,10 +1,10 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: field decorator initializer return types must remain assignable to literal field initializers */
 import { prepare } from "../../metadata/pipeline";
-import { collectMemberNames, getMemberStatic } from "../../metadata/store";
+import { collectMemberNames, getMemberStatic, getOrCreate } from "../../metadata/store";
 import { walkPrototypeChain } from "../../runtime/prototype-chain";
 import { emitMemberDecoration } from "../decorations";
 import { createMemberMetadataReader, mapArgs, prepareTargetBuilder } from "./shared";
-import type { Cardinality, Ctor, MemberKind, MetadataKey } from "../../metadata/types";
+import type { Cardinality, Ctor, MetadataKey } from "../../metadata/types";
 import type { FieldHookRefs, InternalAnnotationOptions, InternalInterceptorContext } from "../internal-types";
 
 const fieldInterceptors = new Map<MetadataKey, FieldHookRefs<unknown, unknown>>();
@@ -27,12 +27,7 @@ function registerFieldInterceptor<TMeta, TField>(
 }
 
 function markFieldInitialized(target: object, name: string | symbol): void {
-	let names = initializedFields.get(target);
-	if (!names) {
-		names = new Set();
-		initializedFields.set(target, names);
-	}
-	names.add(name);
+	getOrCreate(initializedFields, target, () => new Set<string | symbol>()).add(name);
 }
 
 function isFieldInitialized(target: object, name: string | symbol): boolean {
@@ -61,9 +56,7 @@ function applyAllFieldInterceptors(this: unknown): void {
 	const ctor = (this as { constructor: Ctor }).constructor;
 	const target = this as Record<string | symbol, unknown>;
 
-	walkPrototypeChain(ctor, (link) => {
-		prepare(link);
-	});
+	walkPrototypeChain(ctor, prepare);
 
 	let entries = ctorFieldIndex.get(ctor);
 	if (!entries) {
@@ -93,8 +86,7 @@ export type FieldTargetDecorator<_TMeta, TArgs extends unknown[], TField, TThis>
 
 export function buildFieldTarget<TMeta, TArgs extends unknown[], TField, TThis, TCard extends Cardinality = "unique">(
 	key: MetadataKey<TMeta, TCard>,
-	options: InternalAnnotationOptions<TMeta, TArgs> | undefined,
-	storedKind: Extract<MemberKind, "property" | "field"> = "field"
+	options: InternalAnnotationOptions<TMeta, TArgs> | undefined
 ): FieldTargetDecorator<TMeta, TArgs, TField, TThis> {
 	const { argsMapper, validators } = prepareTargetBuilder<TMeta, TArgs>(key, options);
 
@@ -103,7 +95,7 @@ export function buildFieldTarget<TMeta, TArgs extends unknown[], TField, TThis, 
 			emitMemberDecoration({
 				context,
 				key,
-				kind: storedKind,
+				kind: "field",
 				meta: mapArgs(args, argsMapper),
 				token: Symbol("fieldDecoration"),
 				validators,
@@ -121,8 +113,7 @@ export function buildFieldInterceptorTarget<
 >(
 	key: MetadataKey<TMeta, TCard>,
 	options: InternalAnnotationOptions<TMeta, TArgs> | undefined,
-	hookRefs: FieldHookRefs<TMeta, TField>,
-	storedKind: Extract<MemberKind, "property" | "field"> = "field"
+	hookRefs: FieldHookRefs<TMeta, TField>
 ): FieldTargetDecorator<TMeta, TArgs, TField, TThis> {
 	const { argsMapper, validators } = prepareTargetBuilder<TMeta, TArgs>(key, options);
 	const { init } = hookRefs;
@@ -137,7 +128,7 @@ export function buildFieldInterceptorTarget<
 			emitMemberDecoration({
 				context,
 				key,
-				kind: storedKind,
+				kind: "field",
 				meta: mapArgs(args, argsMapper),
 				token: Symbol("fieldIntercept"),
 				validators,
@@ -168,9 +159,7 @@ export function buildFieldInterceptorTarget<
 			const readMetadata = createMemberMetadataReader<TMeta>(key, memberName, false);
 			const interceptorContext: InternalInterceptorContext = { name: memberName, static: false, kind: "field" };
 			return function (this: TThis, initial: TField): TField {
-				walkPrototypeChain((this as { constructor: Ctor }).constructor, (link) => {
-					prepare(link);
-				});
+				walkPrototypeChain((this as { constructor: Ctor }).constructor, prepare);
 				const next = init.call(this, initial, readMetadata, interceptorContext);
 				markFieldInitialized(this as object, memberName);
 				return next;

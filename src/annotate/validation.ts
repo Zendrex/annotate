@@ -101,22 +101,3 @@ export function runValidatorChain<TMeta>(
 export function asDeferredValidators<TMeta>(chain: readonly ValidatorFn<TMeta>[]): readonly DeferredValidatorFn[] {
 	return chain as unknown as readonly DeferredValidatorFn[];
 }
-
-export function chainValidators<TMeta>(
-	parent: ValidatorFn<TMeta> | undefined,
-	child: ValidatorFn<TMeta> | undefined
-): ValidatorFn<TMeta> | undefined {
-	if (!(parent || child)) {
-		return;
-	}
-	if (!parent) {
-		return child;
-	}
-	if (!child) {
-		return parent;
-	}
-	return (meta, context) => {
-		parent(meta, context);
-		child(meta, context);
-	};
-}

@@ -129,7 +129,7 @@ export function fieldAnnotation<TMeta, TArgs extends unknown[], TField, TThis, T
 	input?: BuilderInput<TMeta, TArgs, TCard>
 ): FieldAnnotation<TMeta, TArgs, TField, TThis, TCard> {
 	const { cardinality, key, options } = normalizeBuilderInput<TMeta, TArgs, TCard>(input);
-	const factory = buildFieldTarget<TMeta, TArgs, TField, TThis, InternalCardinalityOf<TCard>>(key, options, "field");
+	const factory = buildFieldTarget<TMeta, TArgs, TField, TThis, InternalCardinalityOf<TCard>>(key, options);
 	return attachMemberRead<typeof factory, TMeta, TCard, TThis>(factory, key, cardinality) as FieldAnnotation<
 		TMeta,
 		TArgs,
@@ -143,12 +143,7 @@ export function accessorAnnotation<TMeta, TArgs extends unknown[], TValue, TThis
 	input?: BuilderInput<TMeta, TArgs, TCard>
 ): AccessorAnnotation<TMeta, TArgs, TValue, TThis, TCard> {
 	const { cardinality, key, options } = normalizeBuilderInput<TMeta, TArgs, TCard>(input);
-	const factory = buildAccessorTarget<TMeta, TArgs, TValue, TThis, InternalCardinalityOf<TCard>>(
-		key,
-		options,
-		{},
-		"accessor"
-	);
+	const factory = buildAccessorTarget<TMeta, TArgs, TValue, TThis, InternalCardinalityOf<TCard>>(key, options);
 	return attachMemberRead<typeof factory, TMeta, TCard, TThis>(factory, key, cardinality) as AccessorAnnotation<
 		TMeta,
 		TArgs,
@@ -219,8 +214,7 @@ export function accessorInterceptor<TMeta, TArgs extends unknown[], TValue, TThi
 	const factory = buildAccessorTarget<TMeta, TArgs, TValue, TThis, InternalCardinalityOf<TCard>>(
 		key,
 		annotationOptions,
-		hookRefs,
-		"accessor"
+		hookRefs
 	);
 	return attachMemberRead<typeof factory, TMeta, TCard, TThis>(factory, key, cardinality) as AccessorAnnotation<
 		TMeta,
@@ -247,8 +241,7 @@ export function fieldInterceptor<TMeta, TArgs extends unknown[], TField, TThis, 
 	const factory = buildFieldInterceptorTarget<TMeta, TArgs, TField, TThis, InternalCardinalityOf<TCard>>(
 		key,
 		annotationOptions,
-		hookRefs,
-		"field"
+		hookRefs
 	);
 	return attachMemberRead<typeof factory, TMeta, TCard, TThis>(factory, key, cardinality) as FieldAnnotation<
 		TMeta,

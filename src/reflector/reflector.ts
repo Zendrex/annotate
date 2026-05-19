@@ -45,7 +45,8 @@ const reflectorCache = new WeakMap<AnyConstructor, Reflector>();
 export class Reflector implements IReflector {
 	private readonly ctor: AnyConstructor;
 	private registered = false;
-	private readonly methodLikeCache = new Map<string | symbol, boolean>();
+	private readonly staticMethodLikeCache = new Map<string | symbol, boolean>();
+	private readonly instanceMethodLikeCache = new Map<string | symbol, boolean>();
 
 	constructor(target: AnyConstructor) {
 		this.ctor = target;
@@ -54,8 +55,7 @@ export class Reflector implements IReflector {
 	all<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedItem<T, C>[] {
 		this.ensureRegistered();
 		const classItem = this.collectClass<T>(key);
-		const methods = this.collectMethods<T>(key);
-		const properties = this.collectProperties<T>(key);
+		const { methods, properties } = this.partitionMembers<T>(key);
 		const items = classItem ? [classItem, ...methods, ...properties] : [...methods, ...properties];
 		return items as DecoratedItem<T, C>[];
 	}
@@ -67,12 +67,12 @@ export class Reflector implements IReflector {
 
 	methods<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedMethodFor<T, C>[] {
 		this.ensureRegistered();
-		return this.collectMethods<T>(key) as DecoratedMethodFor<T, C>[];
+		return this.partitionMembers<T>(key).methods as DecoratedMethodFor<T, C>[];
 	}
 
 	properties<T, C extends Cardinality = Cardinality>(key: MetadataKey<T, C>): DecoratedPropertyFor<T, C>[] {
 		this.ensureRegistered();
-		return this.collectProperties<T>(key) as DecoratedPropertyFor<T, C>[];
+		return this.partitionMembers<T>(key).properties as DecoratedPropertyFor<T, C>[];
 	}
 
 	private collectClass<T>(key: MetadataKey<T>): DecoratedClass<T> | undefined {
@@ -98,43 +98,33 @@ export class Reflector implements IReflector {
 		} satisfies DecoratedClassList<T>;
 	}
 
-	private collectMethods<T>(key: MetadataKey<T>): DecoratedMethod<T>[] {
-		return this.collectMembers<T, DecoratedMethod<T>>(key, "method", true);
-	}
-
-	private collectProperties<T>(key: MetadataKey<T>): DecoratedProperty<T>[] {
-		return this.collectMembers<T, DecoratedProperty<T>>(key, "property", false);
-	}
-
-	private collectMembers<T, R extends DecoratedMethod<T> | DecoratedProperty<T>>(
-		key: MetadataKey<T>,
-		kind: "method" | "property",
-		wantMethod: boolean
-	): R[] {
+	private partitionMembers<T>(key: MetadataKey<T>): {
+		methods: DecoratedMethod<T>[];
+		properties: DecoratedProperty<T>[];
+	} {
 		const snapshot = snapshotMembers(this.ctor, key);
 		const cardinality = getKeyCardinality(key);
-		const out: R[] = [];
+		const methods: DecoratedMethod<T>[] = [];
+		const properties: DecoratedProperty<T>[] = [];
 		for (const [name, entry] of snapshot) {
-			if (this.isMethod(name, entry.static) !== wantMethod) {
-				continue;
+			const metadata = cardinality === "unique" ? (entry.values[0] as T) : (entry.values as T[]);
+			if (this.isMethod(name, entry.static)) {
+				methods.push({ kind: "method", name, static: entry.static, metadata } as DecoratedMethod<T>);
+			} else {
+				properties.push({ kind: "property", name, static: entry.static, metadata } as DecoratedProperty<T>);
 			}
-			out.push({
-				kind,
-				name,
-				static: entry.static,
-				metadata: cardinality === "unique" ? (entry.values[0] as T) : (entry.values as T[]),
-			} as unknown as R);
 		}
-		return out;
+		return { methods, properties };
 	}
 
 	private isMethod(name: string | symbol, isStatic: boolean): boolean {
-		const cached = this.methodLikeCache.get(name);
+		const cache = isStatic ? this.staticMethodLikeCache : this.instanceMethodLikeCache;
+		const cached = cache.get(name);
 		if (cached !== undefined) {
 			return cached;
 		}
 		const result = isMethodLike(this.ctor, name, isStatic);
-		this.methodLikeCache.set(name, result);
+		cache.set(name, result);
 		return result;
 	}
 
