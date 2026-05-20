@@ -19,6 +19,19 @@ Works with npm, pnpm, and yarn. Any runtime with Stage-3 decorator support can u
 
 TypeScript must use Stage-3 decorators (`experimentalDecorators: false`). Legacy TypeScript decorators and parameter decorators are not supported.
 
+## Runtime issues addressed
+
+Annotate does not patch the engine. It stores metadata in annotate-owned structures and controls when decorations are flushed so reads stay correct on imperfect Stage-3 implementations.
+
+| Issue | Typical runtimes | What Annotate does |
+| --- | --- | --- |
+| **`Symbol.metadata` missing** | Node before 22.3, older browsers, some embedded engines | Import [`@zendrex/annotate/shim`](#prerequisites) once so the transformer and runtime agree on `Symbol.for("Symbol.metadata")`. Native `Symbol.metadata` is left untouched when already present. |
+| **Instance members register only after an instance exists** | All Stage-3 engines | Instance-member decorations are queued and flushed on first `prepare(ctor)`, first instance creation (via `addInitializer`), or first read that materializes the class. Call `prepare(Users)` to eager-flush without constructing. |
+| **Shared instance `addInitializer` callbacks** | Bun 1.3.13 (and similar) | Bun can reuse one initializer across classes so only the last registration runs. Annotate’s initializer only calls `prepare(this.constructor)`, so whichever callback runs drains the correct class’s pending metadata. |
+| **Skipped field value-replacement initializers** | Bun 1.3 (`var _init` transformer bug) | When several fields in one class use `Annotate.intercept.field`, Bun may skip per-field initializer closures. Field interceptors keep a per-class index and can re-apply every field hook from the instance in one pass so each field still gets its own metadata. |
+
+Regression tests for the Bun cases live under `tests/integration/cross-class-isolation.test.ts` and `tests/integration/bun-multi-field.test.ts`.
+
 Import the shim once before decorated classes load on runtimes without native `Symbol.metadata`:
 
 ```typescript
