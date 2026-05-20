@@ -40,9 +40,6 @@ function wrapUserValidate<TMeta>(fn: ValidatorFn<TMeta>, label: string, key: Met
 		try {
 			fn(meta, context);
 		} catch (error) {
-			if (error instanceof Error) {
-				throw error;
-			}
 			throw new ValidationError({
 				label,
 				target: context.target,

@@ -8,11 +8,14 @@ import { createScopedReflector } from "../../src/reflector/scoped-reflector";
 import type {
 	AccessorAnnotation,
 	Cardinality as AnnotateCardinality,
+	DecoratedClass,
 	DecoratedClassList,
 	DecoratedClassUnique,
 	DecoratedItem,
+	DecoratedMethod,
 	DecoratedMethodList,
 	DecoratedMethodUnique,
+	DecoratedProperty,
 	DecoratedPropertyList,
 	DecoratedPropertyUnique,
 	FieldAnnotation,
@@ -259,6 +262,9 @@ void _uniqueAsListKey;
 const uniqueMethods: DecoratedMethodUnique<string>[] = reflect(Fixture).methods(UniqueMethodKey);
 void uniqueMethods;
 
+const unionMethods: DecoratedMethod<string>[] = reflect(Fixture).methods(UniqueMethodKey);
+void unionMethods;
+
 const listMethods: DecoratedMethodList<string>[] = reflect(Fixture).methods(ListMethodKey);
 void listMethods;
 
@@ -273,6 +279,9 @@ void _listAsUniqueMethods;
 const uniqueProps: DecoratedPropertyUnique<string>[] = reflect(Fixture).properties(UniquePropertyKey);
 void uniqueProps;
 
+const unionProps: DecoratedProperty<string>[] = reflect(Fixture).properties(UniquePropertyKey);
+void unionProps;
+
 const listProps: DecoratedPropertyList<string>[] = reflect(Fixture).properties(ListPropertyKey);
 void listProps;
 
@@ -286,6 +295,9 @@ void _listAsUniqueProps;
 
 const uniqueClass: DecoratedClassUnique<string> | undefined = reflect(Fixture).class(UniqueClassKey);
 void uniqueClass;
+
+const unionClass: DecoratedClass<string> | undefined = reflect(Fixture).class(UniqueClassKey);
+void unionClass;
 
 const listClass: DecoratedClassList<string> | undefined = reflect(Fixture).class(ListClassKey);
 void listClass;

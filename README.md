@@ -8,14 +8,14 @@ Typed Stage-3 decorators with scoped metadata reads. Zero dependencies, no `refl
 bun add @zendrex/annotate
 ```
 
-Works with npm, pnpm, and yarn. Any runtime with Stage-3 decorator support can use it, including Node 22.3+, Bun, and modern browsers. Ships ESM, CJS, and TypeScript declarations.
+Works with npm, pnpm, and yarn. Any toolchain that emits Stage-3 decorators can use it on Node, Bun, and modern browsers. Ships ESM, CJS, and TypeScript declarations.
 
 ## Prerequisites
 
 | Approach | Typical use | Requirements |
 | --- | --- | --- |
-| **Native `Symbol.metadata`** | Node 22.3+, current Bun, modern browsers | TypeScript 5.2+, `experimentalDecorators: false`, Stage-3 decorator transform |
-| **Shim** | Older Node, embedded runtimes | Import `@zendrex/annotate/shim` once before decorated classes load |
+| **Runtime `Symbol.metadata`** | Engines that already expose `Symbol.metadata` | TypeScript 5.2+, `experimentalDecorators: false`, Stage-3 decorator transform |
+| **Shim** | Node, Bun, older browsers, embedded runtimes, or any engine without `Symbol.metadata` | Import `@zendrex/annotate/shim` once before decorated classes load |
 
 TypeScript must use Stage-3 decorators (`experimentalDecorators: false`). Legacy TypeScript decorators and parameter decorators are not supported.
 
@@ -25,7 +25,7 @@ Annotate does not patch the engine. It stores metadata in annotate-owned structu
 
 | Issue | Typical runtimes | What Annotate does |
 | --- | --- | --- |
-| **`Symbol.metadata` missing** | Node before 22.3, older browsers, some embedded engines | Import [`@zendrex/annotate/shim`](#prerequisites) once so the transformer and runtime agree on `Symbol.for("Symbol.metadata")`. Native `Symbol.metadata` is left untouched when already present. |
+| **`Symbol.metadata` missing** | Node, Bun, older browsers, some embedded engines | Import [`@zendrex/annotate/shim`](#prerequisites) once so the transformer and runtime agree on `Symbol.for("Symbol.metadata")`. Native `Symbol.metadata` is left untouched when already present. |
 | **Instance members register only after an instance exists** | All Stage-3 engines | Instance-member decorations are queued and flushed on first `prepare(ctor)`, first instance creation (via `addInitializer`), or first read that materializes the class. Call `prepare(Users)` to eager-flush without constructing. |
 | **Shared instance `addInitializer` callbacks** | Bun 1.3.13 (and similar) | Bun can reuse one initializer across classes so only the last registration runs. Annotate’s initializer only calls `prepare(this.constructor)`, so whichever callback runs drains the correct class’s pending metadata. |
 | **Skipped field value-replacement initializers** | Bun 1.3 (`var _init` transformer bug) | When several fields in one class use `Annotate.intercept.field`, Bun may skip per-field initializer closures. Field interceptors keep a per-class index and can re-apply every field hook from the instance in one pass so each field still gets its own metadata. |

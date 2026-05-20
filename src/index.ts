@@ -37,12 +37,15 @@ export type {
 export type { ListMetadataKey, MetadataKey, UniqueMetadataKey } from "./metadata/types";
 export type { IReflector } from "./reflector/reflector";
 export type {
+	DecoratedClass,
 	DecoratedClassList,
 	DecoratedClassUnique,
 	DecoratedItem,
 	DecoratedKind,
+	DecoratedMethod,
 	DecoratedMethodList,
 	DecoratedMethodUnique,
+	DecoratedProperty,
 	DecoratedPropertyList,
 	DecoratedPropertyUnique,
 	IScopedReflector,

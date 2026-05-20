@@ -14,8 +14,9 @@ continue to work.
 - Drop `reflect-metadata` peer dependency. Metadata payloads live in
   annotate-owned `WeakMap`s keyed by class constructor;
   `class[Symbol.metadata]` is read only as an identity-only correlation
-  channel. Runtime floor: Node ≥ 20.4 for native `Symbol.metadata`, or a
-  transpiler/`@zendrex/annotate/shim` shim. TypeScript ≥ 5.2.
+  channel. TypeScript ≥ 5.2 must emit Stage-3 decorators. Import
+  `@zendrex/annotate/shim` once before decorated classes load on runtimes
+  that do not expose native `Symbol.metadata`.
 - Instance-member metadata registers lazily on first instantiation unless
   the class has a class decorator, a static decorated member,
   `prepare(ctor)` is called explicitly, or the reflector auto-prepares.
@@ -42,8 +43,9 @@ continue to work.
 - `mintUniqueKey<T>(description?)` and `mintListKey<T>(description?)`
   replace the old `generateKey`. `MetadataKey<TValue, TCard>` is generic
   and branded; aliases `UniqueMetadataKey<T>` and `ListMetadataKey<T>`.
-- Free `reflect(target)`, `Reflector`, `ScopedReflector`, and `prepare(ctor)`
-  remain available for low-level tooling that deliberately manages keys.
+- Free `reflect(target)`, `createScopedReflector(ctor, key)`, and
+  `prepare(ctor)` remain available for low-level tooling that deliberately
+  manages keys.
 - `DecoratedMethod<T>` / `DecoratedProperty<T>` / `DecoratedClass<T>` split
   into `*Unique<T>` / `*List<T>`; the unparameterized aliases are unions.
   Reflector overloads narrow on key brand.

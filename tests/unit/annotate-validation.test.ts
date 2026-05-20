@@ -108,6 +108,29 @@ describe("Annotate validation", () => {
 		expect((caught as ValidationError).code).toBe(AnnotateErrorCode.VALIDATION);
 	});
 
+	test("Error validation throws are wrapped and preserve cause", () => {
+		const cause = new Error("nope");
+		const Tag = Annotate.class<string>({
+			label: "Tag",
+			validate: () => {
+				throw cause;
+			},
+		});
+
+		let caught: unknown;
+		try {
+			@Tag("x")
+			class Subject {}
+			void Subject;
+		} catch (error) {
+			caught = error;
+		}
+
+		expect(caught).toBeInstanceOf(ValidationError);
+		expect((caught as ValidationError).cause).toBe(cause);
+		expect((caught as ValidationError).message).toContain("nope");
+	});
+
 	test("requires accepts valid subclasses and rejects invalid instance members on materialization", () => {
 		const Route = Annotate.method<string>({ label: "Route", requires: Base });
 
