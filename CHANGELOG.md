@@ -1,5 +1,13 @@
 # @zendrex/annotate
 
+## 1.0.1
+
+### Patch Changes
+
+- [`46e3d62`](https://github.com/Zendrex/annotate/commit/46e3d62bed5a1f21c2eb58356b43157213b2c0f1) Thanks [@Zendrex](https://github.com/Zendrex)! - Move the README Prerequisites section below Overview so the intro leads with what the library does before setup requirements.
+
+- [`d4cbce4`](https://github.com/Zendrex/annotate/commit/d4cbce4f14445f6600b88baf07ab1664441aab45) Thanks [@Zendrex](https://github.com/Zendrex)! - Move the README "Runtime issues addressed" section near the end so the intro flows from prerequisites through usage before runtime compatibility details.
+
 ## 1.0.0
 
 ### Major Changes
