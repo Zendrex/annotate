@@ -10,15 +10,6 @@ bun add @zendrex/annotate
 
 Works with npm, pnpm, and yarn. Any toolchain that emits Stage-3 decorators can use it on Node, Bun, and modern browsers. Ships ESM, CJS, and TypeScript declarations.
 
-## Prerequisites
-
-| Approach | Typical use | Requirements |
-| --- | --- | --- |
-| **Runtime `Symbol.metadata`** | Engines that already expose `Symbol.metadata` | TypeScript 5.2+, `experimentalDecorators: false`, Stage-3 decorator transform |
-| **Shim** | Node, Bun, older browsers, embedded runtimes, or any engine without `Symbol.metadata` | Import `@zendrex/annotate/shim` once before decorated classes load |
-
-TypeScript must use Stage-3 decorators (`experimentalDecorators: false`). Legacy TypeScript decorators and parameter decorators are not supported.
-
 ## Overview
 
 - `Annotate.class` / `method` / `field` / `accessor`: typed decorators with built-in readers
@@ -27,6 +18,15 @@ TypeScript must use Stage-3 decorators (`experimentalDecorators: false`). Legacy
 - `cardinality: "one"` (default) or `"many"` for repeatable decorators
 - `Annotate.intercept.*`: method, accessor, and field interceptors with `ctx.get(instance)`
 - Low-level `reflect`, `prepare`, `mintUniqueKey`, `mintListKey` for tooling that owns keys
+
+## Prerequisites
+
+| Approach | Typical use | Requirements |
+| --- | --- | --- |
+| **Runtime `Symbol.metadata`** | Engines that already expose `Symbol.metadata` | TypeScript 5.2+, `experimentalDecorators: false`, Stage-3 decorator transform |
+| **Shim** | Node, Bun, older browsers, embedded runtimes, or any engine without `Symbol.metadata` | Import `@zendrex/annotate/shim` once before decorated classes load |
+
+TypeScript must use Stage-3 decorators (`experimentalDecorators: false`). Legacy TypeScript decorators and parameter decorators are not supported.
 
 ## Quick start
 
