@@ -1,61 +1,55 @@
-import { ReflectorImpl } from "./reflector";
-import type { MetadataKey } from "../metadata/types";
-import type { Reflector } from "./reflector";
+import { Reflector } from "./reflector";
+import type { Cardinality, MetadataKey, UniqueMetadataKey } from "../metadata/types";
+import type { IReflector } from "./reflector";
 import type {
 	AnyConstructor,
-	DecoratedClass,
+	DecoratedClassFor,
 	DecoratedItem,
-	DecoratedMethod,
-	DecoratedMethodSingle,
-	DecoratedParameter,
-	DecoratedProperty,
-	DecoratedPropertySingle,
-	ScopedReflector,
+	DecoratedMethodFor,
+	DecoratedPropertyFor,
+	IScopedReflector,
 } from "./types";
 
-/** @internal */
-export function createScopedReflector<TMeta>(ctor: AnyConstructor, key: MetadataKey): ScopedReflector<TMeta> {
-	return new ScopedReflectorImpl<TMeta>(ctor, key);
+/**
+ * Returns a reflector bound to one `(ctor, key)` pair, shaping results to the
+ * key's runtime cardinality. Equivalent to `reflect(ctor)` queries with the
+ * key elided.
+ */
+export function createScopedReflector<TMeta, TCard extends Cardinality>(
+	ctor: AnyConstructor,
+	key: MetadataKey<TMeta, TCard>
+): IScopedReflector<TMeta, TCard> {
+	return new ScopedReflector<TMeta, TCard>(ctor, key);
 }
 
-class ScopedReflectorImpl<TMeta> implements ScopedReflector<TMeta> {
-	private readonly reflector: Reflector;
-	private readonly key: MetadataKey;
+class ScopedReflector<TMeta, TCard extends Cardinality = Cardinality> implements IScopedReflector<TMeta, TCard> {
+	private readonly reflector: IReflector;
+	private readonly key: MetadataKey<TMeta, TCard>;
 
-	constructor(ctor: AnyConstructor, key: MetadataKey) {
-		this.reflector = new ReflectorImpl(ctor);
+	constructor(ctor: AnyConstructor, key: MetadataKey<TMeta, TCard>) {
+		this.reflector = new Reflector(ctor);
 		this.key = key;
 	}
 
-	all(): DecoratedItem<TMeta>[] {
-		return this.reflector.all<TMeta>(this.key);
+	all(): DecoratedItem<TMeta, TCard>[] {
+		return this.reflector.all<TMeta>(this.uniqueKey) as DecoratedItem<TMeta, TCard>[];
 	}
 
-	class(): DecoratedClass<TMeta> | undefined {
-		return this.reflector.class<TMeta>(this.key);
+	class(): DecoratedClassFor<TMeta, TCard> | undefined {
+		return this.reflector.class<TMeta>(this.uniqueKey) as DecoratedClassFor<TMeta, TCard> | undefined;
 	}
 
-	methods(): DecoratedMethod<TMeta>[] {
-		return this.reflector.methods<TMeta>(this.key);
+	methods(): DecoratedMethodFor<TMeta, TCard>[] {
+		return this.reflector.methods<TMeta>(this.uniqueKey) as DecoratedMethodFor<TMeta, TCard>[];
 	}
 
-	methodsSingular(): DecoratedMethodSingle<TMeta>[] {
-		return this.reflector
-			.methods<TMeta>(this.key)
-			.map((entry) => ({ ...entry, metadata: entry.metadata[0] as TMeta }));
+	properties(): DecoratedPropertyFor<TMeta, TCard>[] {
+		return this.reflector.properties<TMeta>(this.uniqueKey) as DecoratedPropertyFor<TMeta, TCard>[];
 	}
 
-	properties(): DecoratedProperty<TMeta>[] {
-		return this.reflector.properties<TMeta>(this.key);
-	}
-
-	propertiesSingular(): DecoratedPropertySingle<TMeta>[] {
-		return this.reflector
-			.properties<TMeta>(this.key)
-			.map((entry) => ({ ...entry, metadata: entry.metadata[0] as TMeta }));
-	}
-
-	parameters(): DecoratedParameter<TMeta>[] {
-		return this.reflector.parameters<TMeta>(this.key);
+	// Reflector resolves cardinality from the registry at runtime; the static
+	// overload picked here is arbitrary and re-narrowed via `DecoratedXFor` at returns.
+	private get uniqueKey(): UniqueMetadataKey<TMeta> {
+		return this.key as UniqueMetadataKey<TMeta>;
 	}
 }

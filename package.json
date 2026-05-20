@@ -18,8 +18,22 @@
 				"types": "./dist/index.d.cts",
 				"default": "./dist/index.cjs"
 			}
+		},
+		"./shim": {
+			"import": {
+				"types": "./dist/shim.d.mts",
+				"default": "./dist/shim.mjs"
+			},
+			"require": {
+				"types": "./dist/shim.d.cts",
+				"default": "./dist/shim.cjs"
+			}
 		}
 	},
+	"sideEffects": [
+		"./dist/shim.mjs",
+		"./dist/shim.cjs"
+	],
 	"files": [
 		"dist",
 		"README.md",
@@ -34,6 +48,7 @@
 		"test:integration": "bun test tests/integration",
 		"build": "tsdown",
 		"check": "bunx ultracite check",
+		"check:dist-helpers": "bun scripts/check-helper-imports.ts",
 		"fix": "bunx ultracite fix",
 		"check-types": "tsc -b",
 		"changeset": "changeset",
@@ -52,9 +67,6 @@
 		"tsdown": "^0.21.10",
 		"typescript": "^6.0.3",
 		"ultracite": "^7.6.1"
-	},
-	"peerDependencies": {
-		"reflect-metadata": "^0.2.2"
 	},
 	"repository": {
 		"type": "git",

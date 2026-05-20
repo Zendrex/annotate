@@ -1,232 +1,308 @@
 # @zendrex/annotate
 
-A modern decorator and metadata system for TypeScript. Create typed decorators with built-in reflection.
+Typed Stage-3 decorators with scoped metadata reads. Zero dependencies, no `reflect-metadata`.
 
-## Installation
+`Annotate` gives decorator authors one handle that creates the decorator and reads metadata back with the right type.
 
 ```bash
-# Bun
-bun add @zendrex/annotate reflect-metadata
-
-# npm
-npm install @zendrex/annotate reflect-metadata
-
-# Yarn
-yarn add @zendrex/annotate reflect-metadata
-
-# pnpm
-pnpm add @zendrex/annotate reflect-metadata
+bun add @zendrex/annotate
 ```
 
-Requires TypeScript 5.0+ with `experimentalDecorators` and `emitDecoratorMetadata` enabled.
+Works with npm, pnpm, and yarn. Any toolchain that emits Stage-3 decorators can use it on Node, Bun, and modern browsers. Ships ESM, CJS, and TypeScript declarations.
 
-```jsonc
-{
-  "compilerOptions": {
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
-    // ...other options as needed
-  }
-}
-```
+## Prerequisites
 
-## Quick Start
+| Approach | Typical use | Requirements |
+| --- | --- | --- |
+| **Runtime `Symbol.metadata`** | Engines that already expose `Symbol.metadata` | TypeScript 5.2+, `experimentalDecorators: false`, Stage-3 decorator transform |
+| **Shim** | Node, Bun, older browsers, embedded runtimes, or any engine without `Symbol.metadata` | Import `@zendrex/annotate/shim` once before decorated classes load |
+
+TypeScript must use Stage-3 decorators (`experimentalDecorators: false`). Legacy TypeScript decorators and parameter decorators are not supported.
+
+## Runtime issues addressed
+
+Annotate does not patch the engine. It stores metadata in annotate-owned structures and controls when decorations are flushed so reads stay correct on imperfect Stage-3 implementations.
+
+| Issue | Typical runtimes | What Annotate does |
+| --- | --- | --- |
+| **`Symbol.metadata` missing** | Node, Bun, older browsers, some embedded engines | Import [`@zendrex/annotate/shim`](#prerequisites) once so the transformer and runtime agree on `Symbol.for("Symbol.metadata")`. Native `Symbol.metadata` is left untouched when already present. |
+| **Instance members register only after an instance exists** | All Stage-3 engines | Instance-member decorations are queued and flushed on first `prepare(ctor)`, first instance creation (via `addInitializer`), or first read that materializes the class. Call `prepare(Users)` to eager-flush without constructing. |
+| **Shared instance `addInitializer` callbacks** | Bun 1.3.13 (and similar) | Bun can reuse one initializer across classes so only the last registration runs. Annotate’s initializer only calls `prepare(this.constructor)`, so whichever callback runs drains the correct class’s pending metadata. |
+| **Skipped field value-replacement initializers** | Bun 1.3 (`var _init` transformer bug) | When several fields in one class use `Annotate.intercept.field`, Bun may skip per-field initializer closures. Field interceptors keep a per-class index and can re-apply every field hook from the instance in one pass so each field still gets its own metadata. |
+
+Regression tests for the Bun cases live under `tests/integration/cross-class-isolation.test.ts` and `tests/integration/bun-multi-field.test.ts`.
+
+Import the shim once before decorated classes load on runtimes without native `Symbol.metadata`:
 
 ```typescript
-import { createClassDecorator, createMethodDecorator } from "@zendrex/annotate";
+import "@zendrex/annotate/shim";
+```
 
-// Create typed decorators
-const Controller = createClassDecorator<string>();
-const Route = createMethodDecorator<{ path: string; method: string }>();
+## Overview
 
-// Apply them
-@Controller("users")
-class UserController {
-  @Route({ path: "/", method: "GET" })
+- `Annotate.class` / `method` / `field` / `accessor`: typed decorators with built-in readers
+- Collision-proof symbol keys per handle; optional `label` for diagnostics only
+- Typed selectors: `read(Class).get((instance) => instance.member)` instead of string names
+- `cardinality: "one"` (default) or `"many"` for repeatable decorators
+- `Annotate.intercept.*`: method, accessor, and field interceptors with `ctx.get(instance)`
+- Low-level `reflect`, `prepare`, `mintUniqueKey`, `mintListKey` for tooling that owns keys
+
+## Quick start
+
+```typescript
+import { Annotate } from "@zendrex/annotate";
+
+const Route = Annotate.method((method: "GET" | "POST", path: string) => ({ method, path }));
+
+class Users {
+  @Route("GET", "/")
   list() {}
-
-  @Route({ path: "/:id", method: "GET" })
-  get() {}
 }
 
-// Reflect on the metadata
-const routes = Route.reflect(UserController).methods();
+Route.read(Users).get((users) => users.list);
+// { method: "GET", path: "/" }
 
-for (const route of routes) {
-  console.log(route.name, route.metadata);
-}
-// list [{ path: "/", method: "GET" }]
-// get [{ path: "/:id", method: "GET" }]
+Route.read(Users).methods();
+// [{ kind: "method", name: "list", static: false, metadata: { method: "GET", path: "/" } }]
 ```
 
-## Core Concepts
+## Examples
 
-### Decorator Factories
+### Builders
 
-Each factory creates a typed decorator with built-in reflection. Options use a
-single `DecoratorOptions` shape: optional `compose`, `name` (for error
-prefixes), and `unique` (class / method / property / interceptors; not on
-parameters).
+Direct metadata:
 
 ```typescript
-import {
-  createClassDecorator,
-  createMethodDecorator,
-  createPropertyDecorator,
-  createParameterDecorator,
-} from "@zendrex/annotate";
-
-const Tag = createClassDecorator<string>();
-const Route = createMethodDecorator<string>();
-const Column = createPropertyDecorator<string>();
-const Param = createParameterDecorator<string>();
+const Controller = Annotate.class<string>();
+const Column = Annotate.field<{ type: "text" | "int" }>();
 ```
 
-### Compose
-
-Pass `compose` to transform multiple decorator arguments into metadata:
+Argument mapper:
 
 ```typescript
-const Route = createMethodDecorator({
-  compose: (path: string, method: "GET" | "POST") => ({ path, method }),
+const Route = Annotate.method((method: "GET" | "POST", path: string) => ({ method, path }));
+```
+
+Options (label, validation, host restriction):
+
+```typescript
+class ControllerBase {}
+
+const Route = Annotate.method({
+  label: "Route",
+  args: (method: "GET" | "POST", path: string) => ({ method, path }),
+  validate: (route) => {
+    if (!route.path.startsWith("/")) {
+      throw new Error("path must start with /");
+    }
+  },
+  requires: ControllerBase,
 });
+```
+
+Available builders:
+
+```typescript
+Annotate.class(...)
+Annotate.method(...)
+Annotate.field(...)
+Annotate.accessor(...)
+```
+
+### Reading
+
+Class annotations — no selector:
+
+```typescript
+const Controller = Annotate.class<string>();
+
+@Controller("users")
+class Users {}
+
+Controller.read(Users).get(); // string | undefined
+```
+
+Member annotations — typed selectors:
+
+```typescript
+Route.read(Users).get((users) => users.list);
+Route.read(Users).static.get((ctor) => ctor.health);
+```
+
+Selectors must synchronously read exactly one public member. Calling a method, reading none, or reading multiple members throws `InvalidSelectorError`.
+
+Collection helpers return inherited metadata most-derived-first:
+
+```typescript
+Route.read(Users).entries();
+Route.read(Users).methods();
+Column.read(Users).fields();
+Watched.read(Users).accessors();
+```
+
+Entries include `kind`, `name`, `static`, and `metadata`:
+
+```typescript
+const staticRoutes = Route.read(Users)
+  .methods()
+  .filter((route) => route.static);
+```
+
+### Cardinality
+
+Default is one value per decoration site:
+
+```typescript
+const Role = Annotate.method<string>();
+Role.read(Users).get((users) => users.list); // string | undefined
+```
+
+Repeatable decorators:
+
+```typescript
+const Tag = Annotate.method<string>({ cardinality: "many" });
 
 class Api {
-  @Route("/users", "GET")
-  getUsers() {}
+  @Tag("public")
+  @Tag("internal")
+  list() {}
 }
+
+Tag.read(Api).get((api) => api.list); // readonly string[]
 ```
 
-### Reflection
+Stage-3 decorators apply inner-first, so the example above reads `["internal", "public"]`.
 
-Factories expose `key`, `reflect(target)` (class constructor or instance),
-scalar lookups, and `applied` / `appliedOwn` where applicable. Use
-`Factory.reflect(ctorOrInstance).methods()` (and the same for `properties()`,
-`parameters()`) for collections; `methodsSingular` / `propertiesSingular` live
-on `ScopedReflector` only.
+### Interceptors
+
+Under `Annotate.intercept`:
 
 ```typescript
-const Column = createPropertyDecorator<{ type: string; nullable?: boolean }>();
-
-class User {
-  @Column({ type: "varchar" })
-  name!: string;
-
-  @Column({ type: "int", nullable: true })
-  age!: number;
-}
-
-const columns = Column.reflect(User).properties();
-
-for (const col of columns) {
-  console.log(col.name, col.metadata);
-}
-```
-
-### Property injection
-
-```typescript
-import { createPropertyDecorator } from "@zendrex/annotate";
-
-const Inject = createPropertyDecorator<string>();
-
-class UserService {
-  @Inject("database")
-  db!: Database;
-
-  @Inject("logger")
-  logger!: Logger;
-}
-
-const deps = Inject.reflect(UserService).properties();
-const instance = new UserService();
-for (const dep of deps) {
-  (instance as any)[dep.name] = container.get(dep.metadata[0]);
-}
-```
-
-### Class metadata scalars
-
-Use `metadata(target)` (or `requireMetadata(target)`) for the first value, with
-inheritance along the class constructor chain. `applied` / `appliedOwn` report
-array presence; use `appliedOwn` to ignore inherited class metadata on
-subclasses.
-
-```typescript
-const Controller = createClassDecorator<string>();
-
-@Controller("users")
-class UserController {}
-
-class AdminController extends UserController {}
-
-Controller.metadata(AdminController);  // => "users" (inherited)
-Controller.applied(AdminController);   // => true
-Controller.appliedOwn(AdminController); // => false when only the parent is decorated
-```
-
-### Singular method and property lists
-
-```typescript
-const EventHandler = createMethodDecorator<EventHandlerMeta>();
-
-class Component {
-  @EventHandler({ event: "click" })
-  onClick() {}
-}
-
-for (const { name, metadata } of EventHandler.reflect(Component).methodsSingular()) {
-  bind(name, metadata);
-}
-
-EventHandler.metadata(Component, "onClick");
-EventHandler.requireMetadata(Component, "onClick");
-```
-
-### `reflect()`
-
-`reflect(ctorOrInstance)` returns an unscoped `Reflector` (pass a
-`MetadataKey` into each call). The same constructor resolution applies as for
-`factory.reflect`: you may pass a class, or an object whose
-`object.constructor` is a valid class constructor. Plain `{}`, `Object`, arrow
-functions, and other invalid targets throw `TypeError` with stable message
-prefixes (see source tests for patterns).
-
-## Interceptors
-
-```typescript
-import { createMethodInterceptor } from "@zendrex/annotate";
-
-const Timed = createMethodInterceptor<string>({
-  intercept: (original, metadata, ctx) =>
-    function (...args) {
-      const start = performance.now();
-      const result = original.apply(this, args);
-      console.log(`${String(ctx.name)} took ${performance.now() - start}ms`);
-      return result;
+const Log = Annotate.intercept.method<string>({
+  label: "Log",
+  wrap: (original, ctx) =>
+    function (this: object, ...args: unknown[]) {
+      console.log(ctx.name, ctx.get(this));
+      return original.apply(this, args as never);
     },
 });
 ```
 
-`InterceptorContext` uses `owner` (declaration object: prototype or
-constructor) and `name` (member key), plus `descriptor`.
+Hooks:
 
-Property interceptors require at least one of `onGet` / `onSet`. Calling
-`createPropertyInterceptor({})` throws `TypeError`.
+```typescript
+Annotate.intercept.method({ wrap: (original, ctx) => original });
+Annotate.intercept.accessor({ get: (original, ctx) => original, set: (original, ctx) => original });
+Annotate.intercept.field({ init: (initial, ctx) => initial });
+```
 
-## `AnnotateError`
+`ctx.get(instance)` reads this interceptor's metadata on the current member. Return type follows cardinality: `T | undefined` for `"one"`, `readonly T[]` for `"many"`.
 
-Thrown for missing or duplicate (when `unique: true`) metadata. Public fields
-include `key`, `kind` (`DecoratedKind`), `code` (`"missing"` | `"duplicate"`),
-`target` (always a constructor), and optional `memberName` and `parameterIndex`
-for `MISSING` on members or parameters. Invalid factory options (for example
-empty property interceptors) use `TypeError`, not `AnnotateError`.
+### Low-level reflection
 
-## API summary
+The high-level API does not expose metadata keys. For tooling that deliberately manages keys:
 
-- **Class factory:** `key`, `reflect`, `metadata`, `requireMetadata`, `applied`, `appliedOwn`
-- **Method / property (and interceptors):** `key`, `reflect`, `metadata(target, name)`, `requireMetadata`, `applied`, `appliedOwn`
-- **Parameter factory:** `key`, `reflect`, `metadata(target, index, methodName?)`, `requireMetadata`, `applied`, `appliedOwn` — omit `methodName` for constructor parameters
+```typescript
+import { mintListKey, reflect } from "@zendrex/annotate";
+
+const Tags = mintListKey<string>("tags");
+reflect(Users).methods(Tags);
+```
+
+Also exported: `prepare`, `createScopedReflector`, and `mintUniqueKey`. Most applications should prefer `Annotate.*.read(...)`.
+
+## Design notes
+
+**Keys.** Each `Annotate.*` handle mints an internal symbol key. String `label` values are diagnostics only, not identity.
+
+**Storage.** Metadata uses TC39 `Symbol.metadata` (Stage-3). The shim aligns `Symbol.for("Symbol.metadata")` with the transformer on engines without native support.
+
+**Readers.** `read(target)` prepares the class, walks the prototype chain, and returns scoped readers. Member reads use proxy selectors so names stay type-checked.
+
+**Cardinality.** `"one"` maps to a unique key; `"many"` maps to a list key. Duplicate one-cardinality decoration on the same site throws `DuplicateMetadataError`.
+
+**Validation.** Optional `validate` hooks receive mapped metadata and a `ValidateContext`. Class and static-member checks run during decoration initialization; instance-member checks run when metadata is prepared, usually on first read or first instance creation. Failures become `ValidationError`. `requires` rejects hosts that do not extend the given base class.
+
+## Package exports
+
+| Import | Provides |
+| --- | --- |
+| `@zendrex/annotate` | `Annotate`, errors, `reflect`, `prepare`, `createScopedReflector`, key minting, public types |
+| `@zendrex/annotate/shim` | Side-effect install of `Symbol.metadata` on older runtimes |
+
+## API reference
+
+### Builders
+
+```typescript
+Annotate.class<TMeta>();
+Annotate.class<TMeta>({ cardinality: "many" });
+Annotate.class((...args) => meta);
+Annotate.class({ label, args, validate, requires, cardinality });
+
+Annotate.method / Annotate.field / Annotate.accessor — same shapes
+```
+
+Each builder returns a decorator function with `.read(target)`.
+
+### Readers
+
+**Class:**
+
+```typescript
+Controller.read(Users).get();      // TMeta | undefined (or readonly TMeta[] if many)
+Controller.read(Users).entries();    // ClassAnnotationEntry[]
+```
+
+**Member:**
+
+```typescript
+Route.read(Users).get((users) => users.list);
+Route.read(Users).static.get((ctor) => ctor.health);
+
+Route.read(Users).entries();
+Route.read(Users).methods();   // kind === "method"
+Column.read(Users).fields();   // kind === "field"
+Watched.read(Users).accessors(); // kind === "accessor"
+```
+
+### Interceptors
+
+```typescript
+Annotate.intercept.method({ label, wrap, validate, requires, cardinality });
+Annotate.intercept.accessor({ label, get, set, validate, requires, cardinality });
+Annotate.intercept.field({ label, init, validate, requires, cardinality });
+```
+
+`PublicInterceptorContext`: `kind`, `name`, `static`, `get(instance)`.
+
+### Low-level
+
+```typescript
+prepare(ctor);
+reflect(target).class(key);
+reflect(target).methods(key);
+reflect(target).properties(key);
+reflect(target).all(key);
+
+createScopedReflector(ctor, key);
+mintUniqueKey<T>(label?);
+mintListKey<T>(label?);
+```
+
+### Errors
+
+All extend `AnnotateError` with a stable `code`:
+
+| Class | Code | When |
+| --- | --- | --- |
+| `DuplicateMetadataError` | `"duplicate"` | one-cardinality annotation applied twice to the same site |
+| `InvalidDecorationTargetError` | `"invalidTarget"` | `requires` rejects the host class |
+| `InvalidSelectorError` | `"invalidSelector"` | selector does not read exactly one public member |
+| `MissingMetadataError` | `"missing"` | low-level throw-on-missing read found nothing |
+| `UnregisteredClassError` | `"unregistered"` | low-level `reflect()` query sees no registered metadata |
+| `UnregisteredMetadataKeyError` | `"unregisteredKey"` | low-level store receives an unregistered symbol key |
+| `ValidationError` | `"validation"` | a `validate` hook threw |
 
 ## License
 

@@ -1,17 +1,49 @@
-/** Unique symbol key used to identify and store decorator metadata. */
-export type MetadataKey = symbol;
+// biome-ignore lint/complexity/noBannedTypes: WeakMap key parity requires bare Function across the store and related modules.
+export type Ctor = Function;
+
+export type Cardinality = "unique" | "list";
 
 /**
- * Array preserving decorator application order when multiple decorators of same type
- * are applied to a target.
- *
- * @typeParam T - Metadata type stored by decorator
+ * Branded `symbol` carrying value type and cardinality. Mint via
+ * `mintUniqueKey` / `mintListKey` so the cardinality registry stays in sync;
+ * casting a bare symbol to `MetadataKey<T>` throws `UnregisteredMetadataKeyError`
+ * the first time the store sees it.
  */
-export type MetadataArray<T> = T[];
+export type MetadataKey<TValue = unknown, TCard extends Cardinality = Cardinality> = symbol & {
+	readonly __metadataKey: { value: TValue; cardinality: TCard };
+};
 
-/**
- * Maps zero-based parameter indexes to metadata arrays.
- *
- * @typeParam T - Metadata type stored per parameter
- */
-export type ParameterMetadataMap<T> = Map<number, MetadataArray<T>>;
+export type UniqueMetadataKey<T> = MetadataKey<T, "unique">;
+
+export type ListMetadataKey<T> = MetadataKey<T, "list">;
+
+export type ClassBucket = Map<symbol, unknown[]>;
+
+export interface MemberEntry {
+	readonly kind: MemberKind;
+	readonly static: boolean;
+	values: unknown[];
+}
+
+export type MemberBucket = Map<symbol, Map<string | symbol, MemberEntry>>;
+
+export type MemberKind = "method" | "property" | "field" | "accessor";
+
+export interface Deferred {
+	key: MetadataKey;
+	kind: MemberKind;
+	meta: unknown;
+	name: string | symbol;
+	static: boolean;
+	token: symbol;
+	validators?: readonly DeferredValidatorFn[];
+}
+
+export type DeferredValidatorFn = (meta: unknown, context: DeferredValidateContext) => void;
+
+export interface DeferredValidateContext {
+	kind: MemberKind;
+	memberName?: string | symbol;
+	static: boolean;
+	target: Ctor;
+}

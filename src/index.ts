@@ -1,53 +1,52 @@
-/**
- * @packageDocumentation
- *
- * A TypeScript decorator factory library with metadata storage and reflection capabilities.
- */
 /** biome-ignore-all lint/performance/noBarrelFile: main index file */
-import "reflect-metadata";
 
-export { AnnotateError, AnnotateErrorCode } from "./errors";
-export { createClassDecorator } from "./factories/class-decorator";
-export { createMethodDecorator } from "./factories/method-decorator";
-export { createMethodInterceptor } from "./factories/method-interceptor";
-export { createParameterDecorator } from "./factories/parameter-decorator";
-export { createPropertyDecorator } from "./factories/property-decorator";
-export { createPropertyInterceptor } from "./factories/property-interceptor";
+export { Annotate } from "./annotate";
 export {
-	appendMetadata,
-	defineMetadata,
-	getMetadata,
-	getMetadataArray,
-	getOwnMetadata,
-	getParameterMap,
-	setParameterMap,
-} from "./metadata/store";
+	AnnotateError,
+	AnnotateErrorCode,
+	DuplicateMetadataError,
+	InvalidDecorationTargetError,
+	InvalidSelectorError,
+	MissingMetadataError,
+	UnregisteredClassError,
+	UnregisteredMetadataKeyError,
+	ValidationError,
+} from "./errors";
+export { mintListKey, mintUniqueKey } from "./metadata/cardinality";
+export { prepare } from "./metadata/pipeline";
 export { reflect } from "./reflector/reflector";
+export { createScopedReflector } from "./reflector/scoped-reflector";
 export type {
-	DecoratedClassFactory,
-	DecoratedMethodFactory,
-	DecoratedParameterFactory,
-	DecoratedPropertyFactory,
-	DecoratorOptions,
-	InterceptorContext,
-	MethodInterceptorOptions,
-	ParameterDecoratorOptions,
-	PropertyGetter,
-	PropertyInterceptorOptions,
-	PropertySetter,
-} from "./factories/types";
-export type { MetadataArray, MetadataKey, ParameterMetadataMap } from "./metadata/types";
-export type { Reflector } from "./reflector/reflector";
+	AccessorAnnotation,
+	AccessorInterceptorOptions as AnnotateAccessorInterceptorOptions,
+	AnnotationArgsOptions,
+	AnnotationOptions,
+	Cardinality,
+	ClassAnnotation,
+	ClassAnnotationEntry,
+	ClassAnnotationReader,
+	FieldAnnotation,
+	FieldInterceptorOptions as AnnotateFieldInterceptorOptions,
+	MemberAnnotationEntry,
+	MemberAnnotationReader,
+	MethodAnnotation,
+	MethodInterceptorOptions as AnnotateMethodInterceptorOptions,
+	PublicInterceptorContext,
+	ValidateContext,
+} from "./annotate";
+export type { ListMetadataKey, MetadataKey, UniqueMetadataKey } from "./metadata/types";
+export type { IReflector } from "./reflector/reflector";
 export type {
 	DecoratedClass,
-	DecoratedConstructorParameter,
+	DecoratedClassList,
+	DecoratedClassUnique,
 	DecoratedItem,
 	DecoratedKind,
 	DecoratedMethod,
-	DecoratedMethodParameter,
-	DecoratedMethodSingle,
-	DecoratedParameter,
+	DecoratedMethodList,
+	DecoratedMethodUnique,
 	DecoratedProperty,
-	DecoratedPropertySingle,
-	ScopedReflector,
+	DecoratedPropertyList,
+	DecoratedPropertyUnique,
+	IScopedReflector,
 } from "./reflector/types";
